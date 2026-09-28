@@ -23,20 +23,23 @@
 
 ### Phase 1: ExecutionContext progress ping
 
-- [ ] **1.1** Add optional `executionId?: string | null` to `ExecutionContext` constructor opts; store it and expose a readonly `get executionId(): string | null`
+- [x] **1.1** Add optional `executionId?: string | null` to `ExecutionContext` constructor opts; store it and expose a readonly `get executionId(): string | null`
     — **Why:** the ping must carry the run-scoped `execution_id` the engine validates against its pending async set (engine #495); `run()` already mints one (`randomUUID()`, base-node.ts:533) but never hands it to the context
     — **Done when:** `npm run typecheck` green; all existing context tests green
     — **Consumers affected:** `base-node.ts` `run()` (Phase 2.2), `sendProgressPing` (1.2)
+    — **Done:** executionId ctor opt + getter added (context.ts); typecheck green; 18/18 context tests; files: typescript/src/context.ts; fixes: none
 
-- [ ] **1.2** Add private `sendProgressPing(percent?: number, message?: string): void` on `ExecutionContext`: no-op unless `this._request?.callback_url` AND `this._executionId` are set; clamp `percent` to [0,100]; truncate `message` to 1000 chars (engine payload cap, #495 "size-capped payloads"); fire-and-forget `fetch(`${callback_url}/progress`, {method:"POST", headers, body: JSON, signal: AbortSignal.timeout(5000)})` with `.catch(err => this._logger.warn(...))` — never throws, never leaves an unhandled rejection
+- [x] **1.2** Add private `sendProgressPing(percent?: number, message?: string): void` on `ExecutionContext`: no-op unless `this._request?.callback_url` AND `this._executionId` are set; clamp `percent` to [0,100]; truncate `message` to 1000 chars (engine payload cap, #495 "size-capped payloads"); fire-and-forget `fetch(`${callback_url}/progress`, {method:"POST", headers, body: JSON, signal: AbortSignal.timeout(5000)})` with `.catch(err => this._logger.warn(...))` — never throws, never leaves an unhandled rejection
     — **Why:** single POST seam shared by both public surfaces; the progress route is derived from the completion `callback_url` (`{engine}/callbacks/{run_id}/{node_id}` + `/progress` per engine #495) — no new env config
     — **Done when:** unit tests prove (a) no-op without callback_url, (b) no-op without execution_id, (c) happy-path POST URL/body/headers, (d) transport error swallowed + logged
     — **Consumers affected:** `reportProgress` (1.3), `BaseNode.reportProgress` (2.3)
+    — **Done:** `_sendProgressPing` implemented with no-op guards, clamp, 1000-char cap, AbortSignal.timeout(5000), `.catch`→warn; tests (a)–(d) + message-omission + cap/clamp tests all green; files: typescript/src/context.ts, typescript/tests/context.test.ts; fixes: logger stub missing info() in swallow test
 
-- [ ] **1.3** Upgrade `reportProgress(progress, message)` (context.ts:125): keep the existing log line, then delegate `this._sendProgressPing(Math.round(progress * 100), message)` — the docstring's promised evolution ("Currently logs progress. Future: will send to callback")
+- [x] **1.3** Upgrade `reportProgress(progress, message)` (context.ts:125): keep the existing log line, then delegate `this._sendProgressPing(Math.round(progress * 100), message)` — the docstring's promised evolution ("Currently logs progress. Future: will send to callback")
     — **Why:** context-level progress is the pre-existing public API; wiring it to the ping gives file-download progress (base-node.ts:487,505) and node-level `context.reportProgress` calls engine visibility with zero caller changes
     — **Done when:** existing context tests still green (log behavior unchanged); ping tests from 1.2 cover the POST side
     — **Consumers affected:** internal file-download progress; node code calling `context.reportProgress` — behavior identical when no callback_url (local dev)
+    — **Done:** reportProgress now logs then pings; pre-existing tests ("reportProgress does not throw") still green; files: typescript/src/context.ts; fixes: none
 
 ### Phase 2: BaseNode ambient-context helper
 
