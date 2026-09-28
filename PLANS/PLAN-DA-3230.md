@@ -49,15 +49,17 @@
 
 ### Phase 2: BaseNode ambient-context helper
 
-- [ ] **2.2** In `BaseNode.run()`: pass `execution_id=execution_id` to `ExecutionContext`, then `token = execution_context_var.set(context)` after construction and `execution_context_var.reset(token)` in a `finally` covering the rest of the success path through response construction
+- [x] **2.2** In `BaseNode.run()`: pass `execution_id=execution_id` to `ExecutionContext`, then `token = execution_context_var.set(context)` after construction and `execution_context_var.reset(token)` in a `finally` covering the rest of the success path through response construction
     — **Why:** makes the per-run context visible to node code while `execute()` runs — in the handler thread and inside `asyncio.to_thread` workers — with guaranteed cleanup even on exceptions (Token reset); no signature change
     — **Done when:** all existing base/app/deprecation tests green (set/reset is behavior-transparent)
     — **Consumers affected:** every node subclass — zero signature/behavior change
+    — **Done:** run() passes execution_id, sets the ContextVar, resets via finally; full base suite green incl. error-path reset test; files: python/canvastekk_workflow_sdk/base.py; fixes: none
 
-- [ ] **2.3** Add `BaseNode.report_progress(self, percent: float | None = None, message: str = "") -> None`: read `execution_context_var.get()`; `None` → immediate no-op return; present → delegate to the context's progress ping with `percent if percent is not None else 0`
+- [x] **2.3** Add `BaseNode.report_progress(self, percent: float | None = None, message: str = "") -> None`: read `execution_context_var.get()`; `None` → immediate no-op return; present → delegate to the context's progress ping with `percent if percent is not None else 0`
     — **Why:** the ticket-named one-liner surface (exact snake_case name — Python convention matches the ticket): `self.report_progress(50, "still calculating")` inside `execute()` with nothing else to wire; node-app chokepoints (`load_context`, `ErrorOutputNode.run` delegation, `to_node_output` callers) reach it through the unchanged `execute(inputs, context)` seam
     — **Done when:** unit tests prove (a) calling outside a run is a silent no-op, (b) calling inside `execute()` pings with the run's `execution_id`, (c) two concurrent `run()`s in separate threads each ping their own `execution_id`
     — **Consumers affected:** node authors — new additive API
+    — **Done:** BaseNode.report_progress added with full docstring (chokepoint adoption note); tests (a)–(c) + error-path ContextVar reset green; files: python/canvastekk_workflow_sdk/base.py, python/tests/test_base.py; fixes: none
 
 ### Phase 3: exit gate
 
@@ -91,3 +93,4 @@
 ## Trace
 
 <!-- gate memo lines appended during execution -->
+- GATE f080ec4 tier=light lint=t typecheck=- build=- unit=t e2e=n.a note="Phase 1 (+2.1): context ping — ruff scoped + pytest test_context 28/28"

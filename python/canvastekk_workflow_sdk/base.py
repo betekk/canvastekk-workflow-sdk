@@ -29,7 +29,7 @@ from canvastekk_workflow_sdk._url import (
     UrlPolicyError,
     validate_external_url,
 )
-from canvastekk_workflow_sdk.context import ExecutionContext
+from canvastekk_workflow_sdk.context import ExecutionContext, execution_context_var
 from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 from canvastekk_workflow_sdk.exceptions import (
     NodeConfigurationError,
@@ -445,6 +445,37 @@ class BaseNode(ABC):
             replacement,
         )
 
+    def report_progress(self, percent: float | None = None, message: str = "") -> None:
+        """
+        Report mid-run progress to the workflow engine (DA-3230).
+
+        Fire-and-forget POST to the engine's progress route
+        (``{callback_url}/progress``, engine #495) carrying this run's
+        ``execution_id``. Best-effort — transport failures are swallowed
+        and logged, never raised into node logic (same philosophy as
+        DA-2887 telemetry). Safe no-op outside a workflow run (local dev)
+        or when the request carries no callback URL: nothing is sent,
+        nothing raises.
+
+        Call from inside ``execute()``::
+
+            self.report_progress(50, "still calculating")
+
+        Node-app shared chokepoints (``load_context``, ``ErrorOutputNode``
+        subclasses, ``to_node_output`` callers) reach this through the
+        unchanged ``execute(inputs, context)`` seam — no per-node wiring
+        needed beyond the SDK bump.
+
+        Args:
+            percent: Progress percentage 0–100 (clamped). ``None`` sends a
+                liveness-only ping (percent 0).
+            message: Optional human-readable status; capped at 1000 chars.
+        """
+        ctx = execution_context_var.get()
+        if ctx is None:
+            return
+        ctx.report_progress((percent if percent is not None else 0) / 100, message)
+
     def run(self, request: NodeExecutionRequest) -> NodeExecutionResponse:
         """
         Run the node with full error handling, validation, and timing.
@@ -473,44 +504,56 @@ class BaseNode(ABC):
 
             self._validate_inputs(request.inputs)
 
-            context = ExecutionContext(request, cancel_event=getattr(self, "_cancel_event", None))
+            context = ExecutionContext(
+                request,
+                cancel_event=getattr(self, "_cancel_event", None),
+                execution_id=execution_id,
+            )
 
-            inputs = dict(request.inputs)
+            # Ambient context for BaseNode.report_progress() during this run
+            # (DA-3230) — visible in this thread and inside asyncio.to_thread
+            # workers; the Token reset guarantees no leakage across reused
+            # executor threads even when execute() raises.
+            token = execution_context_var.set(context)
+            try:
+                inputs = dict(request.inputs)
 
-            if self.definition.has_file_inputs:
-                inputs = self._prepare_file_inputs(inputs, context)
+                if self.definition.has_file_inputs:
+                    inputs = self._prepare_file_inputs(inputs, context)
 
-            for mw in self._middleware:
-                inputs = mw.on_before_execute(inputs, context)
+                for mw in self._middleware:
+                    inputs = mw.on_before_execute(inputs, context)
 
-            outputs = self.execute(inputs, context)
+                outputs = self.execute(inputs, context)
 
-            self._validate_outputs(outputs)
+                self._validate_outputs(outputs)
 
-            duration_ms = int((time.perf_counter() - start_time) * 1000)
+                duration_ms = int((time.perf_counter() - start_time) * 1000)
 
-            for mw in self._middleware:
-                mw.on_after_execute(inputs, outputs, context, duration_ms)
+                for mw in self._middleware:
+                    mw.on_after_execute(inputs, outputs, context, duration_ms)
 
-            token_usage = context.token_usage.get("total_tokens") or self.definition.token_cost
+                token_usage = context.token_usage.get("total_tokens") or self.definition.token_cost
 
-            self._metrics_collector.record(
-                ExecutionMetric(
-                    run_id=context.run_id,
-                    node_id=context.node_id,
-                    node_name=self.definition.slug,
-                    status="pass",
+                self._metrics_collector.record(
+                    ExecutionMetric(
+                        run_id=context.run_id,
+                        node_id=context.node_id,
+                        node_name=self.definition.slug,
+                        status="pass",
+                        duration_ms=duration_ms,
+                        token_usage=token_usage,
+                    )
+                )
+
+                return NodeExecutionResponse.success(
+                    execution_id=execution_id,
+                    outputs=outputs,
                     duration_ms=duration_ms,
                     token_usage=token_usage,
                 )
-            )
-
-            return NodeExecutionResponse.success(
-                execution_id=execution_id,
-                outputs=outputs,
-                duration_ms=duration_ms,
-                token_usage=token_usage,
-            )
+            finally:
+                execution_context_var.reset(token)
 
         except NodeTimeoutError as e:
             duration_ms = int((time.perf_counter() - start_time) * 1000)
