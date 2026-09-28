@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.32.0] - 2026-09-28
+
+### Features
+
+- **sdk-ts**: BaseNode.reportProgress mid-run progress pings (DA-3232) (#83)
+
+
 ## [0.31.3] - 2026-09-28
 
 ### Miscellaneous Tasks
 
 - **docs**: Remove AGENTS.md
+- **release**: Prepare v0.31.3
 
 
 ## [0.31.2] - 2026-09-28
