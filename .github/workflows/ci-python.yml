@@ -81,7 +81,7 @@ jobs:
   # (evidence: PR #82 first runs, 2026-09-28). Override at job scope.
     defaults:
       run:
-        working-directory: .
+        working-directory: ${{ github.workspace }}
 
   lint-and-test:
     needs: [pick-runner]
@@ -183,18 +183,19 @@ jobs:
       - name: Generate schema (base)
         if: steps.filter.outputs.schema_files == 'true'
         working-directory: base/python
-        run: python -m poetry run python scripts/check_schema_stability.py dump > /tmp/schema-base.json
+        # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes make fixed paths cross-run collision points
+        run: python -m poetry run python scripts/check_schema_stability.py dump > "$RUNNER_TEMP/schema-base.json"
 
       - name: Generate schema (PR)
         if: steps.filter.outputs.schema_files == 'true'
         working-directory: pr/python
-        run: python -m poetry run python scripts/check_schema_stability.py dump > /tmp/schema-pr.json
+        run: python -m poetry run python scripts/check_schema_stability.py dump > "$RUNNER_TEMP/schema-pr.json"
 
       - name: Diff and classify
         id: diff
         if: steps.filter.outputs.schema_files == 'true'
         working-directory: pr/python
-        run: python3 scripts/check_schema_stability.py diff /tmp/schema-base.json /tmp/schema-pr.json
+        run: python3 scripts/check_schema_stability.py diff "$RUNNER_TEMP/schema-base.json" "$RUNNER_TEMP/schema-pr.json"
 
       - name: Enforce 'major' label requirement
         if: steps.filter.outputs.schema_files == 'true' && steps.diff.outputs.breaking == 'true'

@@ -79,7 +79,7 @@ jobs:
   # (evidence: PR #82 first runs, 2026-09-28). Override at job scope.
     defaults:
       run:
-        working-directory: .
+        working-directory: ${{ github.workspace }}
 
   typecheck-test-build:
     needs: [pick-runner]

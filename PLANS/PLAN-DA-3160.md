@@ -41,9 +41,16 @@ Parent workstream A (creds seeding) lives in canvastekk-devops PR #413 → PLAN-
 
 ### Phase 3 — evidence (sequencing-gated)
 
-- [ ] **3.1** PR run (pull_request, same-repo → repo secrets visible) = the evidence: mint works
-  post-seeding, workers land on pool runners. PR creation deliberately AWAITS workstream A's
-  apply (repo-level creds must exist when the pick gate mints).
+- [x] **3.1** PR run (pull_request, same-repo → repo secrets visible) = the evidence.
+  PR creation awaited workstream A's apply (repo-level creds must exist when the pick gate
+  mints). First runs CAUGHT a real conversion precondition: workflow-level
+  `defaults.run.working-directory` (python/ typescript/) applies to the no-checkout gate →
+  bash cannot start (runs 36383949006/49068) → job-scoped cwd override on pick-runner
+  (block untouched) → **runs 36384080118/80223 ALL GREEN, fully pool-routed**:
+  lint-and-test (3.12) → topc-ubuntu1-r8 39s, (3.13) → tuf-ubuntu1-r5 1m05s,
+  schema-stability → topc-r2 11s, skill-mirrors → tuf-r4 11s, typecheck-test-build →
+  tuf-r8 36s. Post-fix: org runner groups' `allows_public_repositories` flipped true
+  (public repo could not see the pool — jobs queued on idle runners for ~70 min).
 
 ### Phase 4 — review + PR + merge + JIRA
 
@@ -55,6 +62,16 @@ Parent workstream A (creds seeding) lives in canvastekk-devops PR #413 → PLAN-
 ## Gate Trace
 
 _(appended per phase; final `GATE <short-sha> tier=full` line is the 4.2 citation)_
+
+- Code review (code-review-subagent, 2026-09-28, round 1): **APPROVE** — 0 Critical /
+  1 Major-WARN / 4 Minors. WARN applied pre-merge (routing-activated hazard, DA-3164
+  precedent): fixed `/tmp` paths in schema-stability + release → `$RUNNER_TEMP` (cross-run
+  collisions on persistent pool boxes). Minors applied: override form aligned to
+  `${{ github.workspace }}`, PLAN 3.1 ticked + token attribution fixed, nodes-dispatch watch
+  scheduled (first post-merge Release run, PLAN 4.2). LEARNINGS ×2 (fixed-tmp anti-pattern;
+  pick-gate cwd-override solution). Requirements gap accepted: Release path (push-to-main)
+  merges on PR evidence; the first post-merge Release run is watched end-to-end as second
+  evidence.
 
 - Workstream A (seeding) RESOLVED: devops PR #413 merged `6d0078b9`; first apply failed —
   **409 Already exists**: repo-level `GH_APP_ID`/`GH_APP_PRIVATE_KEY` pre-existed as MANUAL

@@ -149,11 +149,13 @@ jobs:
           NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
         run: |
           CURRENT_NOTES=$(awk "/^## \[${NEW_VERSION#v}\]/,/^## \[/ { print }" CHANGELOG.md | head -n -1)
-          echo "$CURRENT_NOTES" > /tmp/release-notes.md
+          # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          echo "$CURRENT_NOTES" > "$NOTES_FILE"
 
           gh release create "${NEW_VERSION}" \
             --title "${NEW_VERSION}" \
-            --notes-file /tmp/release-notes.md
+            --notes-file "$NOTES_FILE"
 
       - name: Build and upload Python SDK to GitHub Release
         if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
@@ -201,11 +203,13 @@ jobs:
         if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         working-directory: python
         run: |
-          python3 -m venv /tmp/pre-publish-venv
+          # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
+          VENV="$RUNNER_TEMP/pre-publish-venv"
+          python3 -m venv "$VENV"
           WHEEL_FILE=$(ls dist/*.whl)
-          /tmp/pre-publish-venv/bin/pip install "${WHEEL_FILE}"
+          "$VENV/bin/pip" install "${WHEEL_FILE}"
 
-          /tmp/pre-publish-venv/bin/python -c "
+          "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
               RetryConfig, BaseNode, ExecutionContext,
@@ -241,13 +245,15 @@ jobs:
           VERSION_NUM="${NEW_VERSION#v}"
 
           # Create clean virtualenv
-          python3 -m venv /tmp/verify-venv
+          # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
+          VENV="$RUNNER_TEMP/verify-venv"
+          python3 -m venv "$VENV"
 
           # Install from GitHub Packages with auth + retry for propagation latency
           INDEX_URL="https://nus-cee:${GITHUB_TOKEN}@pypi.pkg.github.com/nus-cee/"
           INSTALL_SUCCESS=false
           for i in 1 2 3; do
-            if /tmp/verify-venv/bin/pip install \
+            if "$VENV/bin/pip" install \
               "canvastekk-workflow-sdk==${VERSION_NUM}" \
               --index-url "${INDEX_URL}"; then
               INSTALL_SUCCESS=true
@@ -262,7 +268,7 @@ jobs:
           fi
 
           # Verify all canonical names import correctly from published wheel
-          /tmp/verify-venv/bin/python -c "
+          "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
               RetryConfig, BaseNode, ExecutionContext,
