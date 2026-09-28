@@ -97,3 +97,4 @@
 - GATE f080ec4 tier=light lint=t typecheck=- build=- unit=t e2e=n.a note="Phase 1 (+2.1): context ping — ruff scoped + pytest test_context 28/28"
 - GATE f562108 tier=light lint=t typecheck=- build=- unit=t e2e=n.a note="Phase 2: BaseNode.report_progress + contextvars — ruff scoped + pytest base/context 67/67"
 - GATE f1ee9d5 tier=full lint=t typecheck=- build=- unit=t(767/767) e2e=n.a note="Phase 3 exit gate: green first try, no fixes; ACs ticked"
+- GATE 4c99e25 tier=full lint=t typecheck=- build=- unit=t(767/767) e2e=n.a note="post-review re-gate: noqa cleanup + memo-sha correction + LEARNINGS; final pushed SHA carries this memo"
