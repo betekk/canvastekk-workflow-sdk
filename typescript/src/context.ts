@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { NodeExecutionRequest } from "./request.js";
 import { getNodeLogger, type SdkLogger } from "./logging.js";
 
@@ -8,6 +9,17 @@ const PROGRESS_MESSAGE_MAX_CHARS = 1000;
 
 /** Per-ping timeout — a slow or hung engine must not leak sockets (DA-3232). */
 const PROGRESS_PING_TIMEOUT_MS = 5000;
+
+/**
+ * Ambient per-run execution context (DA-3232).
+ *
+ * `BaseNode.run()` enters the run's `ExecutionContext` for the duration of
+ * execution (including awaited continuations), so `BaseNode.reportProgress()`
+ * can resolve the current run without threading the context through node
+ * signatures. Async-local storage keeps concurrent runs of one shared node
+ * instance isolated — instance-held state would cross-run race.
+ */
+export const executionContextStorage = new AsyncLocalStorage<ExecutionContext>();
 
 /**
  * Context provided to node execute() method.

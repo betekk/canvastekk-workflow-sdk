@@ -379,3 +379,111 @@ describe("download policy (Phase 1)", () => {
     expect((resp.outputs.got as string).endsWith("point_cloud_named.ply")).toBe(true);
   });
 });
+
+class ProgressNode extends BaseNode {
+  definition: WorkflowNodeManifest = {
+    slug: "progress-node",
+    version: "1.0.0",
+    name: "Progress",
+    description: "Reports progress mid-run",
+    input_schema: { type: "object" },
+    output_schema: {
+      type: "object",
+      properties: { done: { type: "boolean" } },
+      required: ["done"],
+    },
+  };
+
+  execute(_inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+    this.reportProgress(50, "still calculating");
+    return { done: true };
+  }
+}
+
+class SlowProgressNode extends ProgressNode {
+  override definition: WorkflowNodeManifest = {
+    ...new ProgressNode().definition,
+    slug: "slow-progress-node",
+  };
+
+  override async execute(
+    _inputs: Record<string, unknown>,
+    _context: ExecutionContext,
+  ): Promise<Record<string, unknown>> {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    this.reportProgress(75, "nearly there");
+    return { done: true };
+  }
+}
+
+describe("BaseNode.reportProgress (DA-3232)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is a safe no-op outside a run — no fetch, no throw", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(() => new ProgressNode().reportProgress(50, "orphan")).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("POSTs the run's execution_id from inside execute()", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchSpy);
+    const resp = await new ProgressNode().run({
+      run_id: "r-prog",
+      node_id: "n-prog",
+      inputs: {},
+      callback_url: "http://engine/callbacks/r-prog/n-prog",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(resp.status).toBe("pass");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://engine/callbacks/r-prog/n-prog/progress");
+    expect(JSON.parse(init.body as string)).toEqual({
+      execution_id: resp.execution_id,
+      percent: 50,
+      message: "still calculating",
+    });
+  });
+
+  it("interleaved runs each ping their own execution_id", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchSpy);
+    const node = new SlowProgressNode();
+    const [respA, respB] = await Promise.all([
+      node.run({
+        run_id: "ra",
+        node_id: "na",
+        inputs: {},
+        callback_url: "http://engine/callbacks/ra/na",
+      }),
+      node.run({
+        run_id: "rb",
+        node_id: "nb",
+        inputs: {},
+        callback_url: "http://engine/callbacks/rb/nb",
+      }),
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const byUrl = new Map<string, Record<string, unknown>>();
+    for (const [url, init] of fetchSpy.mock.calls as [string, RequestInit][]) {
+      byUrl.set(url, JSON.parse(init.body as string));
+    }
+    expect(byUrl.get("http://engine/callbacks/ra/na/progress")).toEqual({
+      execution_id: respA.execution_id,
+      percent: 75,
+      message: "nearly there",
+    });
+    expect(byUrl.get("http://engine/callbacks/rb/nb/progress")).toEqual({
+      execution_id: respB.execution_id,
+      percent: 75,
+      message: "nearly there",
+    });
+    expect(respA.execution_id).not.toBe(respB.execution_id);
+  });
+});

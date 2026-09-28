@@ -43,20 +43,23 @@
 
 ### Phase 2: BaseNode ambient-context helper
 
-- [ ] **2.1** Export `executionContextStorage = new AsyncLocalStorage<ExecutionContext>()` from `context.ts` (import from `node:async_hooks`)
+- [x] **2.1** Export `executionContextStorage = new AsyncLocalStorage<ExecutionContext>()` from `context.ts` (import from `node:async_hooks`)
     — **Why:** concurrency-safe resolution of "the current run" for a stateless node method — one node instance serves overlapping HTTP requests, so instance-held context would cross-run-race; `AsyncLocalStorage` is the native Node platform mechanism
     — **Done when:** exported; `npm run typecheck` green
     — **Consumers affected:** `base-node.ts` `run()` (2.2) and `reportProgress` (2.3); no other importers
+    — **Done:** storage exported with rationale docstring (context.ts); typecheck green; files: typescript/src/context.ts; fixes: none
 
-- [ ] **2.2** In `BaseNode.run()`: pass `executionId` into the `ExecutionContext` ctor, and wrap the post-context try-body (context creation through response construction) in `executionContextStorage.run(context, async () => {...})`
+- [x] **2.2** In `BaseNode.run()`: pass `executionId` into the `ExecutionContext` ctor, and wrap the post-context try-body (context creation through response construction) in `executionContextStorage.run(context, async () => {...})`
     — **Why:** makes the per-run context visible to node code while `execute()` runs, including awaited continuations, without any signature change
     — **Done when:** all existing base-node/app/deprecation tests green (wrap is behavior-transparent)
     — **Consumers affected:** every node subclass — zero signature/behavior change
+    — **Done:** run() passes executionId + wraps try-body via storage.run; full base-node suite green; files: typescript/src/base-node.ts; fixes: none
 
-- [ ] **2.3** Add `reportProgress(percent?: number, message?: string): void` on `BaseNode`: read `executionContextStorage.getStore()`; absent → immediate no-op return; present → `ctx` delegates to its progress ping (1.2). JSDoc notes the ticket/engine-issue name `report_progress` is the cross-leg spec name; this leg uses camelCase per house convention (matches existing `context.reportProgress`)
+- [x] **2.3** Add `reportProgress(percent?: number, message?: string): void` on `BaseNode`: read `executionContextStorage.getStore()`; absent → immediate no-op return; present → `ctx` delegates to its progress ping (1.2). JSDoc notes the ticket/engine-issue name `report_progress` is the cross-leg spec name; this leg uses camelCase per house convention (matches existing `context.reportProgress`)
     — **Why:** the ticket-named one-liner surface: `this.reportProgress(50, "still calculating")` inside `execute()` with nothing else to wire
     — **Done when:** unit tests prove (a) calling outside a run is a silent no-op, (b) calling inside `execute()` POSTs with the run's `execution_id`, (c) two interleaved `run()`s each ping their own execution_id
     — **Consumers affected:** node authors — new additive API
+    — **Done:** BaseNode.reportProgress added with full JSDoc (ticket-name mapping, no-op semantics); tests (a)–(c) green incl. interleaved-runs isolation; files: typescript/src/base-node.ts, typescript/tests/base-node.test.ts; fixes: eslint unused-args underscore rename
 
 ### Phase 3: exit gate
 
@@ -88,3 +91,4 @@
 ## Trace
 
 <!-- gate memo lines appended during execution -->
+- GATE 069fc55 tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 1: context ping — eslint scoped + tsc + context.test.ts 18/18"
