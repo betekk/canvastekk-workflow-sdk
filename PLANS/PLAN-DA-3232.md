@@ -95,3 +95,4 @@
 - GATE 069fc55 tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 1: context ping — eslint scoped + tsc + context.test.ts 18/18"
 - GATE 8ef3f8d tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 2: BaseNode.reportProgress + ALS — eslint scoped + tsc + base-node/context 37/37"
 - GATE 9c6c2b2 tier=full lint=t typecheck=t build=t unit=t(337/337) e2e=n.a note="Phase 3 exit gate: fix node:async_hooks→async_hooks (rollup-dts externals gap); ACs ticked"
+- GATE 67155fd tier=full lint=t typecheck=t build=t unit=t(338/338) e2e=n.a note="post-review re-gate: 2 minor fixes (trailing-slash URL normalize + trust-boundary doc), +1 test, 2 LEARNINGS; final pushed SHA carries this memo"
