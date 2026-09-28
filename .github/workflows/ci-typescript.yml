@@ -73,6 +73,14 @@ jobs:
             echo 'labels=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
           fi
 
+  # DA-3160: workflow-level defaults.run.working-directory (<lang>/) applies to
+  # every run step INCLUDING this gate — but pick-runner has no checkout, so
+  # that directory does not exist at gate time and bash cannot start
+  # (evidence: PR #82 first runs, 2026-09-28). Override at job scope.
+    defaults:
+      run:
+        working-directory: .
+
   typecheck-test-build:
     needs: [pick-runner]
     runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
