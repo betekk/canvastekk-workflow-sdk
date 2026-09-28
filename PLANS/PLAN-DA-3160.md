@@ -83,3 +83,4 @@ _(appended per phase; final `GATE <short-sha> tier=full` line is the 4.2 citatio
 - Phases 1–2 gate tier=full: 3/3 parse, 3/3 fidelity md5 bc1c3a4d, 5 workers routed,
   matrices preserved (py 3.12+3.13, node 24), triggers/paths/defaults byte-preserved.
   WORK LOG fix attempts: 0 (conversion) / 1 (workstream A manual-credential conflict).
+- GATE bd88c52->review-fixed tier=full lint=t(3/3 parse, fidelity-md5 bc1c3a4d, 5 routed, matrices preserved, /tmp residue 0) typecheck=- build=- unit=n.a e2e=t(PR runs 36398540991/36398541010 all green pool-routed; post-merge Release 36398727558 green on topc-ubuntu1-r8) — exit gate; workstream A: devops PR #413 merged 6d0078b9, apply 36380063155
