@@ -36,3 +36,7 @@ threading is the escape hatch there.
   (`reportProgress`, wrapped `run()`)
 - `typescript/tests/base-node.test.ts` "interleaved runs each ping their own
   execution_id" pins cross-run isolation
+- Python leg shipped the mirror (DA-3230, PR pending at write time):
+  `python/canvastekk_workflow_sdk/context.py` (`execution_context_var` +
+  Token reset in `base.py::run`) with the same interleaved-threads test in
+  `python/tests/test_base.py`

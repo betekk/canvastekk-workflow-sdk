@@ -1,10 +1,13 @@
 """Tests for BaseNode class."""
 
+import threading
 from typing import Any
 
 import pytest
 
 from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
+from canvastekk_workflow_sdk import context as context_module
+from canvastekk_workflow_sdk.context import execution_context_var
 from canvastekk_workflow_sdk.exceptions import (
     NodeIOError,
     NodeOutputValidationError,
@@ -751,3 +754,124 @@ class TestLifecycleHooks:
             assert node.shutdown_count == 1
 
         assert node.shutdown_count == 2
+
+
+class ProgressNode(BaseNode):
+    """Node that reports progress mid-run (DA-3230)."""
+
+    definition = WorkflowNodeManifest(
+        slug="progress-node",
+        version="1.0.0",
+        name="Progress",
+        description="Reports progress mid-run",
+        input_schema={"type": "object"},
+        output_schema={
+            "type": "object",
+            "properties": {"done": {"type": "boolean"}},
+        },
+    )
+
+    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        self.report_progress(50, "still calculating")
+        return {"done": True}
+
+
+class SlowProgressNode(ProgressNode):
+    """Progress node whose execute sleeps briefly so runs can overlap."""
+
+    definition = WorkflowNodeManifest(
+        slug="slow-progress-node",
+        version="1.0.0",
+        name="SlowProgress",
+        description="Reports progress after a short delay",
+        input_schema={"type": "object"},
+        output_schema={
+            "type": "object",
+            "properties": {"done": {"type": "boolean"}},
+        },
+    )
+
+    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        import time
+
+        time.sleep(0.02)
+        self.report_progress(75, "nearly there")
+        return {"done": True}
+
+
+class TestBaseNodeReportProgress:
+    """DA-3230: BaseNode.report_progress ambient-context behavior."""
+
+    def test_noop_outside_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
+        node = ProgressNode()
+        node.report_progress(50, "orphan")  # must not raise or send
+        assert calls == []
+
+    def test_sends_run_execution_id_inside_execute(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
+        node = ProgressNode()
+        resp = node.run(
+            NodeExecutionRequest(
+                run_id="r-prog",
+                node_id="n-prog",
+                inputs={},
+                callback_url="http://engine/callbacks/r-prog/n-prog",
+            )
+        )
+        assert resp.status == "pass"
+        assert calls == [
+            (
+                "http://engine/callbacks/r-prog/n-prog/progress",
+                {"execution_id": resp.execution_id, "percent": 50, "message": "still calculating"},
+            )
+        ]
+
+    def test_interleaved_runs_ping_own_execution_ids(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
+        node = SlowProgressNode()
+        results: dict[str, Any] = {}
+
+        def _run_a() -> None:
+            results["a"] = node.run(
+                NodeExecutionRequest(
+                    run_id="ra", node_id="na", inputs={}, callback_url="http://engine/cb/ra"
+                )
+            )
+
+        def _run_b() -> None:
+            results["b"] = node.run(
+                NodeExecutionRequest(
+                    run_id="rb", node_id="nb", inputs={}, callback_url="http://engine/cb/rb"
+                )
+            )
+
+        ta = threading.Thread(target=_run_a)
+        tb = threading.Thread(target=_run_b)
+        ta.start()
+        tb.start()
+        ta.join()
+        tb.join()
+
+        by_url = {url: payload for url, payload in calls}
+        assert by_url["http://engine/cb/ra/progress"]["execution_id"] == results["a"].execution_id
+        assert by_url["http://engine/cb/rb/progress"]["execution_id"] == results["b"].execution_id
+        assert results["a"].execution_id != results["b"].execution_id
+
+    def test_error_path_resets_context_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: None)
+        node = FailingNode()
+        resp = node.run(
+            NodeExecutionRequest(
+                run_id="r-err", node_id="n-err", inputs={}, callback_url="http://engine/cb"
+            )
+        )
+        assert resp.status == "fail"
+        assert execution_context_var.get() is None

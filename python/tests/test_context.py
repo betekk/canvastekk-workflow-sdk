@@ -1,11 +1,14 @@
 """Tests for ExecutionContext."""
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import pytest
 
 from canvastekk_workflow_sdk import NodeExecutionRequest
+from canvastekk_workflow_sdk import context as context_module
 from canvastekk_workflow_sdk.context import ExecutionContext
 
 
@@ -142,3 +145,101 @@ class TestAccountIdProperty:
 
     def test_none_without_request(self) -> None:
         assert ExecutionContext(run_id="r1", node_id="n1").account_id is None
+
+
+class TestProgressPing:
+    """DA-3230: fire-and-forget progress ping to {callback_url}/progress."""
+
+    @staticmethod
+    def _recorder(calls: list[tuple[str, dict]]) -> Callable[[str, dict], None]:
+        def fake_deliver(url: str, payload: dict) -> None:
+            calls.append((url, payload))
+
+        return fake_deliver
+
+    def test_execution_id_default_and_explicit(self) -> None:
+        assert ExecutionContext(run_id="r", node_id="n").execution_id is None
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={})
+        assert ExecutionContext(req, execution_id="exec-1").execution_id == "exec-1"
+
+    def test_noop_without_callback_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={})
+        ctx = ExecutionContext(req, execution_id="exec-1")
+        ctx.report_progress(0.5, "halfway")
+        assert calls == []
+
+    def test_noop_without_execution_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(
+            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
+        )
+        ctx = ExecutionContext(req)
+        ctx.report_progress(0.5)
+        assert calls == []
+
+    def test_happy_path_posts_execution_id_percent_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(
+            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
+        )
+        ctx = ExecutionContext(req, execution_id="exec-42")
+        ctx.report_progress(0.5, "halfway")
+        assert calls == [
+            (
+                "http://engine/cb/progress",
+                {"execution_id": "exec-42", "percent": 50, "message": "halfway"},
+            )
+        ]
+
+    def test_message_key_omitted_when_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(
+            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
+        )
+        ctx = ExecutionContext(req, execution_id="exec-43")
+        ctx.report_progress(0.25)
+        assert calls == [("http://engine/cb/progress", {"execution_id": "exec-43", "percent": 25})]
+
+    def test_percent_clamped_and_message_truncated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(
+            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
+        )
+        ctx = ExecutionContext(req, execution_id="exec-44")
+        ctx.report_progress(1.5, "x" * 1500)
+        assert len(calls) == 1
+        url, payload = calls[0]
+        assert url == "http://engine/cb/progress"
+        assert payload["percent"] == 100
+        assert len(payload["message"]) == 1000
+
+    def test_trailing_slash_normalized(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
+        req = NodeExecutionRequest(
+            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb/"
+        )
+        ctx = ExecutionContext(req, execution_id="exec-46")
+        ctx.report_progress(1.0)
+        assert calls[0][0] == "http://engine/cb/progress"
+
+    def test_deliver_swallows_httpx_errors(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        def boom(url: str, **kwargs: object) -> None:
+            raise ConnectionError("engine unreachable")
+
+        monkeypatch.setattr(httpx, "post", boom)
+        with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.context"):
+            context_module._deliver_progress_ping("http://engine/cb/progress", {"percent": 1})
+        assert any("Progress ping failed" in rec.message for rec in caplog.records)

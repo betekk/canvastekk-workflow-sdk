@@ -3,6 +3,7 @@
 ## solutions
 - [verify-reindent-with-git-diff-w](solutions/verify-reindent-with-git-diff-w.md) — collapse reindent-heavy diffs to the semantic delta before reviewing
 - [tsup-dts-node-prefix-builtin-import-fails](solutions/tsup-dts-node-prefix-builtin-import-fails.md) — dts pass rejects `node:async_hooks` named imports while `node:fs` works; use the bare builtin name
+- [gate-memo-sha-amend-orphan](solutions/gate-memo-sha-amend-orphan.md) — never amend the commit carrying its own GATE memo sha; cite the real ancestor and fold the memo forward
 
 ## patterns
 - [finally-side-defensive-helper](patterns/finally-side-defensive-helper.md) — finally-called helpers must be exception-proof by construction
