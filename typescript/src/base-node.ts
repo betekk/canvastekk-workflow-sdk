@@ -14,7 +14,7 @@ import {
   UrlPolicyError,
   validateExternalUrl,
 } from "./url-policy.js";
-import { ExecutionContext } from "./context.js";
+import { ExecutionContext, executionContextStorage } from "./context.js";
 import type { NodeMiddleware } from "./middleware.js";
 import { LoggingMiddleware } from "./middleware.js";
 import { MetricsCollector, createExecutionMetric } from "./observability.js";
@@ -529,6 +529,36 @@ export abstract class BaseNode {
     this._cancelSignal = signal;
   }
 
+  /**
+   * Reports mid-run progress to the workflow engine (DA-3232).
+   *
+   * Fire-and-forget POST to the engine's progress route
+   * (`{callback_url}/progress`, engine #495) carrying this run's
+   * `execution_id`. Best-effort — transport failures are swallowed and
+   * logged, never thrown into node logic (same philosophy as DA-2887
+   * telemetry). Safe no-op outside a workflow run (local dev) or when the
+   * request carries no callback URL: nothing is sent, nothing raises.
+   *
+   * Call from inside `execute()`:
+   *
+   * ```ts
+   * this.reportProgress(50, "still calculating");
+   * ```
+   *
+   * Note: the ticket/engine spec names this helper `report_progress`;
+   * this TypeScript leg uses camelCase per house convention, matching the
+   * existing `ExecutionContext.reportProgress`. The percent is 0–100 (the
+   * context-level method takes 0–1).
+   *
+   * @param percent - Progress percentage 0–100 (clamped)
+   * @param message - Optional human-readable status; capped at 1000 chars
+   */
+  reportProgress(percent = 0, message = ""): void {
+    const ctx = executionContextStorage.getStore();
+    if (!ctx) return;
+    ctx.reportProgress(percent / 100, message);
+  }
+
   async run(request: NodeExecutionRequest): Promise<NodeExecutionResponse> {
     const executionId = randomUUID();
     const startTime = performance.now();
@@ -542,42 +572,48 @@ export abstract class BaseNode {
       const context = new ExecutionContext({
         request,
         cancelSignal: this._cancelSignal ?? null,
+        executionId,
       });
-      let inputs = { ...request.inputs };
 
-      const fileFields = getFileInputFields(def);
-      if (fileFields.length > 0) {
-        inputs = await this.prepareFileInputs(inputs, context);
-      }
+      // Ambient context for BaseNode.reportProgress() during this run,
+      // including awaited continuations (DA-3232).
+      return await executionContextStorage.run(context, async () => {
+        let inputs = { ...request.inputs };
 
-      for (const mw of this._middleware) {
-        inputs = mw.onBeforeExecute(inputs, context);
-      }
+        const fileFields = getFileInputFields(def);
+        if (fileFields.length > 0) {
+          inputs = await this.prepareFileInputs(inputs, context);
+        }
 
-      const outputs = await this.execute(inputs, context);
+        for (const mw of this._middleware) {
+          inputs = mw.onBeforeExecute(inputs, context);
+        }
 
-      this.validateOutputs(outputs);
+        const outputs = await this.execute(inputs, context);
 
-      const durationMs = Math.round(performance.now() - startTime);
+        this.validateOutputs(outputs);
 
-      for (const mw of this._middleware) {
-        mw.onAfterExecute(inputs, outputs, context, durationMs);
-      }
+        const durationMs = Math.round(performance.now() - startTime);
 
-      const tokenUsage = context.tokenUsage.total_tokens || def.token_cost;
+        for (const mw of this._middleware) {
+          mw.onAfterExecute(inputs, outputs, context, durationMs);
+        }
 
-      this._metricsCollector.record(
-        createExecutionMetric({
-          runId: context.runId,
-          nodeId: context.nodeId,
-          nodeName: def.slug,
-          status: "pass",
-          durationMs,
-          tokenUsage,
-        }),
-      );
+        const tokenUsage = context.tokenUsage.total_tokens || def.token_cost;
 
-      return NodeExecutionResponseFactory.success(executionId, outputs, durationMs, tokenUsage);
+        this._metricsCollector.record(
+          createExecutionMetric({
+            runId: context.runId,
+            nodeId: context.nodeId,
+            nodeName: def.slug,
+            status: "pass",
+            durationMs,
+            tokenUsage,
+          }),
+        );
+
+        return NodeExecutionResponseFactory.success(executionId, outputs, durationMs, tokenUsage);
+      });
     } catch (err) {
       const durationMs = Math.round(performance.now() - startTime);
       this.recordError(request, err as Error, durationMs);

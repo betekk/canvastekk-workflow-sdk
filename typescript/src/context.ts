@@ -1,7 +1,28 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
+// Unprefixed form: tsup's dts pass doesn't recognize "node:async_hooks" as a
+// resolvable builtin external (while "node:fs" works) — bare "async_hooks"
+// resolves to the same module at runtime and through @types/node.
+import { AsyncLocalStorage } from "async_hooks";
 import type { NodeExecutionRequest } from "./request.js";
 import { getNodeLogger, type SdkLogger } from "./logging.js";
+
+/** Max characters of a progress-ping message (engine payload cap, #495). */
+const PROGRESS_MESSAGE_MAX_CHARS = 1000;
+
+/** Per-ping timeout — a slow or hung engine must not leak sockets (DA-3232). */
+const PROGRESS_PING_TIMEOUT_MS = 5000;
+
+/**
+ * Ambient per-run execution context (DA-3232).
+ *
+ * `BaseNode.run()` enters the run's `ExecutionContext` for the duration of
+ * execution (including awaited continuations), so `BaseNode.reportProgress()`
+ * can resolve the current run without threading the context through node
+ * signatures. Async-local storage keeps concurrent runs of one shared node
+ * instance isolated — instance-held state would cross-run race.
+ */
+export const executionContextStorage = new AsyncLocalStorage<ExecutionContext>();
 
 /**
  * Context provided to node execute() method.
@@ -26,6 +47,7 @@ export class ExecutionContext {
   private _metadata: Record<string, unknown>;
   private _downloadsDir: string | null;
   private _cancelSignal: AbortSignal | null;
+  private _executionId: string | null;
 
   /**
    * Creates a new execution context.
@@ -37,8 +59,16 @@ export class ExecutionContext {
     runId?: string;
     nodeId?: string;
     cancelSignal?: AbortSignal | null;
+    executionId?: string | null;
   } = {}) {
-    const { request = null, outputDir, runId, nodeId, cancelSignal = null } = opts;
+    const {
+      request = null,
+      outputDir,
+      runId,
+      nodeId,
+      cancelSignal = null,
+      executionId = null,
+    } = opts;
 
     this._request = request;
     const resolvedRunId = runId ?? request?.run_id ?? "local";
@@ -61,11 +91,23 @@ export class ExecutionContext {
     this._metadata = {};
     this._downloadsDir = null;
     this._cancelSignal = cancelSignal;
+    this._executionId = executionId;
   }
 
   /** Cooperative cancellation signal — aborted when the request deadline expires. */
   get cancelSignal(): AbortSignal | null {
     return this._cancelSignal;
+  }
+
+  /**
+   * Execution ID minted by `BaseNode.run()` for this execution.
+   *
+   * Carried on the context so mid-run progress pings can echo the same
+   * `execution_id` the engine validated at dispatch time (DA-3232). `null`
+   * for locally constructed contexts (no run).
+   */
+  get executionId(): string | null {
+    return this._executionId;
   }
 
   get runId(): string {
@@ -119,6 +161,11 @@ export class ExecutionContext {
 
   /**
    * Reports execution progress.
+   *
+   * Logs locally and, when running inside a workflow with a callback URL and
+   * execution ID (DA-3232), fires a best-effort progress ping to the engine.
+   * Local/dev contexts without a callback URL log exactly as before.
+   *
    * @param progress - Progress value between 0 and 1
    * @param message - Optional progress message
    */
@@ -127,6 +174,49 @@ export class ExecutionContext {
     let logMsg = `Progress: ${percent}%`;
     if (message) logMsg += ` - ${message}`;
     this._logger.info(logMsg);
+    this._sendProgressPing(percent, message);
+  }
+
+  /**
+   * Fire-and-forget progress ping to the engine's progress route (DA-3232).
+   *
+   * POSTs `{execution_id, percent, message}` to `${callback_url}/progress`
+   * (engine #495: the completion callback URL plus `/progress`). Never
+   * throws into caller code and never leaves an unhandled rejection —
+   * transport failures are swallowed and logged at warn level, matching the
+   * DA-2887 telemetry philosophy: progress reporting must never affect the
+   * node outcome. Safe no-op when either the callback URL or the execution
+   * ID is missing (local dev, request-less contexts).
+   *
+   * @param percent - Progress percentage; clamped to [0, 100]
+   * @param message - Optional message; truncated to 1000 chars (engine
+   *   payload cap)
+   */
+  private _sendProgressPing(percent = 0, message = ""): void {
+    // Engine-issued orchestrator URL, deliberately NOT run through
+    // url-policy: the engine legitimately lives on private/loopback
+    // addresses in-cluster, which the SSRF guard would block.
+    const callbackUrl = this._request?.callback_url?.replace(/\/+$/, "") ?? null;
+    if (!callbackUrl || !this._executionId) return;
+
+    const clamped = Math.min(100, Math.max(0, percent));
+    const cappedMessage = message.slice(0, PROGRESS_MESSAGE_MAX_CHARS);
+    const payload: Record<string, unknown> = {
+      execution_id: this._executionId,
+      percent: clamped,
+    };
+    if (cappedMessage) payload.message = cappedMessage;
+
+    void fetch(`${callbackUrl}/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(PROGRESS_PING_TIMEOUT_MS),
+    }).catch((err: unknown) => {
+      this._logger.warn(
+        `Progress ping failed (best-effort, ignored): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
   }
 
   recordTokenUsage(opts: {
