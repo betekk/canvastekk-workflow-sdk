@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.2] - 2026-09-28
+
+### Miscellaneous Tasks
+
+- Convert workflow-sdk CI + release to local-if-idle pool via canonical pick-runner (DA-3160) (#82)
+
+
 ## [0.31.1] - 2026-09-26
 
 ### Miscellaneous Tasks
 
 - Remove accidentally committed .venv-gates; gitignore .venv*/ (DA-3086) (#81)
+- **release**: Prepare v0.31.1
 
 
 ## [0.31.0] - 2026-09-26
