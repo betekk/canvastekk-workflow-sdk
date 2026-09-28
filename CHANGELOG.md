@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.31.3] - 2026-09-28
+
+### Miscellaneous Tasks
+
+- **docs**: Remove AGENTS.md
+
+
 ## [0.31.2] - 2026-09-28
 
 ### Miscellaneous Tasks
 
 - Convert workflow-sdk CI + release to local-if-idle pool via canonical pick-runner (DA-3160) (#82)
+- **release**: Prepare v0.31.2
 
 
 ## [0.31.1] - 2026-09-26
