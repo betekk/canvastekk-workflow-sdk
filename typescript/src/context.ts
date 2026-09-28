@@ -1,6 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { AsyncLocalStorage } from "node:async_hooks";
+// Unprefixed form: tsup's dts pass doesn't recognize "node:async_hooks" as a
+// resolvable builtin external (while "node:fs" works) — bare "async_hooks"
+// resolves to the same module at runtime and through @types/node.
+import { AsyncLocalStorage } from "async_hooks";
 import type { NodeExecutionRequest } from "./request.js";
 import { getNodeLogger, type SdkLogger } from "./logging.js";
 

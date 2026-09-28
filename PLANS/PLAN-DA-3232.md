@@ -63,10 +63,11 @@
 
 ### Phase 3: exit gate
 
-- [ ] **3.1** Run the full gate in `typescript/`: `npm run lint` + `npm run typecheck` + `npm run build` + `npm test` (vitest run); fix anything red; append the `GATE <sha> tier=full` memo line to this PLAN's trace block
+- [x] **3.1** Run the full gate in `typescript/`: `npm run lint` + `npm run typecheck` + `npm run build` + `npm test` (vitest run); fix anything red; append the `GATE <sha> tier=full` memo line to this PLAN's trace block
     — **Why:** ticket exit gate — the run's last gate is full per verification-loop-skill
     — **Done when:** all four commands green in one sequence on the final tree; memo line appended
     — **Consumers affected:** CI (must stay green post-merge)
+    — **Done:** full gate green (lint, tsc, tsup incl. DTS, vitest 337/337); fix: `node:async_hooks` → `async_hooks` import (rollup-dts externals gap, runtime-identical); files: typescript/src/context.ts; fixes: async_hooks import form
 
 ## Technical Notes
 
@@ -92,3 +93,4 @@
 
 <!-- gate memo lines appended during execution -->
 - GATE 069fc55 tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 1: context ping — eslint scoped + tsc + context.test.ts 18/18"
+- GATE 8ef3f8d tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 2: BaseNode.reportProgress + ALS — eslint scoped + tsc + base-node/context 37/37"
