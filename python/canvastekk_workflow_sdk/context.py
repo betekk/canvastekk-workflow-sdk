@@ -56,7 +56,7 @@ def _deliver_progress_ping(url: str, payload: dict[str, Any]) -> None:
     """
     try:
         httpx.post(url, json=payload, timeout=PROGRESS_PING_TIMEOUT_S)
-    except Exception as exc:  # noqa: BLE001 — best-effort by contract
+    except Exception as exc:  # best-effort by contract — never propagate
         logger.warning("Progress ping failed (best-effort, ignored): %s", exc)
 
 
