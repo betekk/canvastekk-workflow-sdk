@@ -190,6 +190,20 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
     expect((body.message as string).length).toBe(1000);
   });
 
+  it("normalizes a trailing slash on callback_url", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchSpy);
+    const ctx = new ExecutionContext({
+      request: { ...baseRequest, callback_url: "http://engine/cb/" },
+      executionId: "exec-46",
+      outputDir: join(testDir, "n7"),
+    });
+    ctx.reportProgress(1);
+    await flush();
+    const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://engine/cb/progress");
+  });
+
   it("swallows transport errors — never throws, never unhandled", async () => {
     const warnings: string[] = [];
     const fetchSpy = vi.fn(async () => {

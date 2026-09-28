@@ -193,7 +193,10 @@ export class ExecutionContext {
    *   payload cap)
    */
   private _sendProgressPing(percent = 0, message = ""): void {
-    const callbackUrl = this._request?.callback_url ?? null;
+    // Engine-issued orchestrator URL, deliberately NOT run through
+    // url-policy: the engine legitimately lives on private/loopback
+    // addresses in-cluster, which the SSRF guard would block.
+    const callbackUrl = this._request?.callback_url?.replace(/\/+$/, "") ?? null;
     if (!callbackUrl || !this._executionId) return;
 
     const clamped = Math.min(100, Math.max(0, percent));

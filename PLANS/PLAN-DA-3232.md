@@ -6,10 +6,10 @@
 
 ## Acceptance Criteria
 
-- [ ] `report_progress()` never throws into caller code (swallows and logs transport errors)
-- [ ] Safe no-op when no run/callback context is available (local dev, outside a run)
-- [ ] Sends `execution_id` + optional percent/message; payload size-capped
-- [ ] Unit tests cover the no-op path and the happy path
+- [x] `report_progress()` never throws into caller code (swallows and logs transport errors)
+- [x] Safe no-op when no run/callback context is available (local dev, outside a run)
+- [x] Sends `execution_id` + optional percent/message; payload size-capped
+- [x] Unit tests cover the no-op path and the happy path
 
 ## Dependency & Consumer Map
 
@@ -94,3 +94,4 @@
 <!-- gate memo lines appended during execution -->
 - GATE 069fc55 tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 1: context ping — eslint scoped + tsc + context.test.ts 18/18"
 - GATE 8ef3f8d tier=light lint=t typecheck=t build=- unit=t e2e=n.a note="Phase 2: BaseNode.reportProgress + ALS — eslint scoped + tsc + base-node/context 37/37"
+- GATE 9c6c2b2 tier=full lint=t typecheck=t build=t unit=t(337/337) e2e=n.a note="Phase 3 exit gate: fix node:async_hooks→async_hooks (rollup-dts externals gap); ACs ticked"
