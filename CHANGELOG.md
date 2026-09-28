@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.33.0] - 2026-09-28
+
+### Features
+
+- **sdk-py**: BaseNode.report_progress via ambient contextvars (DA-3230) (#84)
+
+
 ## [0.32.0] - 2026-09-28
 
 ### Features
 
 - **sdk-ts**: BaseNode.reportProgress mid-run progress pings (DA-3232) (#83)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.32.0
 
 
 ## [0.31.3] - 2026-09-28
