@@ -10,13 +10,54 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import httpx
 
 from canvastekk_workflow_sdk.logging import get_node_logger
 
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+logger = logging.getLogger(__name__)
+
+# Max characters of a progress-ping message (engine payload cap, #495).
+PROGRESS_MESSAGE_MAX_CHARS = 1000
+
+# Per-ping timeout — a slow or hung engine must not hold threads (DA-3230).
+PROGRESS_PING_TIMEOUT_S = 5.0
+
+# Ambient per-run execution context (DA-3230).
+#
+# BaseNode.run() sets the run's ExecutionContext for the duration of
+# execution, so BaseNode.report_progress() can resolve the current run
+# without threading the context through node signatures. contextvars keep
+# concurrent runs of one shared node instance isolated (asyncio.to_thread
+# runs in a copy of the current context) — instance-held state would
+# cross-run-race. Mirror of the TypeScript leg's executionContextStorage.
+execution_context_var: ContextVar[ExecutionContext | None] = ContextVar(
+    "canvastekk_execution_context", default=None
+)
+
+
+def _deliver_progress_ping(url: str, payload: dict[str, Any]) -> None:
+    """POST a progress ping to the engine (runs on a daemon thread).
+
+    Best-effort: any failure is swallowed and logged at warning level —
+    progress reporting must never affect the node outcome (DA-2887
+    philosophy). Module-level so tests can monkeypatch the delivery seam
+    without real threads.
+
+    Args:
+        url: Full progress-route URL (``{callback_url}/progress``).
+        payload: JSON body — ``{execution_id, percent[, message]}``.
+    """
+    try:
+        httpx.post(url, json=payload, timeout=PROGRESS_PING_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 — best-effort by contract
+        logger.warning("Progress ping failed (best-effort, ignored): %s", exc)
 
 
 class ExecutionContext:
@@ -43,6 +84,7 @@ class ExecutionContext:
         run_id: str | None = None,
         node_id: str | None = None,
         cancel_event: threading.Event | None = None,
+        execution_id: str | None = None,
     ) -> None:
         """Initialize execution context.
 
@@ -52,6 +94,10 @@ class ExecutionContext:
             run_id: Override workflow run ID.
             node_id: Override node instance ID.
             cancel_event: Cooperative cancellation event for downloads.
+            execution_id: Execution ID minted by ``BaseNode.run()`` — carried
+                so mid-run progress pings echo the same id the engine
+                validated at dispatch time (DA-3230). ``None`` for
+                locally constructed contexts (no run).
         """
         self._request = request
         resolved_run_id = run_id or (request.run_id if request else "local")
@@ -73,11 +119,22 @@ class ExecutionContext:
         self._metadata: dict[str, Any] = {}
         self._downloads_dir: Path | None = None
         self._cancel_event = cancel_event if cancel_event is not None else threading.Event()
+        self._execution_id = execution_id
 
     @property
     def cancel_event(self) -> threading.Event:
         """Cooperative cancellation event — set when the request deadline expires."""
         return self._cancel_event
+
+    @property
+    def execution_id(self) -> str | None:
+        """Execution ID minted by ``BaseNode.run()`` for this execution.
+
+        Carried on the context so mid-run progress pings can echo the same
+        ``execution_id`` the engine validated at dispatch time (DA-3230).
+        ``None`` for locally constructed contexts (no run).
+        """
+        return self._execution_id
 
     @property
     def run_id(self) -> str:
@@ -164,18 +221,63 @@ class ExecutionContext:
         """
         Report progress for long-running operations.
 
+        Logs locally and, when running inside a workflow with a callback URL
+        and execution ID (DA-3230), fires a best-effort progress ping to the
+        engine. Local/dev contexts without a callback URL log exactly as
+        before.
+
         Args:
             progress: Progress value from 0.0 to 1.0
             message: Optional progress message
 
         Note:
-            Currently logs progress. Future: will send to callback/websocket.
+            The engine ping is fire-and-forget: transport failures are
+            swallowed and logged, never raised into node logic.
         """
         percent = int(progress * 100)
         log_msg = f"Progress: {percent}%"
         if message:
             log_msg += f" - {message}"
         self._logger.info(log_msg)
+        self._send_progress_ping(percent, message)
+
+    def _send_progress_ping(self, percent: float = 0, message: str = "") -> None:
+        """
+        Fire-and-forget progress ping to the engine's progress route (DA-3230).
+
+        POSTs ``{execution_id, percent, message}`` to
+        ``{callback_url}/progress`` on a daemon thread (engine #495: the
+        completion callback URL plus ``/progress``). Never raises into
+        caller code — delivery failures are swallowed and logged inside
+        :func:`_deliver_progress_ping`. Safe no-op when either the callback
+        URL or the execution ID is missing (local dev, request-less
+        contexts).
+
+        Args:
+            percent: Progress percentage; clamped to [0, 100].
+            message: Optional message; truncated to ``PROGRESS_MESSAGE_MAX_CHARS``.
+        """
+        callback_url = self._request.callback_url if self._request is not None else None
+        # Engine-issued orchestrator URL, deliberately NOT run through an
+        # SSRF policy: the engine legitimately lives on private/loopback
+        # addresses in-cluster.
+        callback_url = callback_url.rstrip("/") if callback_url else None
+        if not callback_url or not self._execution_id:
+            return
+
+        payload: dict[str, Any] = {
+            "execution_id": self._execution_id,
+            "percent": min(100, max(0, int(percent))),
+        }
+        capped = message[:PROGRESS_MESSAGE_MAX_CHARS]
+        if capped:
+            payload["message"] = capped
+
+        threading.Thread(
+            target=_deliver_progress_ping,
+            args=(f"{callback_url}/progress", payload),
+            daemon=True,
+        ).start()
 
     def record_token_usage(
         self,
