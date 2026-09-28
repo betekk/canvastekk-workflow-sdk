@@ -6,10 +6,10 @@
 
 ## Acceptance Criteria
 
-- [ ] Helper never throws into caller code; safe no-op outside a run
-- [ ] Sends `execution_id` + optional percent/message; payload size-capped
-- [ ] SDK surface mirrors the shipped TS leg (DA-3232, PR #83): `ExecutionContext.report_progress` upgrade + `BaseNode.report_progress(percent?, message?)`, so node-app shared chokepoints (`load_context`, `to_node_output`, `ErrorOutputNode` — verified to live in node-app repos, not this SDK) wire it in one line on SDK bump *(user-approved scope: SDK-only; original chokepoint/parity ACs noted as node-app-side adoption work on the ticket)*
-- [ ] Unit tests cover the no-op path, the happy path, payload caps, and cross-run isolation
+- [x] Helper never throws into caller code; safe no-op outside a run
+- [x] Sends `execution_id` + optional percent/message; payload size-capped
+- [x] SDK surface mirrors the shipped TS leg (DA-3232, PR #83): `ExecutionContext.report_progress` upgrade + `BaseNode.report_progress(percent?, message?)`, so node-app shared chokepoints (`load_context`, `to_node_output`, `ErrorOutputNode` — verified to live in node-app repos, not this SDK) wire it in one line on SDK bump *(user-approved scope: SDK-only; original chokepoint/parity ACs noted as node-app-side adoption work on the ticket)*
+- [x] Unit tests cover the no-op path, the happy path, payload caps, and cross-run isolation
 
 ## Dependency & Consumer Map
 
@@ -63,10 +63,11 @@
 
 ### Phase 3: exit gate
 
-- [ ] **3.1** Run the full gate in `python/`: `poetry run ruff check canvastekk_workflow_sdk/ tests/` + `poetry run pytest`; fix anything red; append the `GATE <sha> tier=full` memo line to this PLAN's trace block
+- [x] **3.1** Run the full gate in `python/`: `poetry run ruff check canvastekk_workflow_sdk/ tests/` + `poetry run pytest`; fix anything red; append the `GATE <sha> tier=full` memo line to this PLAN's trace block
     — **Why:** ticket exit gate — the run's last gate is full per verification-loop-skill
     — **Done when:** both commands green in one sequence on the final tree; memo line appended
     — **Consumers affected:** CI (must stay green post-merge)
+    — **Done:** full gate green first try (ruff clean, pytest 767/767); no fixes; files: none beyond Phases 1-2; fixes: none
 
 ## Technical Notes
 
@@ -94,3 +95,5 @@
 
 <!-- gate memo lines appended during execution -->
 - GATE f080ec4 tier=light lint=t typecheck=- build=- unit=t e2e=n.a note="Phase 1 (+2.1): context ping — ruff scoped + pytest test_context 28/28"
+- GATE f562108 tier=light lint=t typecheck=- build=- unit=t e2e=n.a note="Phase 2: BaseNode.report_progress + contextvars — ruff scoped + pytest base/context 67/67"
+- GATE 8945a54 tier=full lint=t typecheck=- build=- unit=t(767/767) e2e=n.a note="Phase 3 exit gate: green first try, no fixes; ACs ticked"
