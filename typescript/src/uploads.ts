@@ -1,24 +1,58 @@
 import { createReadStream, statSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
+import { z } from "zod";
 import type { NodeExecutionResponse } from "./response.js";
+import { uploadViaSession } from "./multipart.js";
 import { NodeIOError } from "./exceptions.js";
+
+/**
+ * Engine-provided multipart upload-session descriptor (DA-2886).
+ *
+ * Wire contract (snake_case, matching the execute-request wire):
+ * - `initiate`  POST `{"size", "content_type"}` → `{"upload_id", "part_size", "part_urls": [...]}`
+ * - `complete`  POST `{"upload_id", "parts": [{"part_number", "etag"}]}`
+ * - `abort`     POST `{"upload_id"}` (best-effort)
+ * - `status`    GET → `{"upload_id", "uploaded_parts": [...]}`
+ *
+ * Mirrors the python SDK's `UploadSession` model (uploads.py).
+ */
+export const UploadSessionDescriptorSchema = z.object({
+  kind: z.literal("multipart-upload-session").default("multipart-upload-session"),
+  session_token: z.string(),
+  initiate_url: z.string().url(),
+  complete_url: z.string().url(),
+  abort_url: z.string().url(),
+  status_url: z.string().url(),
+  expires_at: z.string().optional(),
+});
+
+export type UploadSessionDescriptor = z.infer<typeof UploadSessionDescriptorSchema>;
+
+/** An upload target: legacy presigned-URL string or session descriptor (DA-2886). */
+export type UploadTarget = string | UploadSessionDescriptor;
 
 /**
  * Interface for uploading node output files.
  */
 export interface OutputUploader {
-  uploadFile(filePath: string, presignedUrl: string): Promise<void>;
+  /**
+   * Uploads one file to one target. Implementations MUST accept both target
+   * shapes; keeping a string-only parameter is legal for custom
+   * implementations (method-syntax bivariance keeps them assignable) —
+   * they simply cannot serve multipart sessions.
+   */
+  uploadFile(filePath: string, target: UploadTarget): Promise<void>;
   /**
    * Implementations MUST throw (not skip) when a file-output field that is
-   * present in `response.outputs` and has a presigned URL holds a value
+   * present in `response.outputs` and has an upload target holds a value
    * that is not an existing local file — silently skipping would report
    * success while the engine stamps a storage URI for the missing object,
    * corrupting downstream consumers (DA-2337).
    */
   uploadOutputs(
     response: NodeExecutionResponse,
-    uploadUrls: Record<string, string>,
+    uploadUrls: Record<string, UploadTarget>,
     fileOutputFields: string[],
   ): Promise<void>;
 }
@@ -72,15 +106,35 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// DA-2886 deprecation optics: once per PROCESS (module-level flag; python's
+// per-call-site warnings registry has no node equivalent — documented
+// divergence). Assertion tests must isolate accordingly.
+let _legacyWarningEmitted = false;
+function warnLegacyPresignedUpload(): void {
+  if (_legacyWarningEmitted) return;
+  _legacyWarningEmitted = true;
+  console.warn(
+    "Single-PUT presigned upload target is deprecated under the multipart-only standard (DA-2885/DA-2886) — upgrade the engine to multipart upload sessions (DA-2887). This SDK path is removed in v1.0.",
+  );
+}
+
 /**
  * Uploads output files to S3 using presigned URLs.
  */
 export class S3PresignedUploader implements OutputUploader {
   /**
-   * Uploads a single file to S3 via presigned URL.
+   * Uploads a single file to S3 via an upload target.
+   *
+   * DA-2886 router: a session descriptor takes the multipart client
+   * (`uploadViaSession` — lazy initiate → bounded parallel part PUTs →
+   * complete; per-part retry; status reconcile; abort on failure); a plain
+   * string takes the legacy single-PUT path below with a once-per-process
+   * deprecation warning (removed in SDK v1.0).
    *
    * Streams the file from disk (never buffers the whole body in memory —
-   * outputs in this domain are multi-GB point clouds).
+   * outputs in this domain are multi-GB point clouds). Multipart parts are
+   * buffered per batch, bounded by part_size × parallelism (see
+   * MAX_BUFFERED_BYTES in multipart.ts).
    *
    * Uses Node's http/https core module instead of fetch: fetch cannot send
    * a fixed-length stream body (it forces `Transfer-Encoding: chunked`,
@@ -93,11 +147,17 @@ export class S3PresignedUploader implements OutputUploader {
    * errors (4xx) are never retried (DA-1955).
    *
    * @param filePath - Local file path
-   * @param presignedUrl - S3 presigned upload URL
+   * @param target - Presigned upload URL string (legacy) or session descriptor
    * @throws UploadHttpError on HTTP status failure after retries
    * @throws Error on transport failure after retries
    */
-  async uploadFile(filePath: string, presignedUrl: string): Promise<void> {
+  async uploadFile(filePath: string, target: UploadTarget): Promise<void> {
+    if (typeof target !== "string") {
+      await uploadViaSession(target, filePath);
+      return;
+    }
+    warnLegacyPresignedUpload();
+    const presignedUrl = target;
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -194,7 +254,7 @@ export class S3PresignedUploader implements OutputUploader {
    */
   async uploadOutputs(
     response: NodeExecutionResponse,
-    uploadUrls: Record<string, string>,
+    uploadUrls: Record<string, UploadTarget>,
     fileOutputFields: string[],
   ): Promise<void> {
     if (!response.outputs) return;
