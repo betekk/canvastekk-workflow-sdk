@@ -186,6 +186,40 @@ describe("Auth middleware", () => {
     delete process.env.CANVASTEKK_API_KEY;
   });
 
+  it("accepts the rotation NEXT key alongside the current key", async () => {
+    const node = new TestNode();
+    process.env.CANVASTEKK_API_KEY = "current-key";
+    process.env.CANVASTEKK_API_KEY_NEXT = "new-key";
+    delete process.env.CANVASTEKK_DEV_MODE;
+    const auth = NodeAuth.apiKey();
+    const app = createNodeApp(node, { dependencies: [auth] });
+
+    const resp = await request(app)
+      .get("/health")
+      .set("X-API-Key", "new-key");
+
+    expect(resp.status).toBe(200);
+    delete process.env.CANVASTEKK_API_KEY;
+    delete process.env.CANVASTEKK_API_KEY_NEXT;
+  });
+
+  it("ignores an empty NEXT key", async () => {
+    const node = new TestNode();
+    process.env.CANVASTEKK_API_KEY = "current-key";
+    process.env.CANVASTEKK_API_KEY_NEXT = "";
+    delete process.env.CANVASTEKK_DEV_MODE;
+    const auth = NodeAuth.apiKey();
+    const app = createNodeApp(node, { dependencies: [auth] });
+
+    const resp = await request(app)
+      .get("/health")
+      .set("X-API-Key", "current-key");
+
+    expect(resp.status).toBe(200);
+    delete process.env.CANVASTEKK_API_KEY;
+    delete process.env.CANVASTEKK_API_KEY_NEXT;
+  });
+
   it("bypasses auth in dev mode", async () => {
     const node = new TestNode();
     process.env.CANVASTEKK_API_KEY = "test-secret-key";

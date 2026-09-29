@@ -1169,6 +1169,10 @@ const app = node.createApp({
 
 The middleware reads the key from the `CANVASTEKK_API_KEY` environment variable. Set `CANVASTEKK_DEV_MODE=true` to bypass auth during development.
 
+During a rotation window, `CANVASTEKK_API_KEY_NEXT` is accepted alongside the
+current key (empty = ignored). Python `NodeAuth.apiKey()` behaves identically
+via `<key_env_var>_NEXT`.
+
 ### JWT
 
 ```typescript
