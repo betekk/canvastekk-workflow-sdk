@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.34.0] - 2026-09-29
+
+### Features
+
+- **auth**: Accept CANVASTEKK_API_KEY_NEXT alongside the current key (rotation window) (#85)
+
+
 ## [0.33.0] - 2026-09-28
 
 ### Features
 
 - **sdk-py**: BaseNode.report_progress via ambient contextvars (DA-3230) (#84)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.33.0
 
 
 ## [0.32.0] - 2026-09-28
