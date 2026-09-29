@@ -331,20 +331,10 @@ export async function uploadViaSession(
           .map((p) => p?.part_number)
           .filter((n): n is number => typeof n === "number"),
       );
-      for (const n of uploaded) {
-        if (!etags.has(n)) {
-          // Server confirms a part this process never recorded (e.g. etag
-          // lost mid-batch) — re-read nothing; the part exists but we lack
-          // its etag, so it must be re-PUT. Keep it in remaining.
-          continue;
-        }
-      }
+      // Keep only parts with no server confirmation OR no locally-recorded
+      // etag — the latter are re-PUT (idempotent overwrite of the same part).
       remaining = remaining.filter((n) => !uploaded.has(n) || !etags.has(n));
-      // Parts the server confirmed but we hold no etag for are re-PUT (idempotent overwrite).
-      if (remaining.length === 0) {
-        // everything confirmed server-side that we have etags for
-        remaining = [];
-      } else {
+      if (remaining.length > 0) {
         console.warn(`resume round: ${remaining.length}/${totalParts} part(s) still unconfirmed`);
       }
     }
