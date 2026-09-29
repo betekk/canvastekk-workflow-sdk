@@ -142,6 +142,78 @@ class TestApiKeyAuth:
         depends = auth.as_dependency()
         assert depends is not None
 
+    def test_next_key_accepted_during_rotation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CANVASTEKK_API_KEY", "current-key")
+        monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "new-key")
+
+        class MockRequest:
+            headers: dict[str, str] = {}
+
+        auth = _ApiKeyAuth()
+        request = MockRequest()
+        request.headers["X-API-Key"] = "new-key"
+
+        result = auth.authenticate(request)
+        assert result == {"auth_mode": "api_key"}
+
+    def test_current_key_still_accepted_with_next_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CANVASTEKK_API_KEY", "current-key")
+        monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "new-key")
+
+        class MockRequest:
+            headers: dict[str, str] = {}
+
+        auth = _ApiKeyAuth()
+        request = MockRequest()
+        request.headers["X-API-Key"] = "current-key"
+
+        result = auth.authenticate(request)
+        assert result == {"auth_mode": "api_key"}
+
+    def test_empty_next_key_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CANVASTEKK_API_KEY", "current-key")
+        monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "")
+
+        class MockRequest:
+            headers: dict[str, str] = {}
+
+        auth = _ApiKeyAuth()
+        request = MockRequest()
+        request.headers["X-API-Key"] = "current-key"
+
+        result = auth.authenticate(request)
+        assert result == {"auth_mode": "api_key"}
+
+    def test_unknown_key_rejected_when_next_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CANVASTEKK_API_KEY", "current-key")
+        monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "new-key")
+
+        class MockRequest:
+            headers: dict[str, str] = {}
+
+        auth = _ApiKeyAuth()
+        request = MockRequest()
+        request.headers["X-API-Key"] = "neither-key"
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth.authenticate(request)
+        assert exc_info.value.status_code == 401
+
+    def test_next_only_configured_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Edge case: NEXT set while current is empty (mid-rotation misconfig still authenticates NEXT holders)."""
+        monkeypatch.setenv("CANVASTEKK_API_KEY", "")
+        monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "new-key")
+
+        class MockRequest:
+            headers: dict[str, str] = {}
+
+        auth = _ApiKeyAuth()
+        request = MockRequest()
+        request.headers["X-API-Key"] = "new-key"
+
+        result = auth.authenticate(request)
+        assert result == {"auth_mode": "api_key"}
+
     def test_callable_invokes_authenticate(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_API_KEY", "test-key")
 

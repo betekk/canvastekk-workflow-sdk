@@ -70,12 +70,22 @@ class _ApiKeyAuth(_AuthBackend):
     """Validate requests using a shared ``X-API-Key`` header.
 
     The expected key is read from the environment variable specified by
-    ``key_env_var`` (defaults to ``CANVASTEKK_API_KEY``).
+    ``key_env_var`` (defaults to ``CANVASTEKK_API_KEY``). During a rotation
+    window, ``<key_env_var>_NEXT`` (defaults to ``CANVASTEKK_API_KEY_NEXT``)
+    is accepted alongside the current key; empty values are ignored.
     """
 
     def __init__(self, key_env_var: str = "CANVASTEKK_API_KEY") -> None:
         """Initialize the backend, remembering the env var holding the expected key."""
         self._key_env_var = key_env_var
+
+    def _expected_keys(self) -> list[str]:
+        """Return the non-empty configured keys (current + optional rotation next)."""
+        keys = (
+            os.environ.get(self._key_env_var, ""),
+            os.environ.get(f"{self._key_env_var}_NEXT", ""),
+        )
+        return [key for key in keys if key]
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``X-API-Key`` header against the configured env var."""
@@ -83,13 +93,16 @@ class _ApiKeyAuth(_AuthBackend):
             logger.debug("Dev mode: skipping API key authentication")
             return {"auth_mode": "dev_bypass"}
 
-        expected_key = os.environ.get(self._key_env_var, "")
-        if not expected_key:
+        expected_keys = self._expected_keys()
+        if not expected_keys:
             logger.warning("Auth env var %s is not set — rejecting all requests", self._key_env_var)
             raise HTTPException(status_code=401, detail="Authentication not configured")
 
         provided_key = request.headers.get("X-API-Key", "")
-        if not hmac.compare_digest(provided_key.encode(), expected_key.encode()):
+        if not any(
+            hmac.compare_digest(provided_key.encode(), expected.encode())
+            for expected in expected_keys
+        ):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
         return {"auth_mode": "api_key"}

@@ -64,17 +64,27 @@ export class NodeAuth {
         return;
       }
 
-      const expectedKey = process.env[keyEnvVar] ?? "";
-      if (!expectedKey) {
+      // Rotation window (DA-3191): <keyEnvVar>_NEXT is accepted alongside the
+      // current key; empty values are ignored.
+      const expectedKeys = [
+        process.env[keyEnvVar] ?? "",
+        process.env[`${keyEnvVar}_NEXT`] ?? "",
+      ].filter((key) => key.length > 0);
+
+      if (expectedKeys.length === 0) {
         unauthorized(res, "Authentication not configured");
         return;
       }
 
       const providedKey = req.headers["x-api-key"] as string ?? "";
-      const expected = Buffer.from(expectedKey);
       const provided = Buffer.from(providedKey);
 
-      if (expected.length !== provided.length || !timingSafeEqual(provided, expected)) {
+      const matches = expectedKeys.some((key) => {
+        const expected = Buffer.from(key);
+        return expected.length === provided.length && timingSafeEqual(provided, expected);
+      });
+
+      if (!matches) {
         unauthorized(res, "Invalid API key");
         return;
       }
