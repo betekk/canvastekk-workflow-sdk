@@ -119,13 +119,6 @@ async function startServer(opts: {
   };
 }
 
-function writeFile12(): string {
-  const dir = mkdtempSync(join(tmpdir(), "sdk-multipart-"));
-  const p = join(dir, "out.bin");
-  writeFileSync(p, "AAAABBBBCCCC"); // 12 bytes → 3 parts of 4
-  return p;
-}
-
 describe("uploadViaSession (DA-2886)", () => {
   let filePath: string;
   let tmpDir: string;
