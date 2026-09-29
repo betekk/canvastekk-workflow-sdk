@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.35.1] - 2026-09-29
+
+### Bug Fixes
+
+- **ts-sdk**: DA-3314 red-CI fix — unused helper + dead resume code (#87)
+
+
 ## [0.35.0] - 2026-09-29
 
 ### Features
 
 - **ts-sdk**: Multipart upload-session support (DA-2886 parity, DA-3314) (#86)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.35.0
 
 
 ## [0.34.0] - 2026-09-29
