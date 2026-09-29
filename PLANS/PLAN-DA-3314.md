@@ -63,7 +63,7 @@
 
 — **Done:** full exit gate: eslint clean, tsc --noEmit clean, vitest 351/351 (24 files, incl. 5 multipart + 2 deprecation + 2 request-widen + 2 uploads-widen tests), tsup build green, tsconfig.tests fixture (legacy-only implementor) green; fixes: 2 (fs/promises open overload; unused-var lint). Part-PUT retry mirrors python multipart.py (3× any-error, backoffs 1.0/2.0s); control-plane 30s vs parts 600s; parallel clamp ≤512MiB buffered.
 
-GATE <final-sha> tier=full lint=t typecheck=t build=t unit=t(351/351) e2e=n.a + version
+GATE 77a4ce0 tier=full lint=t typecheck=t build=t unit=t(351/351) e2e=n.a + version
 
 - [x] **3.1** Full gate: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` — all green; append tier=full memo.
     — **Why:** public SDK surface change; exit gate is full.

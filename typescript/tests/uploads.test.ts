@@ -324,3 +324,97 @@ describe("retry classification (DA-1955 review fix)", () => {
     ).rejects.toThrow(/ENOENT/);
   });
 });
+
+describe("S3PresignedUploader — widened targets (DA-3314)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "sdk-uploads-wide-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("routes a descriptor target through the multipart flow via uploadOutputs", async () => {
+    const calls: { method?: string; url?: string; body: Buffer }[] = [];
+    const server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c as Buffer));
+      req.on("end", () => {
+        calls.push({ method: req.method, url: req.url, body: Buffer.concat(chunks) });
+        const url = req.url ?? "";
+        if (url === "/initiate") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          const port = (server.address() as AddressInfo).port;
+          res.end(
+            JSON.stringify({
+              upload_id: "up-9",
+              part_size: 64,
+              part_urls: [`http://127.0.0.1:${port}/part/1`],
+            }),
+          );
+          return;
+        }
+        if (url.startsWith("/part/")) {
+          res.writeHead(200, { ETag: '"e1"' });
+          res.end();
+          return;
+        }
+        if (url === "/complete" || url === "/abort" || url === "/status") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, uploaded_parts: [] }));
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const payload = "session-bytes";
+      const filePath = join(tmpDir, "out.bin");
+      writeFileSync(filePath, payload);
+
+      await new S3PresignedUploader().uploadOutputs(
+        { status: "pass", outputs: { out: filePath } } as never,
+        {
+          out: {
+            kind: "multipart-upload-session",
+            session_token: "t",
+            initiate_url: `http://127.0.0.1:${port}/initiate`,
+            complete_url: `http://127.0.0.1:${port}/complete`,
+            abort_url: `http://127.0.0.1:${port}/abort`,
+            status_url: `http://127.0.0.1:${port}/status`,
+          },
+        },
+        ["out"],
+      );
+
+      expect(calls.some((c) => c.url === "/initiate")).toBe(true);
+      expect(calls.some((c) => c.url === "/complete")).toBe(true);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("keeps the NodeIOError contract for descriptor targets with non-file values", async () => {
+    await expect(
+      new S3PresignedUploader().uploadOutputs(
+        { status: "pass", outputs: { out: "/nonexistent/missing.bin" } } as never,
+        {
+          out: {
+            kind: "multipart-upload-session",
+            session_token: "t",
+            initiate_url: "http://127.0.0.1:1/initiate",
+            complete_url: "http://127.0.0.1:1/complete",
+            abort_url: "http://127.0.0.1:1/abort",
+            status_url: "http://127.0.0.1:1/status",
+          },
+        },
+        ["out"],
+      ),
+    ).rejects.toMatchObject({ name: "NodeIOError" });
+  });
+});
