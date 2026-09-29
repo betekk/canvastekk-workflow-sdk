@@ -27,6 +27,7 @@
     "test:watch": "vitest",
     "lint": "eslint src/ tests/",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

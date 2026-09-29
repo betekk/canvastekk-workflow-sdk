@@ -83,3 +83,44 @@ describe("NodeExecutionRequest slug validation (DA-1711)", () => {
     expect(parsed.success).toBe(true);
   });
 });
+
+describe("NodeExecutionRequest output_upload_url targets (DA-3314)", () => {
+  it("parses a full execute request with a multipart-session descriptor", () => {
+    const parsed = NodeExecutionRequestSchema.safeParse({
+      run_id: "run-1",
+      node_id: "n1",
+      inputs: {},
+      output_upload_url: {
+        frag_file: {
+          kind: "multipart-upload-session",
+          session_token: "tok",
+          initiate_url: "https://engine/initiate",
+          complete_url: "https://engine/complete",
+          abort_url: "https://engine/abort",
+          status_url: "https://engine/status",
+        },
+      },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      const target = parsed.data.output_upload_url?.["frag_file"];
+      expect(typeof target).toBe("object");
+    }
+  });
+
+  it("still parses legacy string targets and null", () => {
+    for (const output_upload_url of [
+      { frag_file: "https://s3/presigned-put" },
+      null,
+      undefined,
+    ]) {
+      const parsed = NodeExecutionRequestSchema.safeParse({
+        run_id: "run-1",
+        node_id: "n1",
+        inputs: {},
+        output_upload_url,
+      });
+      expect(parsed.success).toBe(true);
+    }
+  });
+});

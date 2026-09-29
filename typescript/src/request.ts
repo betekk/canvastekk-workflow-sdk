@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UploadSessionDescriptorSchema } from "./uploads.js";
 
 /**
  * Slug charset for run_id/node_id — letters, digits, dot, underscore,
@@ -17,8 +18,11 @@ export const NodeExecutionRequestSchema = z.object({
   node_id: slugField,
   inputs: z.record(z.unknown()).default({}),
   callback_url: z.string().nullable().optional(),
+  // DA-3314: targets widened to `string | multipart-session descriptor`
+  // (DA-2886) — a descriptor value must not 400 at this parse; python
+  // widened the same field (request.py:70 `dict[str, UploadTarget] | None`).
   output_upload_url: z
-    .union([z.record(z.string()), z.null()])
+    .union([z.record(z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
     .optional()
     .default(null),
 });
