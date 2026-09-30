@@ -11,7 +11,7 @@ import { CANVASTEKK_AUTH_MARKER } from "./auth.js";
 import type { BaseNode } from "./base-node.js";
 import { NodeExecutionRequestSchema } from "./request.js";
 import { HealthResponseSchema } from "./response.js";
-import { getDefaultUploader } from "./uploads.js";
+import { getDefaultUploader, type UploadTarget } from "./uploads.js";
 import { isDevMode } from "./url-policy.js";
 
 export interface CreateNodeAppOptions {
@@ -162,7 +162,15 @@ export function createNodeApp(
         const fileOutputFields = getFileOutputFields(def);
         if (fileOutputFields.length > 0) {
           try {
-            await getDefaultUploader().uploadOutputs(response, execRequest.output_upload_url, fileOutputFields);
+            // The parse union still admits legacy string targets (request.ts);
+            // uploadFile rejects them at runtime with NodeIOError (DA-3340),
+            // so the cast only re-widens the type for this call — a string
+            // value surfaces as UPLOAD_FAILED below, never a silent fallback.
+            await getDefaultUploader().uploadOutputs(
+              response,
+              execRequest.output_upload_url as Record<string, UploadTarget>,
+              fileOutputFields,
+            );
           } catch (err) {
             // A declared file output that could not be uploaded means the
             // engine would receive a local path it cannot fetch — fail the

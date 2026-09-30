@@ -67,22 +67,26 @@
     — **Done:** ruff clean; pytest 763 passed (fresh-venv `poetry install` was the only environment fix); fixes: none (lint fix counted in 1.6)
 
 ### Phase 2: TypeScript SDK parity
-- [ ] **2.1** In `typescript/src/uploads.ts`: set `export type UploadTarget = UploadSessionDescriptor`; make `uploadFile` throw `new NodeIOError("engine sent deprecated presigned target — upgrade the engine")` for string targets before the session path; delete `warnLegacyPresignedUpload`, `_legacyWarningEmitted`, `attemptUpload`, `isTransientError`, `TRANSIENT_ERRNO_CODES`, `UPLOAD_TIMEOUT_MS`, and the now-unused `node:http`/`node:https` imports; update `OutputUploader`/`uploadOutputs` doc comments.
+- [x] **2.1** In `typescript/src/uploads.ts`: set `export type UploadTarget = UploadSessionDescriptor`; make `uploadFile` throw `new NodeIOError("engine sent deprecated presigned target — upgrade the engine")` for string targets before the session path; delete `warnLegacyPresignedUpload`, `_legacyWarningEmitted`, `attemptUpload`, `isTransientError`, `TRANSIENT_ERRNO_CODES`, `UPLOAD_TIMEOUT_MS`, and the now-unused `node:http`/`node:https` imports; update `OutputUploader`/`uploadOutputs` doc comments.
     — **Why:** the union exists in TS (`uploads.ts:33`) — ticket AC #3 requires the same removal; the deleted machinery is single-PUT-only.
     — **Done when:** `grep -n "warnLegacyPresignedUpload\|attemptUpload\|isTransientError" typescript/src/uploads.ts` is empty and `tsc --noEmit` (2.4) passes.
     — **Consumers affected:** `index.ts` exports (2.2), TS tests (2.3).
-- [ ] **2.2** Remove `UploadHttpError` (class in `uploads.ts` + its `index.ts` export) — its only producer was the deleted single-PUT path; keep the parse union in `request.ts` (`z.union([z.string(), UploadSessionDescriptorSchema])`) and update its DA-3314 comment to state the DA-3340 seam rationale.
+    — **Done:** full-file rewrite — session-only type, exact-message NodeIOError guard, single-PUT machinery + http/https imports deleted; files: uploads.ts; fixes: none
+- [x] **2.2** Remove `UploadHttpError` (class in `uploads.ts` + its `index.ts` export) — its only producer was the deleted single-PUT path; keep the parse union in `request.ts` (`z.union([z.string(), UploadSessionDescriptorSchema])`) and update its DA-3314 comment to state the DA-3340 seam rationale.
     — **Why:** leaving a never-thrown exported error class is dead public API; the parse-union comment otherwise teaches the old string-target semantics.
     — **Done when:** `grep -rn "UploadHttpError" typescript/src/` is empty and `grep -n "z.string()" typescript/src/request.ts` still matches.
     — **Consumers affected:** external TS consumers importing `UploadHttpError` (breaking — 0.36.0 notice).
-- [ ] **2.3** Rewrite TS tests: convert `uploads-deprecation.test.ts` to assert NodeIOError on string targets (rename file/suite to match DA-3340 semantics), delete/convert legacy single-PUT cases in `uploads.test.ts` to session fakes.
+    — **Done:** class + export deleted; request.ts parse union kept with DA-3340 seam comment; files: uploads.ts, index.ts, request.ts; fixes: none
+- [x] **2.3** Rewrite TS tests: convert `uploads-deprecation.test.ts` to assert NodeIOError on string targets (rename file/suite to match DA-3340 semantics), delete/convert legacy single-PUT cases in `uploads.test.ts` to session fakes.
     — **Why:** executable proof of TS parity (AC #3).
     — **Done when:** `npm test` exits 0 from `typescript/` with no string-target success-path test remaining.
     — **Consumers affected:** coverage signal.
-- [ ] **2.4** Run the light gate in `typescript/`: `npm run lint && npm run typecheck && npm run typecheck:tests && npm test && npm run build`.
+    — **Done:** uploads-deprecation.test.ts deleted (superseded by DA-3340 rejection suite); uploads.test.ts rewritten with session server fixture + fail-loud suites; legacy-uploader-fixture.ts re-pinned on the session-only contract (string-only uploader now correctly fails typecheck); files: uploads.test.ts, uploads-deprecation.test.ts (deleted), legacy-uploader-fixture.ts; fixes: app.ts call-site cast + fixture rewrite (typecheck catches)
+- [x] **2.4** Run the light gate in `typescript/`: `npm run lint && npm run typecheck && npm run typecheck:tests && npm test && npm run build`.
     — **Why:** phase-scoped verification matching CI.
     — **Done when:** all five commands exit 0.
     — **Consumers affected:** CI parity.
+    — **Done:** lint + typecheck + typecheck:tests clean; vitest 343 passed; tsup build (incl. DTS) green; fixes: none beyond 2.3's
 
 ### Phase 3: Docs + skills sweep (all copies) + examples
 - [ ] **3.1** Update `canvastekk-node-builder/SKILL.md` in BOTH copies (`.agents/skills/` and `python/canvastekk_workflow_sdk/data/skills/`): line ~217 comment (`"<UploadSession | presigned URL>"`), the upload-targets section (~675-682) — sessions only, legacy string raises `NodeIOError`, correct "removed in SDK v1.0" to "removed in SDK 0.36.0" (ticket item 6), delete the warning-silencing recipe.
