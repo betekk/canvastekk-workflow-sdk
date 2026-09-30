@@ -161,4 +161,4 @@
 - GATE 71d6c89 tier=light lint=t typecheck=- build=- unit=t(763) e2e=n.a. note="Phase 1: python session-only removal — ruff + full pytest; fresh-venv poetry install was env-only setup"
 - GATE 41e926a tier=light lint=t typecheck=t build=t unit=t(343) e2e=n.a. note="Phase 2: TS parity — eslint/tsc/tsc-tests/vitest/build; gate fixes: app.ts call-site cast, uploader fixture re-pin (2/20 budget)"
 - GATE 1554a02 tier=light lint=t typecheck=- build=- unit=n.a. e2e=n.a. note="Phase 3: docs sweep — stale-mention sweeps empty, docs-only diff"
-- GATE 156746d tier=full lint=t typecheck=t build=t unit=t(py 763 + ts 343) e2e=n.a. note="Phase 4 exit gate on the version-bump tree (e2e n.a.: backend SDKs, no Playwright scope); final pushed SHA carries this memo (amended append — the memo line does not change the gated code)"
+- GATE 405ca3c tier=full lint=t typecheck=t build=t unit=t(py 763 + ts 343) e2e=n.a. note="Phase 4 exit gate on the version-bump tree (e2e n.a.: backend SDKs, no Playwright scope); final pushed SHA carries this memo (fold-forward correction: ghost sha 156746d sed-replaced per gate-memo-sha-amend-orphan; memo rides chore(learnings))"
