@@ -18,9 +18,12 @@ export const NodeExecutionRequestSchema = z.object({
   node_id: slugField,
   inputs: z.record(z.unknown()).default({}),
   callback_url: z.string().nullable().optional(),
-  // DA-3314: targets widened to `string | multipart-session descriptor`
-  // (DA-2886) — a descriptor value must not 400 at this parse; python
-  // widened the same field (request.py:70 `dict[str, UploadTarget] | None`).
+  // DA-3314 widened targets to `string | multipart-session descriptor`
+  // (DA-2886) so a descriptor value must not 400 at this parse. Since
+  // DA-3340 the string member exists at this parse ONLY — the upload seam
+  // (uploads.ts uploadFile) throws NodeIOError for it, so a legacy engine
+  // payload fails loudly instead of as an opaque 400 (python
+  // request.py `dict[str, str | UploadSession]` parity).
   output_upload_url: z
     .union([z.record(z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
     .optional()

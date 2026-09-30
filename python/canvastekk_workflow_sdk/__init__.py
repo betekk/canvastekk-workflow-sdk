@@ -86,7 +86,6 @@ from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionRespon
 from canvastekk_workflow_sdk.router import create_multi_node_app
 from canvastekk_workflow_sdk.testing import LocalFileServer, serve_files
 from canvastekk_workflow_sdk.uploads import (
-    LegacyPresignedUploadWarning,
     OutputUploader,
     S3PresignedUploader,
     UploadSession,
@@ -150,7 +149,6 @@ __all__ = [
     "S3PresignedUploader",
     "UploadSession",
     "UploadTarget",
-    "LegacyPresignedUploadWarning",
     "SDKVersionMiddleware",
     "StructuredJsonFormatter",
     "TimingMiddleware",
@@ -178,4 +176,4 @@ __all__ = [
     "validate",
 ]
 
-__version__ = "0.35.2"
+__version__ = "0.36.0"

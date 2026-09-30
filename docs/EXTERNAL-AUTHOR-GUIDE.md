@@ -270,12 +270,12 @@ The auto-download pipeline enforces an SSRF protection policy:
 
 Uploads changed too: a failed output upload now **fails the execution** with `error_code: "UPLOAD_FAILED"` instead of silently passing with a local-only path.
 
-### Multipart Output Uploads (v0.29+, DA-2886)
+### Multipart Output Uploads (v0.29+, session-only since v0.36.0)
 
 Nothing changes in **your** node code — the router, not the developer, performs output uploads. What changed underneath:
 
-- The engine may now send a **multipart upload-session descriptor** as an upload target instead of a plain presigned-URL string. The SDK handles either transparently: sessions go through lazy initiate → bounded parallel part PUTs (per-part `Content-MD5`) → complete, with per-part retry, resume-from-server-status, and abort-on-failure.
-- Plain-string targets still work everywhere (old engine ↔ new SDK and new engine ↔ old SDK both degrade to strings) but are **deprecated**: node packages see a per-call-site `LegacyPresignedUploadWarning` (`DeprecationWarning` subclass — standard `warnings` filtering is the only silencing mechanism; no env flag). The path is removed in SDK **v1.0**; upgrading the engine (DA-2887) is the fix, not node changes.
+- The engine sends a **multipart upload-session descriptor** as the upload target: lazy initiate → bounded parallel part PUTs (per-part `Content-MD5`) → complete, with per-part retry, resume-from-server-status, and abort-on-failure.
+- Since SDK **0.36.0** (DA-3340) plain-string targets are **removed**: a legacy presigned-PUT string reaching the SDK raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") and fails the execution — there is no deprecation warning and no fallback. The fix is upgrading the engine (DA-3338/DA-2887), not node changes.
 - `fail`/`UPLOAD_FAILED` semantics on terminal upload failure are unchanged (DA-1711).
 
 ### Account Context (v0.24.0+)

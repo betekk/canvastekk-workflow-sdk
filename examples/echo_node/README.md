@@ -7,7 +7,7 @@ Minimal example showing file input/output with the CanvasTEKK Workflow SDK.
 - **File fields**: `format: "file"` with `x-accept` and `x-maxSizeBytes` extensions
 - **Auto-download**: SDK automatically downloads presigned URL file inputs before execute()
 - **Runtime validation**: SDK auto-validates downloaded files against `x-accept` and `x-maxSizeBytes`
-- **Output upload**: Returns a local path; SDK uploads via presigned PUT URL
+- **Output upload**: Returns a local path; SDK uploads via the engine's multipart upload session
 - **CLI validation**: Offline manifest validation during development
 
 ## Setup
@@ -44,7 +44,7 @@ curl http://localhost:8001/health
 # Manifest
 curl http://localhost:8001/manifest
 
-# Execute (simulates engine sending presigned URL)
+# Execute (simulates an engine sending a multipart upload session)
 curl -X POST http://localhost:8001/execute \
   -H "Content-Type: application/json" \
   -d '{
@@ -54,7 +54,14 @@ curl -X POST http://localhost:8001/execute \
       "input_file": "https://example.com/test.txt"
     },
     "output_upload_url": {
-      "output_file": "https://s3.amazonaws.com/bucket/echo-output.txt?X-Amz-Signature=..."
+      "output_file": {
+        "kind": "multipart-upload-session",
+        "session_token": "tok-1",
+        "initiate_url": "https://engine.example/sessions/tok-1/initiate",
+        "complete_url": "https://engine.example/sessions/tok-1/complete",
+        "abort_url": "https://engine.example/sessions/tok-1/abort",
+        "status_url": "https://engine.example/sessions/tok-1/status"
+      }
     }
   }'
 ```

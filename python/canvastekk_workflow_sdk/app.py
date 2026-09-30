@@ -165,7 +165,8 @@ def _upload_outputs_to_s3(
     Args:
         response: The node execution response containing output values.
         upload_urls: Mapping of output field name to upload target
-            (presigned URL string or session descriptor).
+            (multipart session descriptor; a legacy string target
+            raises :class:`NodeIOError`).
         file_output_fields: Output field names that produce files.
     """
     get_default_uploader().upload_outputs(response, upload_urls, file_output_fields)
@@ -333,7 +334,9 @@ def create_node_app(
         Execute the node with given inputs via JSON body.
 
         The engine sends presigned GET URLs for file input fields.
-        Outputs are uploaded via presigned PUT URLs after successful execution.
+        Outputs are uploaded via multipart upload-session descriptors
+        after successful execution (a legacy presigned-PUT string target
+        fails the execution with NodeIOError — DA-3340).
         """
         try:
             body = await request.json()

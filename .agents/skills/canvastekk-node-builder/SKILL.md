@@ -214,7 +214,7 @@ NodeExecutionRequest(
     node_id="node-instance-456",        # Required
     inputs={"field": "value"},          # Validated against input_schema
     callback_url=None,                  # Optional: for async execution
-    output_upload_url=None,             # Optional: {"field_name": "<UploadSession | presigned URL>"}
+    output_upload_url=None,             # Optional: {"field_name": "<UploadSession descriptor>"}
 )
 ```
 
@@ -672,14 +672,14 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 
 1. Write output files to `context.output_path("filename.ext")`
 2. Return the file path as a string in the outputs dict
-3. The SDK uploads the file automatically after successful execution — the engine provides the upload target, which is a multipart `UploadSession` descriptor (current standard) or a legacy presigned PUT URL string (deprecated; emits `LegacyPresignedUploadWarning` once per call site (registry-deduped), removed in SDK v1.0)
+3. The SDK uploads the file automatically after successful execution — the engine provides the upload target, which is a multipart `UploadSession` descriptor; since SDK 0.36.0 a legacy presigned PUT URL string is rejected with `NodeIOError` (DA-3340)
 
-**Upload targets: `str | UploadSession`** (`canvastekk_workflow_sdk.uploads.UploadTarget`)
+**Upload targets: `UploadSession`** (`canvastekk_workflow_sdk.uploads.UploadTarget`)
 
 The engine mints the target; your node never constructs one and must pass it through untouched:
 
-- `UploadSession` (multipart standard, DA-2885/2886): engine-minted descriptor (`session_token`, `initiate_url`, `complete_url`, `abort_url`, `status_url`, TTL-bound). The SDK redeems it lazily — POSTs size to `initiate_url`, PUTs parts in bounded parallel batches, finalizes via `complete_url`; resume via `status_url` (machinery in `multipart.py`).
-- Legacy presigned-PUT string: single-PUT path, deprecated — emits `LegacyPresignedUploadWarning` once per call site (registry-deduped); silence with `from canvastekk_workflow_sdk import LegacyPresignedUploadWarning` + `filterwarnings("ignore", category=LegacyPresignedUploadWarning)` if a legacy engine must be supported.
+- `UploadSession` (multipart, DA-2885/2886): engine-minted descriptor (`session_token`, `initiate_url`, `complete_url`, `abort_url`, `status_url`, TTL-bound). The SDK redeems it lazily — POSTs size to `initiate_url`, PUTs parts in bounded parallel batches, finalizes via `complete_url`; resume via `status_url` (machinery in `multipart.py`).
+- Legacy presigned-PUT string: removed in SDK 0.36.0 — reaching the SDK it raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine"). There is no warning to silence and no fallback; the fix is upgrading the engine (DA-3338), not node changes.
 
 Rules: never assume the target is a string (no slicing, concatenation, or `.startswith("http")` checks); never persist or pre-fetch URLs; return the output path and let the SDK upload.
 

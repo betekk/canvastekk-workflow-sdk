@@ -355,11 +355,11 @@ definition = WorkflowNodeManifest(
 app = create_node_app(node, auth="api-key")  # reads CANVASTEKK_API_KEY
 ```
 
-### Upload Retry
+### Output Upload Retry
 
-`S3PresignedUploader.upload_file` retries transient failures (network errors
-and HTTP 5xx) up to 3 attempts with exponential backoff (0.5s, 1s). Client
-errors (4xx) fail immediately — they are deterministic.
+Session-based output uploads retry transient part failures with backoff and
+resume from server-reported state before completing (see `multipart.py`).
+Terminal failures fail the execution — they are deterministic.
 
 ### AI Agent Setup
 

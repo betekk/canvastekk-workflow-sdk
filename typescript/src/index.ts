@@ -80,7 +80,7 @@ export { createNodeApp, createMultiNodeApp } from "./app.js";
 export type { CreateNodeAppOptions } from "./app.js";
 export { NodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
 export type { AuthMiddleware, AuthResult } from "./auth.js";
-export { S3PresignedUploader, getDefaultUploader, UploadHttpError, UploadSessionDescriptorSchema } from "./uploads.js";
+export { S3PresignedUploader, getDefaultUploader, UploadSessionDescriptorSchema } from "./uploads.js";
 export type { OutputUploader, UploadTarget, UploadSessionDescriptor } from "./uploads.js";
 export { uploadViaSession } from "./multipart.js";
 export {

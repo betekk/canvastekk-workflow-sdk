@@ -1,20 +1,19 @@
 """Multipart session uploads — DA-2886.
 
-Covers the AC paths: session handshake (request model), both degradation
-directions, deprecation-warning semantics, and the multipart machinery
-ported from canvastekk-workflow-nodes (happy / failure / resume).
+Covers the AC paths: session handshake (request model), both target
+shapes at the parse boundary, the legacy-target fail-loud contract
+(DA-3340), and the multipart machinery ported from
+canvastekk-workflow-nodes (happy / failure / resume).
 """
 
 from __future__ import annotations
 
-import logging
-import warnings
 from typing import Any
 
 import httpx
 import pytest
 
-from canvastekk_workflow_sdk import LegacyPresignedUploadWarning, UploadSession
+from canvastekk_workflow_sdk import UploadSession
 from canvastekk_workflow_sdk.exceptions import NodeIOError
 from canvastekk_workflow_sdk.multipart import upload_via_session
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
@@ -66,20 +65,19 @@ class TestSessionHandshake:
 
 
 class TestDegradation:
-    def test_string_target_takes_legacy_put_path(self, tmp_path, monkeypatch):
+    def test_string_target_raises_node_io_error(self, tmp_path, monkeypatch):
+        """Legacy string target → NodeIOError; the multipart client is never
+        invoked (fail-loud, no silent fallback — DA-3340)."""
         f = tmp_path / "out.bin"
         f.write_bytes(b"data")
-        calls: list[str] = []
 
-        def fake_put(url: str, **kwargs: Any) -> httpx.Response:
-            calls.append(url)
-            return httpx.Response(200, request=httpx.Request("PUT", url))
+        def _fail(*args: Any, **kwargs: Any) -> None:
+            raise AssertionError("multipart client must not run for a legacy target")
 
-        monkeypatch.setattr(httpx, "put", fake_put)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", LegacyPresignedUploadWarning)
+        monkeypatch.setattr("canvastekk_workflow_sdk.multipart.upload_via_session", _fail)
+        with pytest.raises(NodeIOError) as excinfo:
             S3PresignedUploader().upload_file(str(f), "https://presigned")
-        assert calls == ["https://presigned"]
+        assert str(excinfo.value) == "engine sent deprecated presigned target — upgrade the engine"
 
     def test_session_target_takes_multipart_path(self, tmp_path, monkeypatch):
         """New SDK + new engine: initiate → part PUTs → complete."""
@@ -120,87 +118,6 @@ class TestDegradation:
         assert any(p.endswith("/initiate") for p in seen)
         assert any(p.endswith("/complete") for p in seen)
         assert seen["part-put"]
-
-
-class TestDeprecationWarning:
-    def test_warning_fires_and_is_filterable(self, tmp_path, monkeypatch):
-        f = tmp_path / "out.bin"
-        f.write_bytes(b"data")
-        monkeypatch.setattr(httpx, "put", lambda url, **k: httpx.Response(200, request=httpx.Request("PUT", url)))
-        uploader = S3PresignedUploader()
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            uploader.upload_file(str(f), "https://presigned")
-            uploader.upload_file(str(f), "https://presigned-2")
-
-        legacy = [w for w in caught if issubclass(w.category, LegacyPresignedUploadWarning)]
-        assert legacy, "deprecation warning must fire on the string path"
-        assert issubclass(LegacyPresignedUploadWarning, DeprecationWarning)
-        assert "v1.0" in str(legacy[0].message)
-
-        with warnings.catch_warnings(record=True) as silenced:
-            warnings.filterwarnings("ignore", category=LegacyPresignedUploadWarning)
-            uploader.upload_file(str(f), "https://presigned-3")
-        assert not [w for w in silenced if issubclass(w.category, LegacyPresignedUploadWarning)]
-
-    def test_warning_deduped_per_call_site(self, tmp_path, monkeypatch):
-        """Under the DEFAULT filter the registry dedups by location:
-        two calls at one site → one warning; a second site → fires."""
-        f = tmp_path / "out.bin"
-        f.write_bytes(b"data")
-        monkeypatch.setattr(
-            httpx,
-            "put",
-            lambda url, **k: httpx.Response(200, request=httpx.Request("PUT", url)),
-        )
-        uploader = S3PresignedUploader()
-
-        def same_site() -> None:
-            uploader.upload_file(str(f), "https://p1")
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("default")
-            same_site()
-            same_site()
-        assert len(caught) == 1
-
-        def second_site() -> None:
-            uploader.upload_file(str(f), "https://p2")
-
-        with warnings.catch_warnings(record=True) as caught2:
-            warnings.simplefilter("default")
-            second_site()
-            second_site()
-        assert len(caught2) == 1
-
-    def test_session_path_emits_no_warning(self, tmp_path, monkeypatch):
-        f = tmp_path / "out.bin"
-        f.write_bytes(b"y" * 8)
-        monkeypatch.setattr(
-            "canvastekk_workflow_sdk.multipart.upload_via_session",
-            lambda session, path, **k: None,
-        )
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            S3PresignedUploader().upload_file(str(f), _session())
-        assert not [w for w in caught if "deprecated" in str(w.message).lower()]
-
-    def test_operator_log_fires_once_per_process(self, tmp_path, monkeypatch, caplog):
-        import canvastekk_workflow_sdk.uploads as up
-
-        f = tmp_path / "out.bin"
-        f.write_bytes(b"data")
-        monkeypatch.setattr(httpx, "put", lambda url, **k: httpx.Response(200, request=httpx.Request("PUT", url)))
-        monkeypatch.setattr(up, "_operator_warning_emitted", False)
-        uploader = S3PresignedUploader()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", LegacyPresignedUploadWarning)
-            with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.uploads"):
-                uploader.upload_file(str(f), "https://p1")
-                uploader.upload_file(str(f), "https://p2")
-        matches = [r for r in caplog.records if "Legacy single-PUT" in r.message]
-        assert len(matches) == 1
 
 
 class TestMachinery:
