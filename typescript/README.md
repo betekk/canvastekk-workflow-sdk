@@ -411,7 +411,7 @@ override async execute(
 
 ### Output Upload
 
-The engine provides presigned PUT URLs via the `output_upload_url` field in the request. The SDK uploads file outputs automatically after successful execution. If execution fails (`status: "fail"`), the upload is skipped.
+The engine provides multipart upload-session descriptors via the `output_upload_url` field in the request — the only target since SDK 0.36.0 (DA-3340). The SDK uploads file outputs automatically after successful execution (initiate → parallel part PUTs → complete, with per-part retry and resume). If execution fails (`status: "fail"`), the upload is skipped. A legacy presigned-PUT string reaching the SDK throws `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — the fix is upgrading the engine (DA-3338/DA-2887), not node changes.
 
 ### Complete Example
 

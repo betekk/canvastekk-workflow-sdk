@@ -89,26 +89,31 @@
     — **Done:** lint + typecheck + typecheck:tests clean; vitest 343 passed; tsup build (incl. DTS) green; fixes: none beyond 2.3's
 
 ### Phase 3: Docs + skills sweep (all copies) + examples
-- [ ] **3.1** Update `canvastekk-node-builder/SKILL.md` in BOTH copies (`.agents/skills/` and `python/canvastekk_workflow_sdk/data/skills/`): line ~217 comment (`"<UploadSession | presigned URL>"`), the upload-targets section (~675-682) — sessions only, legacy string raises `NodeIOError`, correct "removed in SDK v1.0" to "removed in SDK 0.36.0" (ticket item 6), delete the warning-silencing recipe.
+- [x] **3.1** Update `canvastekk-node-builder/SKILL.md` in BOTH copies (`.agents/skills/` and `python/canvastekk_workflow_sdk/data/skills/`): line ~217 comment (`"<UploadSession | presigned URL>"`), the upload-targets section (~675-682) — sessions only, legacy string raises `NodeIOError`, correct "removed in SDK v1.0" to "removed in SDK 0.36.0" (ticket item 6), delete the warning-silencing recipe.
     — **Why:** the ticket names this file twice (items 4 and 6); both copies must stay identical (project learning on mirror drift).
     — **Done when:** `diff` of the two copies is empty and `grep -n "v1.0" <copy>` has no upload-target removal claim.
     — **Consumers affected:** node authors, `init`-copied bundles.
-- [ ] **3.2** Update `canvastekk-node-patterns/SKILL.md` in BOTH copies: rewrite the "Upload targets: `str | UploadSession`" section (~954-959) to session-only + NodeIOError behavior.
+    — **Done:** comment + File Outputs section rewritten session-only with 0.36.0 removal note; silencing recipe replaced by fail-loud contract; copies byte-identical (`diff -q` clean); files: both builder SKILL.md copies; fixes: none
+- [x] **3.2** Update `canvastekk-node-patterns/SKILL.md` in BOTH copies: rewrite the "Upload targets: `str | UploadSession`" section (~954-959) to session-only + NodeIOError behavior.
     — **Why:** ticket item 4 names this file; the section teaches the removed union.
     — **Done when:** both copies identical; section no longer mentions the deprecated string target as usable.
     — **Consumers affected:** node authors.
-- [ ] **3.3** Update `docs/EXTERNAL-AUTHOR-GUIDE.md` (~277-278): sessions are the only target; plain-string targets from an unupgraded engine fail with `NodeIOError` — no warning, no silencing; removal version 0.36.0.
+    — **Done:** section retitled "Upload target: UploadSession" with DA-3340 rejection note; copies byte-identical; files: both patterns SKILL.md copies; fixes: none
+- [x] **3.3** Update `docs/EXTERNAL-AUTHOR-GUIDE.md` (~277-278): sessions are the only target; plain-string targets from an unupgraded engine fail with `NodeIOError` — no warning, no silencing; removal version 0.36.0.
     — **Why:** the external-author contract must match shipped behavior or authors debug against fiction.
     — **Done when:** `grep -n "LegacyPresignedUploadWarning\|still work" docs/EXTERNAL-AUTHOR-GUIDE.md` is empty.
     — **Consumers affected:** external node package authors.
-- [ ] **3.4** Sweep `README.md` (the "Upload Retry" section ~358-364 — single-PUT retry is gone; describe session retry) and `examples/echo_node/` (README output-upload wording ~8-10, ~47, any handler/test/example payload using a string upload target) to session descriptors; then repo-wide grep sweep for stale output-upload claims.
+    — **Done:** section retitled "session-only since v0.36.0"; bullets rewritten (removal + NodeIOError + no-fallback); files: EXTERNAL-AUTHOR-GUIDE.md; fixes: none
+- [x] **3.4** Sweep `README.md` (the "Upload Retry" section ~358-364 — single-PUT retry is gone; describe session retry) and `examples/echo_node/` (README output-upload wording ~8-10, ~47, any handler/test/example payload using a string upload target) to session descriptors; then repo-wide grep sweep for stale output-upload claims.
     — **Why:** deprecation sweep must cover every mention, not just the sections being rewritten (project learning); examples that send string targets would now demonstrate a guaranteed failure.
     — **Done when:** `grep -rn -i "LegacyPresignedUploadWarning" --include='*.md' --include='*.py' --include='*.ts' . | grep -v PLANS/ | grep -v LEARNINGS/` returns nothing, and input-presigned-GET wording is intact.
     — **Consumers affected:** README readers, example users.
-- [ ] **3.5** Run the light gate on docs-only changes: markdown link/reference sanity (`grep -n` the edited anchors) + confirm no code files changed in this phase (`git diff --stat` scoped).
+    — **Done:** README Upload Retry → session retry; echo_node README bullet + curl payload → session descriptor; found-and-fixed two extra stragglers the sweep surfaced (python/README.md:455 Output Upload section, typescript/README.md:414 Output Upload section); input-side presigned-GET wording (builder SKILL.md:770, README download sections) left intact; fixes: none
+- [x] **3.5** Run the light gate on docs-only changes: markdown link/reference sanity (`grep -n` the edited anchors) + confirm no code files changed in this phase (`git diff --stat` scoped).
     — **Why:** docs-only phase needs a proportionate check, not the full suite.
     — **Done when:** no code diffs in the phase commit; referenced symbols/files in docs exist.
     — **Consumers affected:** none (docs).
+    — **Done:** repo-wide sweeps exit empty (warning class, UploadHttpError, "removed in v1.0", stale-phrase patterns); `git diff --name-only` shows 9 docs files only; fixes: none
 
 ### Phase 4: Version 0.36.0 + ticket exit gate (full)
 - [ ] **4.1** Bump versions to 0.36.0: `python/pyproject.toml`, `python/canvastekk_workflow_sdk/__init__.py` `__version__`, `typescript/package.json`, `typescript/src/version.ts`.

@@ -951,18 +951,19 @@ context.metadata[field_name] = {
 Read these in `execute()` for audit trails or size-based branching. Manual
 `httpx.stream()` downloads are for non-file URLs or opt-out scenarios only.
 
-## Upload targets: `str | UploadSession`
+## Upload target: `UploadSession`
 
-Output upload targets come from the engine and are either a multipart
-`UploadSession` descriptor (current standard) or a legacy presigned PUT URL
-string (deprecated — emits `LegacyPresignedUploadWarning`; removed in SDK
-v1.0). Your node never constructs one:
+Output upload targets come from the engine and are a multipart `UploadSession`
+descriptor. Since SDK 0.36.0 (DA-3340) a legacy presigned PUT URL string is
+rejected with `NodeIOError` ("engine sent deprecated presigned target —
+upgrade the engine") — the fix is upgrading the engine, not node changes.
+Your node never constructs one:
 
 ```python
 def execute(self, inputs: dict, context: ExecutionContext) -> dict:
     out = context.output_path("result.parquet")
     # ... write the file ...
-    return {"output_file": str(out)}   # SDK uploads; handles str | UploadSession
+    return {"output_file": str(out)}   # SDK uploads via the engine's session
 ```
 
 Rules: pass targets through untouched — no string slicing, concatenation, or

@@ -450,10 +450,7 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 
 ### Output Upload
 
-The engine provides upload targets via the `output_upload_url` field in the request. The SDK uploads file outputs automatically after successful execution. A target is either:
-
-- **Plain presigned PUT URL string (legacy, deprecated)** — single PUT with the S3 5 GB ceiling. Emits a per-call-site `LegacyPresignedUploadWarning` (`DeprecationWarning` subclass; filter with `warnings.filterwarnings("ignore", category=LegacyPresignedUploadWarning)`). Removed in SDK v1.0 — upgrade the engine (DA-2887) to stop seeing it.
-- **Multipart upload-session descriptor (v0.29+)** — the engine's multipart lane. The SDK lazily redeems the session token, PUTs parts in bounded parallel batches with per-part `Content-MD5`, retries per part, resumes from server-side upload status after a failure, and aborts cleanly. No size ceiling beyond the engine's own part policy; node code needs **zero changes** (the router, not the developer, performs uploads).
+The engine provides upload targets via the `output_upload_url` field in the request. The SDK uploads file outputs automatically after successful execution. The target is a **multipart upload-session descriptor** — the only target since SDK 0.36.0 (DA-3340): the SDK lazily redeems the session token, PUTs parts in bounded parallel batches with per-part `Content-MD5`, retries per part, resumes from server-side upload status after a failure, and aborts cleanly. No size ceiling beyond the engine's own part policy; node code needs **zero changes** (the router, not the developer, performs uploads). A legacy presigned-PUT string reaching the SDK raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — there is no fallback; the fix is upgrading the engine (DA-3338/DA-2887).
 
 Session descriptor wire contract (snake_case, matching the execute wire):
 
