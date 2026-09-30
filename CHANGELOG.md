@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.36.0] - 2026-09-30
+
+### Features
+
+- **sdk**: Session-only uploads — remove legacy presigned PUT target (DA-3340) (#89) (**BREAKING**)
+
+
 ## [0.35.2] - 2026-09-30
 
 ### Bug Fixes
 
 - **sdk**: Drop unsigned Content-MD5 from multipart part PUTs (DA-3341)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.35.2
 
 
 ## [0.35.1] - 2026-09-29
