@@ -176,10 +176,10 @@ class S3PresignedUploader:
         Direct swap (DA-2886): a plain string target takes the legacy
         single-PUT path (with a deprecation warning — removed in SDK
         v1.0); an :class:`UploadSession` descriptor takes the multipart
-        client (lazy initiate → bounded parallel part PUTs with per-part
-        Content-MD5 → complete; per-part retry; resume-from-server-truth;
-        abort-on-failure). Node-developer code needs no changes — the
-        router, not the developer, performs uploads.
+        client (lazy initiate → bounded parallel part PUTs → complete;
+        per-part retry; resume-from-server-truth; abort-on-failure).
+        Node-developer code needs no changes — the router, not the
+        developer, performs uploads.
 
         The legacy string path keeps its contract: ``Content-Length`` set
         explicitly (pins the fixed-length identity wire contract against

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import logging
 import warnings
-from base64 import b64encode
-from hashlib import md5
 from typing import Any
 
 import httpx
@@ -33,10 +31,6 @@ def _session(**overrides: Any) -> UploadSession:
     }
     fields.update(overrides)
     return UploadSession(**fields)
-
-
-def _expected_md5(chunk: bytes) -> str:
-    return b64encode(md5(chunk).digest()).decode()
 
 
 class TestSessionHandshake:
@@ -218,7 +212,7 @@ class TestMachinery:
 
         monkeypatch.setattr(httpx, "Client", _client_factory)
 
-    def test_happy_path_content_md5_and_sorted_complete(self, tmp_path, monkeypatch):
+    def test_happy_path_no_unsigned_headers_and_sorted_complete(self, tmp_path, monkeypatch):
         f = tmp_path / "big.bin"
         payload = bytes(range(256)) * 2  # 512 bytes → 2 parts of 256
         f.write_bytes(payload)
@@ -240,7 +234,10 @@ class TestMachinery:
                 body = request.read()
                 part_puts.append((str(request.url), dict(request.headers)))
                 assert request.headers["Content-Length"] == str(len(body))
-                assert request.headers["Content-MD5"] == _expected_md5(body)
+                # The engine presigns part URLs with SignedHeaders=host — any
+                # header outside that set (e.g. Content-MD5) makes S3 reject
+                # the PUT with AccessDenied (DA-3341).
+                assert "Content-MD5" not in request.headers
                 return httpx.Response(200, headers={"ETag": f'"etag-{len(body)}"'})
             if path.endswith("/complete"):
                 import json as _json
