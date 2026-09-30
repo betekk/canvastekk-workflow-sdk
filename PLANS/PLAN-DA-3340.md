@@ -30,34 +30,41 @@
 ## Implementation Phases
 
 ### Phase 1: Python SDK — session-only UploadTarget
-- [ ] **1.1** Narrow `UploadTarget = UploadSession` in `python/canvastekk_workflow_sdk/uploads.py` and rewrite its comment: the legacy `str` member is removed (DA-3340); sessions are the only upload target.
+- [x] **1.1** Narrow `UploadTarget = UploadSession` in `python/canvastekk_workflow_sdk/uploads.py` and rewrite its comment: the legacy `str` member is removed (DA-3340); sessions are the only upload target.
     — **Why:** the public alias is the ticket's headline API change; every consumer (request field, protocol, tests) keys off it.
     — **Done when:** `grep -n "UploadTarget = " python/canvastekk_workflow_sdk/uploads.py` shows `UploadSession` only, with a DA-3340 comment.
     — **Consumers affected:** `request.py`, `uploads.py` signatures, `app.py`, tests (all updated in later steps).
-- [ ] **1.2** Replace the legacy branch in `S3PresignedUploader.upload_file`: delete `_warn_legacy_presigned_upload()`, `LegacyPresignedUploadWarning`, `_operator_warning_lock`/`_operator_warning_emitted`, the `threading` import (its only user), and the single-PUT retry loop; a non-`UploadSession` target now raises `NodeIOError("engine sent deprecated presigned target — upgrade the engine")`.
+    — **Done:** alias is `UploadSession` with DA-3340 comment; files: uploads.py; fixes: none
+- [x] **1.2** Replace the legacy branch in `S3PresignedUploader.upload_file`: delete `_warn_legacy_presigned_upload()`, `LegacyPresignedUploadWarning`, `_operator_warning_lock`/`_operator_warning_emitted`, the `threading` import (its only user), and the single-PUT retry loop; a non-`UploadSession` target now raises `NodeIOError("engine sent deprecated presigned target — upgrade the engine")`.
     — **Why:** fail-loud compliance is the ticket's core behavior; the warning machinery and retry loop exist only for the removed path.
     — **Done when:** `grep -n "LegacyPresignedUploadWarning\|_warn_legacy\|_operator_warning" python/canvastekk_workflow_sdk/uploads.py` returns nothing, and a string target raises the exact NodeIOError (test in 1.6).
     — **Consumers affected:** `__init__.py` export (1.5), tests (1.6).
-- [ ] **1.3** Switch `request.py` `output_upload_url` to the inline wire union `dict[str, str | UploadSession] | None` with a DA-3340 comment explaining parse tolerance: strings must still parse so the upload seam raises NodeIOError, not an opaque 422; update the field description.
+    — **Done:** legacy branch → exact-message NodeIOError; warning class/machinery, retry loop, `threading`/`time`/`warnings`/`httpx` imports and `_UPLOAD_TIMEOUT_SECONDS` deleted; files: uploads.py; fixes: none
+- [x] **1.3** Switch `request.py` `output_upload_url` to the inline wire union `dict[str, str | UploadSession] | None` with a DA-3340 comment explaining parse tolerance: strings must still parse so the upload seam raises NodeIOError, not an opaque 422; update the field description.
     — **Why:** narrowing the field to the (now session-only) `UploadTarget` alias would 422 legacy payloads at parse and make the ticket's required NodeIOError unreachable.
     — **Done when:** `NodeExecutionRequest(output_upload_url={"f": "https://legacy"})` validates, and `TestSessionHandshake` string-parse tests stay green (1.6).
     — **Consumers affected:** `app.py execute()` (no code change — value flows through), CI manifest-schema-stability job (watch item: generated schema shape changes).
-- [ ] **1.4** Sweep docstrings: `OutputUploader.upload_file`/`upload_outputs`, `S3PresignedUploader` class docstring, `app.py:_upload_outputs_to_s3`, and the output half of `app.py execute()`'s docstring ("Outputs are uploaded via presigned PUT URLs") — sessions only, NodeIOError on legacy. Keep input-presigned-GET wording untouched.
+    — **Done:** field is inline `str | UploadSession` union with parse-tolerance description; import narrowed to `UploadSession`; files: request.py; fixes: none
+- [x] **1.4** Sweep docstrings: `OutputUploader.upload_file`/`upload_outputs`, `S3PresignedUploader` class docstring, `app.py:_upload_outputs_to_s3`, and the output half of `app.py execute()`'s docstring ("Outputs are uploaded via presigned PUT URLs") — sessions only, NodeIOError on legacy. Keep input-presigned-GET wording untouched.
     — **Why:** per project learning, a deprecation must sweep every teaching mention or docs drift from behavior.
     — **Done when:** `grep -n -i "presigned PUT\|legacy" python/canvastekk_workflow_sdk/{uploads,app,request}.py` shows no stale output-path claims (input-GET mentions remain).
     — **Consumers affected:** doc readers; `docs/` sweep is Phase 3.
-- [ ] **1.5** Remove `LegacyPresignedUploadWarning` from `python/canvastekk_workflow_sdk/__init__.py` imports and `__all__` (keep `UploadTarget`, `UploadSession`).
+    — **Done:** protocol + uploader + app docstrings rewritten session-only; input-GET wording untouched; files: uploads.py, app.py; fixes: none
+- [x] **1.5** Remove `LegacyPresignedUploadWarning` from `python/canvastekk_workflow_sdk/__init__.py` imports and `__all__` (keep `UploadTarget`, `UploadSession`).
     — **Why:** exporting a deleted class breaks import; dropping the export is the documented breaking change for 0.36.0.
     — **Done when:** `python -c "from canvastekk_workflow_sdk import LegacyPresignedUploadWarning"` fails and `from canvastekk_workflow_sdk import UploadTarget, UploadSession` succeeds.
     — **Consumers affected:** external node packages that import the warning (breaking — covered by the 0.36.0 notice).
-- [ ] **1.6** Rewrite Python tests: `test_uploads.py` — delete/convert legacy single-PUT suites (`TestUploadRetry`, `TestUploadWireFormat`, `upload_file` PUT tests, string-target `upload_outputs` tests) to session-fake equivalents; `test_multipart_uploads.py` — convert `test_string_target_takes_legacy_put_path` to assert the exact NodeIOError, delete `TestDeprecationWarning` (4 tests), keep `TestSessionHandshake` and `TestMachinery`; add a test that a legacy string reaching `upload_outputs` fails the response as `UPLOAD_FAILED` at the app seam.
+    — **Done:** export + `__all__` entry removed; files: __init__.py; fixes: none
+- [x] **1.6** Rewrite Python tests: `test_uploads.py` — delete/convert legacy single-PUT suites (`TestUploadRetry`, `TestUploadWireFormat`, `upload_file` PUT tests, string-target `upload_outputs` tests) to session-fake equivalents; `test_multipart_uploads.py` — convert `test_string_target_takes_legacy_put_path` to assert the exact NodeIOError, delete `TestDeprecationWarning` (4 tests), keep `TestSessionHandshake` and `TestMachinery`; add a test that a legacy string reaching `upload_outputs` fails the response as `UPLOAD_FAILED` at the app seam.
     — **Why:** tests are the executable proof of AC #1 and #2; dead legacy suites would fail or lie.
     — **Done when:** `python -m poetry run pytest` exits 0 from `python/` with no legacy-path test remaining (`grep -rn "LegacyPresignedUploadWarning" python/tests/` empty).
     — **Consumers affected:** coverage signal carried by CI.
-- [ ] **1.7** Run the light gate in `python/`: `python -m poetry run ruff check canvastekk_workflow_sdk/ tests/` + `python -m poetry run pytest`.
+    — **Done:** test_uploads.py rewritten (legacy rejection + session-routing suites; retry/wire-format suites deleted); TestDeprecationWarning deleted, string test converted to exact-message NodeIOError; unmocked seam test `test_legacy_string_target_fails_with_upload_failed` added; files: test_uploads.py, test_multipart_uploads.py, test_app.py; fixes: ruff F401 unused MagicMock import
+- [x] **1.7** Run the light gate in `python/`: `python -m poetry run ruff check canvastekk_workflow_sdk/ tests/` + `python -m poetry run pytest`.
     — **Why:** phase-scoped verification before stacking Phase 2.
     — **Done when:** both commands exit 0.
     — **Consumers affected:** CI parity (same commands).
+    — **Done:** ruff clean; pytest 763 passed (fresh-venv `poetry install` was the only environment fix); fixes: none (lint fix counted in 1.6)
 
 ### Phase 2: TypeScript SDK parity
 - [ ] **2.1** In `typescript/src/uploads.ts`: set `export type UploadTarget = UploadSessionDescriptor`; make `uploadFile` throw `new NodeIOError("engine sent deprecated presigned target — upgrade the engine")` for string targets before the session path; delete `warnLegacyPresignedUpload`, `_legacyWarningEmitted`, `attemptUpload`, `isTransientError`, `TRANSIENT_ERRNO_CODES`, `UPLOAD_TIMEOUT_MS`, and the now-unused `node:http`/`node:https` imports; update `OutputUploader`/`uploadOutputs` doc comments.

@@ -1,33 +1,53 @@
-"""Tests for output upload functionality (Phase 1)."""
+"""Tests for output upload functionality (session-only targets since DA-3340)."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
-import httpx
 import pytest
 
 from canvastekk_workflow_sdk.exceptions import NodeIOError
 from canvastekk_workflow_sdk.response import NodeExecutionResponse
-from canvastekk_workflow_sdk.uploads import OutputUploader, S3PresignedUploader, get_default_uploader
+from canvastekk_workflow_sdk.uploads import (
+    OutputUploader,
+    S3PresignedUploader,
+    UploadSession,
+    get_default_uploader,
+)
+
+#: Exact fail-loud message for a legacy presigned-PUT string target (DA-3340).
+LEGACY_TARGET_MESSAGE = "engine sent deprecated presigned target — upgrade the engine"
+
+
+def _session(**overrides: Any) -> UploadSession:
+    fields = {
+        "session_token": "tok-1",
+        "initiate_url": "https://engine/sessions/tok-1/initiate",
+        "complete_url": "https://engine/sessions/tok-1/complete",
+        "abort_url": "https://engine/sessions/tok-1/abort",
+        "status_url": "https://engine/sessions/tok-1/status",
+    }
+    fields.update(overrides)
+    return UploadSession(**fields)
 
 
 class MockUploader(OutputUploader):
     """Mock uploader for testing protocol compliance."""
 
     def __init__(self) -> None:
-        self.uploaded: list[tuple[NodeExecutionResponse, dict[str, str], list[str]]] = []
+        self.uploaded: list[tuple[NodeExecutionResponse, dict[str, UploadSession], list[str]]] = []
 
     def upload_outputs(
         self,
         response: NodeExecutionResponse,
-        upload_urls: dict[str, str],
+        upload_urls: dict[str, UploadSession],
         file_output_fields: list[str],
     ) -> None:
         self.uploaded.append((response, upload_urls, file_output_fields))
 
 
 class TestOutputUploaderProtocol:
-    """Tests for OutputUploader protocol (Phase 1)."""
+    """Tests for OutputUploader protocol."""
 
     def test_protocol_is_runtime_checkable(self) -> None:
         """Test that OutputUploader protocol is runtime checkable."""
@@ -40,62 +60,55 @@ class TestOutputUploaderProtocol:
         assert isinstance(uploader, OutputUploader)
 
 
+class TestLegacyTargetRejection:
+    """Fail-loud compliance: a legacy presigned-PUT string never uploads (DA-3340)."""
+
+    def test_upload_file_rejects_legacy_string_target(self, tmp_path: Path) -> None:
+        """A string target raises NodeIOError with the upgrade-the-engine message."""
+        test_file = tmp_path / "out.bin"
+        test_file.write_bytes(b"data")
+
+        with pytest.raises(NodeIOError) as excinfo:
+            S3PresignedUploader().upload_file(str(test_file), "https://example.com/presigned")
+
+        assert str(excinfo.value) == LEGACY_TARGET_MESSAGE
+
+    def test_upload_outputs_rejects_legacy_string_target(self, tmp_path: Path) -> None:
+        """A legacy string in upload_urls fails upload_outputs before any upload."""
+        test_file = tmp_path / "result.ply"
+        test_file.write_bytes(b"ply data")
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"result_path": str(test_file)},
+            duration_ms=100,
+        )
+
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+            with pytest.raises(NodeIOError) as excinfo:
+                S3PresignedUploader().upload_outputs(
+                    response, {"result_path": "https://example.com/presigned"}, ["result_path"]
+                )
+
+        assert str(excinfo.value) == LEGACY_TARGET_MESSAGE
+        mock_session_upload.assert_not_called()
+
+
 class TestS3PresignedUploader:
-    """Tests for S3PresignedUploader class (Phase 1)."""
+    """Tests for S3PresignedUploader session-path behavior."""
 
-    def test_upload_file_with_valid_file(self, tmp_path: Path) -> None:
-        """Test upload_file works with a valid file."""
-        uploader = S3PresignedUploader()
-        test_file = tmp_path / "test.txt"
-        test_file.write_text("test content")
+    def test_upload_file_routes_session_target_to_multipart(self, tmp_path: Path) -> None:
+        """A session target takes the multipart client (upload_via_session)."""
+        test_file = tmp_path / "result.ply"
+        test_file.write_bytes(b"ply data")
+        sess = _session()
 
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+            S3PresignedUploader().upload_file(str(test_file), sess)
 
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_response) as mock_put:
-            uploader.upload_file(str(test_file), "https://example.com/presigned")
+        mock_session_upload.assert_called_once_with(sess, str(test_file))
 
-        mock_put.assert_called_once()
-        call_kwargs = mock_put.call_args[1]
-        assert call_kwargs["headers"]["Content-Type"] == "application/octet-stream"
-        assert hasattr(call_kwargs["content"], "read")
-
-    def test_upload_file_sets_headers(self, tmp_path: Path) -> None:
-        """Test that upload_file sets correct headers."""
-        uploader = S3PresignedUploader()
-        test_file = tmp_path / "test.bin"
-        test_file.write_bytes(b"x" * 1000)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_response) as mock_put:
-            uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        mock_put.assert_called_once()
-        call_kwargs = mock_put.call_args[1]
-        assert call_kwargs["headers"]["Content-Type"] == "application/octet-stream"
-        assert hasattr(call_kwargs["content"], "read")
-
-    def test_upload_file_zero_byte_file(self, tmp_path: Path) -> None:
-        """Test upload_file with a zero-byte file sends Content-Length: 0."""
-        uploader = S3PresignedUploader()
-        test_file = tmp_path / "empty.bin"
-        test_file.write_bytes(b"")
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_response) as mock_put:
-            uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        mock_put.assert_called_once()
-        call_kwargs = mock_put.call_args[1]
-        assert call_kwargs["headers"]["Content-Length"] == "0"
-        assert call_kwargs["headers"]["Content-Type"] == "application/octet-stream"
-
-    def test_upload_outputs_with_valid_file_and_url(self, tmp_path: Path) -> None:
-        """Test upload_outputs with valid file and URL."""
+    def test_upload_outputs_with_valid_file_and_session(self, tmp_path: Path) -> None:
+        """Test upload_outputs with a valid file and session target."""
         uploader = S3PresignedUploader()
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
@@ -105,16 +118,14 @@ class TestS3PresignedUploader:
             outputs={"result_path": str(test_file), "summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_response) as mock_put:
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
-        mock_put.assert_called_once()
+        mock_session_upload.assert_called_once()
+        assert mock_session_upload.call_args[0][1] == str(test_file)
 
     def test_upload_outputs_raises_on_non_string_value(self) -> None:
         """A present non-string file-output value fails the node (DA-2337)."""
@@ -124,18 +135,15 @@ class TestS3PresignedUploader:
             outputs={"result": 123, "summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result": _session()}
         file_output_fields = ["result"]
 
-        mock_put = MagicMock()
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
-            with pytest.raises(NodeIOError) as excinfo:
-                uploader.upload_outputs(response, upload_urls, file_output_fields)
+        with pytest.raises(NodeIOError) as excinfo:
+            uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         assert "Output field 'result'" in str(excinfo.value)
         assert "not a string" in str(excinfo.value)
         assert excinfo.value.path is None
-        mock_put.assert_not_called()
 
     def test_upload_outputs_raises_on_nonexistent_file(self) -> None:
         """A present path that does not exist fails the node with path detail (DA-2337)."""
@@ -145,17 +153,14 @@ class TestS3PresignedUploader:
             outputs={"result_path": "/nonexistent/file.ply", "summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        mock_put = MagicMock()
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
-            with pytest.raises(NodeIOError) as excinfo:
-                uploader.upload_outputs(response, upload_urls, file_output_fields)
+        with pytest.raises(NodeIOError) as excinfo:
+            uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         assert "Output field 'result_path' value is not a local file" in str(excinfo.value)
         assert excinfo.value.path == "/nonexistent/file.ply"
-        mock_put.assert_not_called()
 
     def test_upload_outputs_raises_on_directory_value(self, tmp_path: Path) -> None:
         """A directory path is not a file — fails like a missing path (DA-2337)."""
@@ -165,12 +170,11 @@ class TestS3PresignedUploader:
             outputs={"result_path": str(tmp_path), "summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", MagicMock()):
-            with pytest.raises(NodeIOError) as excinfo:
-                uploader.upload_outputs(response, upload_urls, file_output_fields)
+        with pytest.raises(NodeIOError) as excinfo:
+            uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         assert "not a local file" in str(excinfo.value)
         assert excinfo.value.path == str(tmp_path)
@@ -183,14 +187,13 @@ class TestS3PresignedUploader:
             outputs={"summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        mock_put = MagicMock()
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
-        mock_put.assert_not_called()
+        mock_session_upload.assert_not_called()
 
     def test_upload_outputs_partial_failure_orphans_earlier_uploads(self, tmp_path: Path) -> None:
         """A bad later field raises AFTER earlier valid fields uploaded (DA-2337)."""
@@ -204,21 +207,17 @@ class TestS3PresignedUploader:
             duration_ms=100,
         )
         upload_urls = {
-            "good_path": "https://s3.amazonaws.com/good",
-            "bad_path": "https://s3.amazonaws.com/bad",
+            "good_path": _session(session_token="tok-good"),
+            "bad_path": _session(session_token="tok-bad"),
         }
         file_output_fields = ["good_path", "bad_path"]
 
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-
-        mock_put = MagicMock(return_value=mock_response)
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
             with pytest.raises(NodeIOError) as excinfo:
                 uploader.upload_outputs(response, upload_urls, file_output_fields)
 
-        assert mock_put.call_count == 1
-        assert mock_put.call_args[0][0] == "https://s3.amazonaws.com/good"
+        assert mock_session_upload.call_count == 1
+        assert mock_session_upload.call_args[0][0].session_token == "tok-good"
         assert "bad_path" in str(excinfo.value)
 
     def test_upload_outputs_skips_missing_urls(self, tmp_path: Path) -> None:
@@ -232,16 +231,16 @@ class TestS3PresignedUploader:
             outputs={"result_path": str(test_file), "summary": "done"},
             duration_ms=100,
         )
-        upload_urls: dict[str, str] = {}
+        upload_urls: dict[str, UploadSession] = {}
         file_output_fields = ["result_path"]
 
-        mock_put = MagicMock()
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
-            mock_put.assert_not_called()
+
+        mock_session_upload.assert_not_called()
 
     def test_upload_outputs_raises_on_upload_failure(self, tmp_path: Path) -> None:
-        """Upload failures now raise so the execution fails (DA-1711 4.1)."""
+        """Session-path failures raise so the execution fails (DA-1711 4.1)."""
         uploader = S3PresignedUploader()
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
@@ -251,16 +250,14 @@ class TestS3PresignedUploader:
             outputs={"result_path": str(test_file), "summary": "done"},
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.text = "Error"
-        error = httpx.HTTPStatusError("Upload failed", request=MagicMock(), response=mock_response)
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", side_effect=error):
-            with pytest.raises(httpx.HTTPStatusError):
+        with patch(
+            "canvastekk_workflow_sdk.multipart.upload_via_session",
+            side_effect=NodeIOError("part PUT failed"),
+        ):
+            with pytest.raises(NodeIOError):
                 uploader.upload_outputs(response, upload_urls, file_output_fields)
 
     def test_upload_outputs_with_no_outputs(self) -> None:
@@ -272,17 +269,17 @@ class TestS3PresignedUploader:
             error_type="ValueError",
             duration_ms=100,
         )
-        upload_urls = {"result_path": "https://s3.amazonaws.com/upload"}
+        upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        mock_put = MagicMock()
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", mock_put):
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
-            mock_put.assert_not_called()
+
+        mock_session_upload.assert_not_called()
 
 
 class TestDefaultUploaderSingleton:
-    """Tests for get_default_uploader singleton (Phase 1)."""
+    """Tests for get_default_uploader singleton."""
 
     def test_get_default_uploader_returns_singleton(self) -> None:
         """Test that get_default_uploader returns the same instance."""
@@ -299,151 +296,3 @@ class TestDefaultUploaderSingleton:
         """Test that default uploader implements OutputUploader protocol."""
         uploader = get_default_uploader()
         assert isinstance(uploader, OutputUploader)
-
-
-class TestUploadWireFormat:
-    """Wire-contract regression pins (DA-1900).
-
-    Asserts the actual bytes-on-the-wire for S3 presigned PUTs against a real local
-    HTTP server: explicit Content-Length, no Transfer-Encoding: chunked, body intact.
-    Passes on pre-DA-1900 code too (httpx 0.28 auto-sets Content-Length via os.fstat)
-    — the pin exists to catch future httpx drift, not to gate the fix.
-    """
-
-    def test_upload_file_sends_fixed_length_identity_put(self, tmp_path: Path) -> None:
-        """PUT wire format: Content-Length == file size, no chunked TE, body intact."""
-        import http.server
-        import threading
-
-        payload = bytes(range(256)) * 64  # 16 KiB of non-repeating-pattern data
-        test_file = tmp_path / "payload.bin"
-        test_file.write_bytes(payload)
-
-        captured: dict[str, object] = {}
-
-        class _CaptureHandler(http.server.BaseHTTPRequestHandler):
-            protocol_version = "HTTP/1.1"
-
-            def do_PUT(self) -> None:  # noqa: N802 (stdlib naming)
-                captured["content_length"] = self.headers.get("Content-Length")
-                captured["transfer_encoding"] = self.headers.get("Transfer-Encoding")
-                length = int(self.headers["Content-Length"])
-                captured["body"] = self.rfile.read(length)
-                self.send_response(200)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-
-            def log_message(self, *args: object) -> None:
-                pass  # keep test output clean
-
-        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _CaptureHandler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            url = f"http://127.0.0.1:{server.server_address[1]}/upload"
-            S3PresignedUploader().upload_file(str(test_file), url)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join(timeout=5)
-
-        assert captured["content_length"] == str(len(payload))
-        assert captured["transfer_encoding"] is None
-        assert captured["body"] == payload
-
-
-class TestUploadRetry:
-    """Retry semantics for S3PresignedUploader.upload_file (DA-1955)."""
-
-    def _write_file(self, tmp_path: Path) -> Path:
-        test_file = tmp_path / "test.txt"
-        test_file.write_text("test content")
-        return test_file
-
-    def test_transport_error_retries_then_succeeds(self, tmp_path: Path) -> None:
-        """Two transport failures then success = 3 attempts, uploads."""
-        uploader = S3PresignedUploader()
-        test_file = self._write_file(tmp_path)
-
-        mock_success = MagicMock()
-        mock_success.raise_for_status = MagicMock()
-
-        with patch(
-            "canvastekk_workflow_sdk.uploads.httpx.put",
-            side_effect=[httpx.TransportError("boom"), httpx.TransportError("boom"), mock_success],
-        ) as mock_put:
-            uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        assert mock_put.call_count == 3
-
-    def test_500_retries_then_raises_after_max_attempts(self, tmp_path: Path) -> None:
-        """Persistent 500s exhaust 3 attempts then raise."""
-        uploader = S3PresignedUploader()
-        test_file = self._write_file(tmp_path)
-
-        mock_500 = MagicMock()
-        mock_500.status_code = 500
-        mock_500.raise_for_status = MagicMock(
-            side_effect=httpx.HTTPStatusError("500", request=MagicMock(), response=mock_500)
-        )
-
-        with (
-            patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_500) as mock_put,
-            patch("canvastekk_workflow_sdk.uploads.time.sleep") as mock_sleep,
-        ):
-            with pytest.raises(httpx.HTTPStatusError):
-                uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        assert mock_put.call_count == 3
-        assert mock_sleep.call_count == 2
-
-    def test_403_never_retries(self, tmp_path: Path) -> None:
-        """Deterministic 4xx client errors raise immediately."""
-        uploader = S3PresignedUploader()
-        test_file = self._write_file(tmp_path)
-
-        mock_403 = MagicMock()
-        mock_403.status_code = 403
-        mock_403.raise_for_status = MagicMock(
-            side_effect=httpx.HTTPStatusError("403", request=MagicMock(), response=mock_403)
-        )
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_403) as mock_put:
-            with pytest.raises(httpx.HTTPStatusError):
-                uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        mock_put.assert_called_once()
-
-    def test_success_single_attempt(self, tmp_path: Path) -> None:
-        """Successful upload makes exactly one attempt."""
-        uploader = S3PresignedUploader()
-        test_file = self._write_file(tmp_path)
-
-        mock_success = MagicMock()
-        mock_success.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_success) as mock_put:
-            uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        mock_put.assert_called_once()
-
-    def test_backoff_schedule_exponential(self, tmp_path: Path) -> None:
-        """Backoff is 0.5s then 1.0s (0.5 * 2^(n-1))."""
-        uploader = S3PresignedUploader()
-        test_file = self._write_file(tmp_path)
-
-        mock_500 = MagicMock()
-        mock_500.status_code = 500
-        mock_500.raise_for_status = MagicMock(
-            side_effect=httpx.HTTPStatusError("500", request=MagicMock(), response=mock_500)
-        )
-
-        with (
-            patch("canvastekk_workflow_sdk.uploads.httpx.put", return_value=mock_500),
-            patch("canvastekk_workflow_sdk.uploads.time.sleep") as mock_sleep,
-        ):
-            with pytest.raises(httpx.HTTPStatusError):
-                uploader.upload_file(str(test_file), "https://example.com/presigned")
-
-        delays = [call.args[0] for call in mock_sleep.call_args_list]
-        assert delays == [0.5, 1.0]

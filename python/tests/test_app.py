@@ -451,6 +451,30 @@ class TestOutputUploadToS3:
             # No upload should happen
             mock_upload.assert_not_called()
 
+    def test_legacy_string_target_fails_with_upload_failed(self, file_output_client: TestClient) -> None:
+        """A legacy presigned-PUT string target fails the execution (DA-3340).
+
+        No mocking: the real upload_file sees the string and raises
+        NodeIOError, which the app seam converts to fail/UPLOAD_FAILED.
+        """
+        response = file_output_client.post(
+            "/execute",
+            json={
+                "run_id": "run-1",
+                "node_id": "node-1",
+                "inputs": {"input_data": "test"},
+                "output_upload_url": {
+                    "result_path": "https://s3.amazonaws.com/presigned-put",
+                },
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "fail"
+        assert data["error_code"] == "UPLOAD_FAILED"
+        assert "engine sent deprecated presigned target" in data["error"]
+
 
 class TestAsyncExecution:
     """Tests for async execution with asyncio.to_thread (Phase 1)."""

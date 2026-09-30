@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from canvastekk_workflow_sdk.uploads import UploadTarget
+from canvastekk_workflow_sdk.uploads import UploadSession
 
 
 class NodeExecutionRequest(BaseModel):
@@ -67,12 +67,14 @@ class NodeExecutionRequest(BaseModel):
         default=None,
         description="For async execution - URL to POST result to when complete",
     )
-    output_upload_url: dict[str, UploadTarget] | None = Field(
+    output_upload_url: dict[str, str | UploadSession] | None = Field(
         default=None,
         description=(
-            "Mapping of output field name to an upload target: a pre-signed "
-            "S3 PUT URL string (legacy, deprecated) or a multipart upload "
-            "session descriptor (DA-2886/DA-2887)"
+            "Mapping of output field name to a multipart upload-session "
+            "descriptor (the only upload target since SDK 0.36.0, "
+            "DA-3340). A legacy presigned-PUT string is still admitted at "
+            "this parse — solely so the upload seam can fail loudly with "
+            "NodeIOError instead of an opaque 422"
         ),
     )
 
