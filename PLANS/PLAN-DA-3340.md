@@ -5,10 +5,10 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] Legacy `str` form removed from the public API (`UploadTarget = UploadSession`); `NodeIOError` raised on legacy targets with message "engine sent deprecated presigned target — upgrade the engine"
-- [ ] `UploadSession` upload path unchanged (multipart machinery in `python/.../multipart.py` and `typescript/src/multipart.ts` untouched)
-- [ ] TypeScript SDK parity verified (the union exists there: `typescript/src/uploads.ts:33` — same removal applied)
-- [ ] node-builder / node-patterns SKILL.md (both `.agents/skills/` mirror and `python/.../data/skills/` bundled copies) and EXTERNAL-AUTHOR-GUIDE.md updated; in-repo version bumped to 0.36.0 (no production release/tag — that stays with the release workflow)
+- [x] Legacy `str` form removed from the public API (`UploadTarget = UploadSession`); `NodeIOError` raised on legacy targets with message "engine sent deprecated presigned target — upgrade the engine"
+- [x] `UploadSession` upload path unchanged (multipart machinery in `python/.../multipart.py` and `typescript/src/multipart.ts` untouched)
+- [x] TypeScript SDK parity verified (the union exists there: `typescript/src/uploads.ts:33` — same removal applied)
+- [x] node-builder / node-patterns SKILL.md (both `.agents/skills/` mirror and `python/.../data/skills/` bundled copies) and EXTERNAL-AUTHOR-GUIDE.md updated; in-repo version bumped to 0.36.0 (no production release/tag — that stays with the release workflow)
 
 **Requirement note (stated, not hidden):** the ticket's AC #4 says "v1.0.0 released" while Proposed #5 says "Version 0.36.0 — feature bump. No production release yet" and Proposed #6 says the removal lands in 0.36.0. These cannot both hold; this PLAN follows the Proposed section (0.36.0 in-repo bump, docs corrected from "removed in SDK v1.0" to 0.36.0, no tag/release).
 
@@ -116,22 +116,26 @@
     — **Done:** repo-wide sweeps exit empty (warning class, UploadHttpError, "removed in v1.0", stale-phrase patterns); `git diff --name-only` shows 9 docs files only; fixes: none
 
 ### Phase 4: Version 0.36.0 + ticket exit gate (full)
-- [ ] **4.1** Bump versions to 0.36.0: `python/pyproject.toml`, `python/canvastekk_workflow_sdk/__init__.py` `__version__`, `typescript/package.json`, `typescript/src/version.ts`.
+- [x] **4.1** Bump versions to 0.36.0: `python/pyproject.toml`, `python/canvastekk_workflow_sdk/__init__.py` `__version__`, `typescript/package.json`, `typescript/src/version.ts`.
     — **Why:** ticket item 5 — feature bump marking the breaking removal; done in-repo, no tag.
     — **Done when:** `grep -n "0.36.0" python/pyproject.toml python/canvastekk_workflow_sdk/__init__.py typescript/package.json typescript/src/version.ts` matches all four.
     — **Consumers affected:** release workflow (next prep is version-noop), poetry lock (4.2).
-- [ ] **4.2** Refresh `python/poetry.lock` with `python -m poetry lock` (2.x preserves pinned deps) and verify the diff touches only the project version/hash lines.
+    — **Done:** all four files at 0.36.0 (grep confirms); files: pyproject.toml, __init__.py, package.json, version.ts; fixes: none
+- [x] **4.2** Refresh `python/poetry.lock` with `python -m poetry lock` (2.x preserves pinned deps) and verify the diff touches only the project version/hash lines.
     — **Why:** the lock records the package's own version; a stale lock fails `poetry install` consistency checks in CI.
     — **Done when:** `git diff python/poetry.lock` shows only version/content-hash lines.
     — **Consumers affected:** CI install steps.
-- [ ] **4.3** Run the ticket exit gate — full tier, both SDKs: Python `ruff check` + `pytest`; TS `lint`, `typecheck`, `typecheck:tests`, `test`, `build`.
+    — **Done:** DEVIATION (documented): `poetry lock` produced an EMPTY diff — the lock never records the project's own version (verified against the v0.35.2 release commit: its lock diff was generator drift only) and the content-hash is version-independent. `poetry check --lock` reports the same 3 pre-existing extras-case errors on unmodified main (not introduced here; CI does not run poetry check). files: none; fixes: none
+- [x] **4.3** Run the ticket exit gate — full tier, both SDKs: Python `ruff check` + `pytest`; TS `lint`, `typecheck`, `typecheck:tests`, `test`, `build`.
     — **Why:** the run's last gate is full (pipeline contract); the whole surface changed across two SDKs.
     — **Done when:** every command exits 0; gate memo written into the PLAN trace block with the final implementation SHA.
     — **Consumers affected:** Step 9 review-fix re-gate and Step 10a gate citation.
-- [ ] **4.4** Land the breaking-change notice in commit messages: the removal phase commit uses `feat(sdk)!: ...` + `BREAKING CHANGE:` footer (legacy presigned PUT target removed; `LegacyPresignedUploadWarning`/`UploadHttpError` exports deleted) so git-cliff renders `(**BREAKING**)` in the eventual 0.36.0 entry — the "changelog notice for external authors" is commit-carried, no manual CHANGELOG.md edit (generated at release).
+    — **Done:** python ruff clean + 763 passed; TS lint/typecheck/typecheck:tests clean + vitest 343 passed + tsup build green; memo in Gate Trace; fixes: none
+- [x] **4.4** Land the breaking-change notice in commit messages: the removal phase commit uses `feat(sdk)!: ...` + `BREAKING CHANGE:` footer (legacy presigned PUT target removed; `LegacyPresignedUploadWarning`/`UploadHttpError` exports deleted) so git-cliff renders `(**BREAKING**)` in the eventual 0.36.0 entry — the "changelog notice for external authors" is commit-carried, no manual CHANGELOG.md edit (generated at release).
     — **Why:** CHANGELOG.md is git-cliff-generated at release time; the footer is the only correct injection point.
     — **Done when:** `git log --format=%B -1 <removal-commit>` contains the footer.
     — **Consumers affected:** external authors reading the 0.36.0 changelog.
+    — **Done:** `feat(sdk)!:` (71d6c89) and `feat(ts-sdk)!:` (41e926a) both carry BREAKING CHANGE footers naming the warning class + UploadHttpError removals; fixes: none
 
 ## Technical Notes
 - Exact NodeIOError message (both SDKs): `engine sent deprecated presigned target — upgrade the engine`.
@@ -152,4 +156,9 @@
 - **Hidden legacy-path tests** surfacing late → repo-wide grep sweep in 3.4 covers `*.py`/`*.ts`/`*.md`; test dirs grepped in 1.6/2.3.
 
 ## Gate Trace
-(appended per phase by the executor)
+
+<!-- gate memo lines appended during execution -->
+- GATE 71d6c89 tier=light lint=t typecheck=- build=- unit=t(763) e2e=n.a. note="Phase 1: python session-only removal — ruff + full pytest; fresh-venv poetry install was env-only setup"
+- GATE 41e926a tier=light lint=t typecheck=t build=t unit=t(343) e2e=n.a. note="Phase 2: TS parity — eslint/tsc/tsc-tests/vitest/build; gate fixes: app.ts call-site cast, uploader fixture re-pin (2/20 budget)"
+- GATE 1554a02 tier=light lint=t typecheck=- build=- unit=n.a. e2e=n.a. note="Phase 3: docs sweep — stale-mention sweeps empty, docs-only diff"
+- GATE 156746d tier=full lint=t typecheck=t build=t unit=t(py 763 + ts 343) e2e=n.a. note="Phase 4 exit gate on the version-bump tree (e2e n.a.: backend SDKs, no Playwright scope); final pushed SHA carries this memo (amended append — the memo line does not change the gated code)"
