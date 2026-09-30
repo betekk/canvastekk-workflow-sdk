@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.35.2] - 2026-09-30
+
+### Bug Fixes
+
+- **sdk**: Drop unsigned Content-MD5 from multipart part PUTs (DA-3341)
+
+
 ## [0.35.1] - 2026-09-29
 
 ### Bug Fixes
 
 - **ts-sdk**: DA-3314 red-CI fix — unused helper + dead resume code (#87)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.35.1
 
 
 ## [0.35.0] - 2026-09-29
