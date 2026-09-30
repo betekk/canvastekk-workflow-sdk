@@ -8,7 +8,6 @@ not a CDS client. This module owns the byte-level concerns:
 
 - ETag parsing (S3 returns quoted hex; some S3-compatible stores don't)
 - Per-part chunking (seek + read within a single open file handle)
-- Per-part Content-MD5 (RFC 1864 raw-MD5 base64 — DA-2891 verdict)
 - Per-part retry with backoff (multipart is designed for per-part retry)
 - Resume reconciliation (post-retry part failure queries server-side
   upload status and re-attempts only unconfirmed parts — DA-2881)
@@ -27,9 +26,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from base64 import b64encode
 from concurrent.futures import ThreadPoolExecutor
-from hashlib import md5
 from typing import Any, BinaryIO
 
 import httpx
@@ -144,11 +141,13 @@ def _put_one_part(
         NodeIOError: If all attempts fail (S3 error body surfaced).
         NodeExecutionError: If the response carries no usable ETag.
     """
-    # End-to-end integrity (DA-2884/DA-2891): S3 validates Content-MD5
-    # against the received bytes at PUT time — corruption rejects loudly
-    # (BadDigest) instead of surfacing downstream. Raw-MD5 base64
-    # (RFC 1864), not hex.
-    content_md5 = b64encode(md5(chunk).digest()).decode()
+    # No Content-MD5 on part PUTs (DA-2891 verdict superseded by DA-3341
+    # evidence): the engine presigns part URLs with SignedHeaders=host only
+    # and the MD5 is unknowable at mint time, so an unsigned Content-MD5
+    # header makes S3 reject the PUT with AccessDenied "There were headers
+    # present in the request which were not signed". Integrity rides TLS
+    # in transit plus S3's MPU etag consistency; reintroduce per-part
+    # checksums only via a mint-time per-part signing protocol change.
 
     last_exc: Exception | None = None
     for attempt in range(1, retry_attempts + 1):
@@ -157,7 +156,6 @@ def _put_one_part(
         headers = {
             "Content-Type": content_type,
             "Content-Length": str(len(chunk)),
-            "Content-MD5": content_md5,
         }
         try:
             res = s3_client.put(presigned_url, content=chunk, headers=headers)
