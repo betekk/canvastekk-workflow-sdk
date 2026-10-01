@@ -133,7 +133,7 @@ describe("uploadViaSession (DA-2886)", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("happy path: initiate → parallel part PUTs with Content-MD5 → complete sorted, no abort", async () => {
+  it("happy path: initiate → parallel part PUTs without unsigned headers → complete sorted, no abort", async () => {
     const srv = await startServer();
     try {
       await uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
@@ -149,7 +149,10 @@ describe("uploadViaSession (DA-2886)", () => {
       expect(parts).toHaveLength(3);
       expect(parts.map((p) => p.url.split("/part/")[1])).toEqual(["1", "2", "3"]);
       for (const p of parts) {
-        expect(p.contentMd5).toBeDefined();
+        // The engine presigns part URLs with SignedHeaders=host — any header
+        // outside that set (e.g. Content-MD5) makes S3 reject the PUT with
+        // AccessDenied (DA-3341).
+        expect(p.contentMd5).toBeUndefined();
         expect(p.contentLength).toBeDefined();
       }
 
