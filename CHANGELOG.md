@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.1] - 2026-10-01
+
+### Bug Fixes
+
+- **ts-sdk**: Drop unsigned Content-MD5 from multipart part PUTs (DA-3341) (#91)
+
+
 ## [0.37.0] - 2026-10-01
 
 ### Features
 
 - Sdk 0.37.0 — stamped manifests, contract builder, support horizon (py+ts) (DA-3359) (#90)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.0
 
 
 ## [0.36.0] - 2026-09-30
