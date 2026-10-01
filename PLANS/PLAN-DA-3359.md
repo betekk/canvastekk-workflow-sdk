@@ -52,18 +52,21 @@ Deferred (cited on the ticket): canary registration into dev with stamped `sdk_v
     — **Done:** ruff check clean, 769 tests green. **Deviation:** `ruff format`/`mypy` are NOT this repo's gates (CI runs `ruff check` only, ci-python.yml:109) — an exploratory `ruff format .` reformatted 29 unrelated files and was reverted before commit; format/mypy dropped from this ticket's gate set. files: none; fixes: churn reverted.
 
 ### Phase 2: python — contracts builders + closed schemas
-- [ ] **2.1** Extend the existing `contracts.py` (geometric models stay) with `build_check_output_schema(verdicts, result_description, *, closed=False)` + `validate_verdict_fields(payload, verdicts)`: default vocab `PASS|FAIL|NOT_EVALUABLE`; output shape mirrors the ifc repo's check_output_schema (root: `result` object with `verdict` enum + `summary`/`result_description`, `error` nullable object property so error paths stay valid); `closed=True` sets `additionalProperties: false` on root + `result`.
+- [x] **2.1** Extend the existing `contracts.py` (geometric models stay) with `build_check_output_schema(verdicts, result_description, *, closed=False)` + `validate_verdict_fields(payload, verdicts)`: default vocab `PASS|FAIL|NOT_EVALUABLE`; output shape mirrors the ifc repo's check_output_schema (root: `result` object with `verdict` enum + `summary`/`result_description`, `error` nullable object property so error paths stay valid); `closed=True` sets `additionalProperties: false` on root + `result`.
     — **Why:** ticket item 2/3 — shared output-contract builder; closed-schema support that survives ErrorOutputNode's error-append.
     — **Done when:** tests: default vocab enum; custom vocab; closed flag on both levels; `validate_verdict_fields` accepts a valid payload and rejects an off-vocab verdict; a payload carrying `error` validates against the closed schema.
     — **Consumers affected:** check-node authors (opt-in import only).
-- [ ] **2.2** Import-graph test: assert `app.py` and `base.py` never import `contracts` (parse AST imports of both modules; zero `contracts` references).
+    — **Done:** builders added to `contracts.py` after the geometric models; generalized from the ifc fleet shape (verdict/verdict_counts/result + nullable error); closed flag on both levels; jsonschema round-trip test proves the error-append survives closure. files: `contracts.py`, `tests/test_contracts.py`; fixes: none.
+- [x] **2.2** Import-graph test: assert `app.py` and `base.py` never import `contracts` (parse AST imports of both modules; zero `contracts` references).
     — **Why:** ticket — opt-in module, zero core coupling.
     — **Done when:** test green (and demonstrably fails if the import is added).
     — **Consumers affected:** core package purity.
-- [ ] **2.3** Phase gate (light).
+    — **Done:** `TestImportGraph` AST-walks both modules (parametrized app/base). files: `tests/test_contracts.py`; fixes: none.
+- [x] **2.3** Phase gate (light).
     — **Why:** gate evidence.
     — **Done when:** green.
     — **Consumers affected:** none.
+    — **Done:** 45 contracts tests green. files: none; fixes: none.
 
 ### Phase 3: python — support-horizon gate
 - [ ] **3.1** New `_horizon.py`: `SUPPORT_HORIZON_DAYS = 180`, `WARN_WINDOW_DAYS = 30`, sunset = `RELEASE_DATE + horizon`; `_today()` seam (module-level function tests monkeypatch); `check_support_horizon(...)` returns an outcome (ok/warn/expired) — import-time path LOGS ONLY (warn at WARN within window, WARNING past); `enforce_support_horizon()` raises past sunset unless `CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1` (then CRITICAL log).

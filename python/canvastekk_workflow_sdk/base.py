@@ -496,6 +496,11 @@ class BaseNode(ABC):
         Returns:
             NodeExecutionResponse with pass/fail status
         """
+        # DA-3359: entrypoint horizon gate (import stays log-only).
+        from canvastekk_workflow_sdk._horizon import enforce_support_horizon
+
+        enforce_support_horizon()
+
         execution_id = str(uuid.uuid4())
         start_time = time.perf_counter()
 
