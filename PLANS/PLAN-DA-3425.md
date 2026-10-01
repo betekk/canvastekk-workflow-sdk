@@ -56,7 +56,7 @@ No runtime SDK code changes — `__init__.py` already re-exports the leaf (`from
 
 ## Trace
 
-GATE <sha-in-phase2-commit> tier=full lint=t build=-|n.a unit=t(795) e2e=-|n.a
+GATE e49518b tier=full lint=t build=-|n.a unit=t(795) e2e=-|n.a
 
 ## Technical Notes
 
