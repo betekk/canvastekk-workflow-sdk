@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Self
 
@@ -374,3 +375,105 @@ STANDARD_CLASSES = {
 }
 
 STANDARD_CLASS_NAMES = list(STANDARD_CLASSES.values())
+
+
+# ---------------------------------------------------------------------------
+# Check-node output-contract builder (DA-3359)
+# ---------------------------------------------------------------------------
+# Opt-in module surface for compliance-check nodes. `app.py` / `base.py` never
+# import this module (pinned by tests/test_contracts.py::TestImportGraph) —
+# nothing here is on the core execution path.
+
+DEFAULT_CHECK_VERDICTS: tuple[str, ...] = ("PASS", "FAIL", "NOT_EVALUABLE")
+
+
+def build_check_output_schema(
+    verdicts: Sequence[str] = DEFAULT_CHECK_VERDICTS,
+    result_description: str = "Check result summary.",
+    *,
+    closed: bool = False,
+) -> dict[str, Any]:
+    """Build the output schema shared by compliance-check nodes (DA-3359).
+
+    Generalizes the shape the IFC compliance fleet uses (verdict head-line,
+    verdict_counts, a nested ``result`` summary) into a reusable builder.
+
+    Args:
+        verdicts: The node's verdict vocabulary. Defaults to the
+            three-value PASS/FAIL/NOT_EVALUABLE contract.
+        result_description: One line naming what ``result`` holds, emitted
+            as the ``result`` property description.
+        closed: When True, sets ``additionalProperties: false`` on the root
+            and on ``result``. The root keeps a nullable ``error`` property
+            so the ErrorOutputNode error-append rewrite still validates.
+
+    Returns:
+        A JSON Schema dict ready for ``WorkflowNodeManifest(output_schema=...)``.
+    """
+    vocab = list(verdicts)
+    result_properties: dict[str, Any] = {
+        "verdict": {"type": "string", "enum": vocab},
+    }
+    result: dict[str, Any] = {
+        "type": "object",
+        "description": result_description,
+        "properties": result_properties,
+        "required": ["verdict"],
+    }
+    if closed:
+        result["additionalProperties"] = False
+
+    root: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "verdict": {
+                "type": "string",
+                "enum": vocab,
+                "description": (
+                    "Headline verdict for the subject, emitted verbatim from "
+                    "the check."
+                ),
+                "examples": [vocab[-2] if len(vocab) > 1 else vocab[0]],
+            },
+            "verdict_counts": {
+                "type": "object",
+                "additionalProperties": {"type": "integer", "minimum": 0},
+                "description": "Count of measured subjects per verdict; absent keys mean zero.",
+            },
+            "result": result,
+            "error": {
+                "type": ["object", "null"],
+                "description": (
+                    "Error detail when the node failed before producing a "
+                    "verdict; null (or absent) on a normal run."
+                ),
+            },
+        },
+        "required": ["verdict", "result"],
+    }
+    if closed:
+        root["additionalProperties"] = False
+    return root
+
+
+def validate_verdict_fields(payload: dict[str, Any], verdicts: Sequence[str] = DEFAULT_CHECK_VERDICTS) -> None:
+    """Validate a check node's output against its verdict vocabulary (DA-3359).
+
+    Raises:
+        ValueError: If the head-line verdict or the ``result.verdict`` is
+            missing or outside the vocabulary.
+    """
+    vocab = set(verdicts)
+    headline = payload.get("verdict")
+    if headline not in vocab:
+        raise ValueError(
+            f"verdict {headline!r} is not in the check vocabulary {sorted(vocab)}"
+        )
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise ValueError("check payload must carry a 'result' object")
+    result_verdict = result.get("verdict")
+    if result_verdict not in vocab:
+        raise ValueError(
+            f"result.verdict {result_verdict!r} is not in the check vocabulary {sorted(vocab)}"
+        )
