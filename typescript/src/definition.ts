@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VERSION } from "./version.js";
 import { NodeValidationError } from "./exceptions.js";
 
 const SLUG_PATTERN = /^[a-z]([a-z0-9-]*[a-z0-9])?$/;
@@ -168,6 +169,12 @@ const WorkflowNodeManifestObjectSchema = z
     role: WorkflowNodeRoleSchema,
     styles: WorkflowNodeStylesSchema.nullable().default(null),
     deprecation: DeprecationInfoSchema.nullable().default(null),
+    // DA-3359: SDK provenance is STAMPED (defaults to the installed VERSION);
+    // the legacy minimum/maximum fields stay optional for one release.
+    sdk_version: z
+      .string()
+      .default(VERSION)
+      .readonly(),
     minimum_sdk_version: z
       .string()
       .refine((v) => SEMVER_PATTERN.test(v), (v) => ({

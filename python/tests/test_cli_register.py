@@ -40,13 +40,12 @@ class TestBuildEngineRequest:
         assert "slug" not in payload  # engine 422s on client-sent slug
 
     def test_keys_within_engine_whitelist(self) -> None:
-        payload = _build_engine_request(
-            _manifest(
-                minimum_sdk_version="0.27.0",
-                docs_url="https://docs.example.com/echo",
-                styles=None,
-            )
+        manifest = _manifest(
+            minimum_sdk_version="0.27.0",
+            docs_url="https://docs.example.com/echo",
+            styles=None,
         )
+        payload = _build_engine_request(manifest)
         allowed = {
             "name", "version", "label", "description", "input_schema", "output_schema",
             "invoke_type", "invoke_url", "invoke_config", "category", "tags", "styles",
@@ -56,6 +55,8 @@ class TestBuildEngineRequest:
         assert payload["constraints"] == {
             "minimum_sdk_version": "0.27.0",
             "docs_url": "https://docs.example.com/echo",
+            # DA-3359: the stamped provenance + legacy dual-write ride along
+            "sdk_version": manifest.sdk_version,
         }
 
     def test_invoke_url_and_suffix(self) -> None:

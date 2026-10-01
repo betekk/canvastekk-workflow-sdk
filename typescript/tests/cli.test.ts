@@ -57,10 +57,11 @@ describe("buildEngineRequest (DA-2603)", () => {
     const payload = buildEngineRequest(
       parseManifest({ ...canonicalManifest, minimum_sdk_version: "0.27.0", docs_url: "https://docs.example.com" }),
     );
-    expect(payload["constraints"]).toEqual({
-      minimum_sdk_version: "0.27.0",
-      docs_url: "https://docs.example.com",
-    });
+    const constraints = payload["constraints"] as Record<string, unknown>;
+    expect(constraints.minimum_sdk_version).toBe("0.27.0");
+    expect(constraints.docs_url).toBe("https://docs.example.com");
+    // DA-3359: the stamped provenance rides along
+    expect(constraints.sdk_version).toBe("0.37.0");
     const allowed = new Set([
       "name", "version", "label", "description", "input_schema", "output_schema",
       "invoke_type", "invoke_url", "invoke_config", "category", "tags", "styles",

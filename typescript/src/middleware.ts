@@ -142,13 +142,16 @@ export class TimingMiddleware implements NodeMiddleware {
  */
 export class SDKVersionMiddleware {
   private _version: string;
+  private _nodeSlug: string | null;
 
   /**
    * Creates a new SDK version middleware.
    * @param version - SDK version string
+   * @param nodeSlug - optional node slug for X-Canvastekk-Node-Slug (DA-3359)
    */
-  constructor(version: string) {
+  constructor(version: string, nodeSlug: string | null = null) {
     this._version = version;
+    this._nodeSlug = nodeSlug;
   }
 
   /**
@@ -158,6 +161,9 @@ export class SDKVersionMiddleware {
   handler(): (req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => void {
     return (_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
       res.setHeader("X-SDK-Version", this._version);
+      if (this._nodeSlug) {
+        res.setHeader("X-Canvastekk-Node-Slug", this._nodeSlug);
+      }
       next();
     };
   }

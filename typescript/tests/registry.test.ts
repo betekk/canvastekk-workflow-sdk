@@ -114,15 +114,18 @@ describe("buildRegistryPayload", () => {
     const payload = buildRegistryPayload(def, {
       constraints: { minimum_sdk_version: "0.21.0", gpu_required: true },
     });
-    expect(payload.constraints).toEqual({
-      minimum_sdk_version: "0.21.0",
-      gpu_required: true,
-    });
+    const constraints = payload.constraints as Record<string, unknown>;
+    expect(constraints.minimum_sdk_version).toBe("0.21.0");
+    expect(constraints.gpu_required).toBe(true);
+    // DA-3359: the stamp rides along (the manifest's 0.22.0 loses to the caller)
+    expect(constraints.sdk_version).toBe("0.37.0");
   });
 
-  it("omits constraints when nothing set (DA-1955)", () => {
-    const payload = buildRegistryPayload(testDef);
-    expect(payload).not.toHaveProperty("constraints");
+  it("always carries the stamped provenance (DA-3359 supersedes the DA-1955 omission)", () => {
+    const payload = buildRegistryPayload({ ...testDef });
+    const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
+    expect(constraints.sdk_version).toBeTruthy();
+    expect(constraints.minimum_sdk_version).toBeTruthy();
   });
 
   it("payload keys are a subset of engine request fields (DA-1955)", () => {
@@ -298,5 +301,26 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
     } finally {
       rmSync(outPath, { force: true });
     }
+  });
+});
+
+describe("stamped dual-write (DA-3359)", () => {
+  it("payload carries sdk_version + legacy minimum_sdk_version", () => {
+    const payload = buildRegistryPayload({ ...testDef });
+    const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
+    expect(constraints.sdk_version).toBe("0.37.0");
+    expect(constraints.minimum_sdk_version).toBe("0.37.0");
+  });
+
+  it("explicit caller constraints win over the legacy merge; stamp is forced", () => {
+    const payload = buildRegistryPayload(
+      { ...testDef, sdk_version: "0.40.0" },
+      { constraints: { minimum_sdk_version: "0.23.1" } },
+    );
+    const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
+    expect(constraints.minimum_sdk_version).toBe("0.23.1");
+    // the stamp is ALWAYS the installed VERSION (python parity) — a manifest
+    // claiming 0.40.0 cannot masquerade as the registering SDK
+    expect(constraints.sdk_version).toBe("0.37.0");
   });
 });

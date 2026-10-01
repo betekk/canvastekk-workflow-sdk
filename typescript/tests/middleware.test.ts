@@ -75,3 +75,21 @@ describe("SDKVersionMiddleware", () => {
     expect(res.setHeader).toHaveBeenCalledWith("X-SDK-Version", "0.13.0");
   });
 });
+
+describe("node slug header (DA-3359)", () => {
+  it("stamps X-Canvastekk-Node-Slug when provided", () => {
+    const mw = new SDKVersionMiddleware("0.37.0", "echo-lambda");
+    const headers: Record<string, string> = {};
+    mw.handler()({} as never, { setHeader: (k: string, v: string) => { headers[k] = v; } }, () => {});
+    expect(headers["X-SDK-Version"]).toBe("0.37.0");
+    expect(headers["X-Canvastekk-Node-Slug"]).toBe("echo-lambda");
+  });
+
+  it("omits the slug header when absent", () => {
+    const mw = new SDKVersionMiddleware("0.37.0");
+    const headers: Record<string, string> = {};
+    mw.handler()({} as never, { setHeader: (k: string, v: string) => { headers[k] = v; } }, () => {});
+    expect(headers["X-SDK-Version"]).toBe("0.37.0");
+    expect(headers).not.toHaveProperty("X-Canvastekk-Node-Slug");
+  });
+});

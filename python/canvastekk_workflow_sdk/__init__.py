@@ -176,4 +176,7 @@ __all__ = [
     "validate",
 ]
 
-__version__ = "0.36.0"
+# DA-3359: single source of truth lives in _version.py (leaf module — no
+# import cycle); re-exported for backwards compatibility.
+from canvastekk_workflow_sdk._version import RELEASE_DATE as RELEASE_DATE  # noqa: E402, F401
+from canvastekk_workflow_sdk._version import __version__ as __version__  # noqa: E402, F401

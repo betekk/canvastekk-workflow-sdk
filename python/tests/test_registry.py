@@ -493,12 +493,17 @@ class TestBuildRegistryPayload:
     def test_constraints_included_when_provided(self) -> None:
         definition = self._make_definition()
         payload = build_registry_payload(definition, constraints={"gpu": True})
-        assert payload["constraints"] == {"gpu": True}
+        assert payload["constraints"]["gpu"] is True
+        # DA-3359: the stamp always rides along
+        assert payload["constraints"].get("sdk_version") == definition.sdk_version
 
-    def test_constraints_not_included_by_default(self) -> None:
+    def test_constraints_always_carry_stamp(self) -> None:
+        """DA-3359: provenance is always present — sdk_version + legacy dual-write."""
         definition = self._make_definition()
         payload = build_registry_payload(definition)
-        assert "constraints" not in payload
+        constraints = payload.get("constraints", {})
+        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("minimum_sdk_version") == definition.sdk_version
 
     def test_constraints_merges_manifest_compat_fields(self) -> None:
         """DA-1955: manifest compat + docs fields land in constraints."""
@@ -524,11 +529,13 @@ class TestBuildRegistryPayload:
         assert payload["constraints"]["minimum_sdk_version"] == "0.21.0"
         assert payload["constraints"]["gpu_required"] is True
 
-    def test_constraints_omitted_when_all_none(self) -> None:
-        """DA-1955: no manifest fields + no caller constraints -> no constraints key."""
+    def test_constraints_stamp_when_all_none(self) -> None:
+        """DA-3359: no manifest fields + no caller constraints -> stamped
+        provenance still lands (the old "omitted" contract is retired)."""
         definition = self._make_definition()
         payload = build_registry_payload(definition)
-        assert "constraints" not in payload
+        constraints = payload.get("constraints", {})
+        assert constraints.get("sdk_version") == definition.sdk_version
 
     def test_node_status_not_in_request_payload(self) -> None:
         """DA-1955 B1: node_status is not an engine request field (param kept for compat)."""
@@ -921,3 +928,34 @@ class TestRegistrationErrorEnrichment:
         assert exc_info.value.error_code is None
         assert exc_info.value.guidance is None
         assert exc_info.value.status_code == 500
+
+
+class TestStampedDualWrite:
+    """DA-3359: the register payload dual-writes sdk_version + legacy minimum."""
+
+    @staticmethod
+    def _definition(**overrides):
+        defaults = dict(
+            name="test",
+            version="1.0.0",
+            title="Test Node",
+            description="A test node",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+        )
+        defaults.update(overrides)
+        return WorkflowNodeManifest(**defaults)
+
+    def test_payload_carries_both_keys(self) -> None:
+        definition = self._definition()
+        payload = build_registry_payload(definition)
+        constraints = payload.get("constraints", {})
+        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("minimum_sdk_version") == definition.sdk_version
+
+    def test_explicit_caller_constraints_win(self) -> None:
+        definition = self._definition()
+        payload = build_registry_payload(definition, constraints={"minimum_sdk_version": "0.23.1"})
+        constraints = payload.get("constraints", {})
+        assert constraints.get("minimum_sdk_version") == "0.23.1"
+        assert constraints.get("sdk_version") == definition.sdk_version

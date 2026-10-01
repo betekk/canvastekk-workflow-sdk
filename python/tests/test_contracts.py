@@ -15,6 +15,8 @@ from canvastekk_workflow_sdk.contracts import (
     Plane,
     PlaneSet,
     Point3D,
+    build_check_output_schema,
+    validate_verdict_fields,
 )
 
 
@@ -285,3 +287,77 @@ class TestStandardClasses:
 
     def test_standard_class_names(self) -> None:
         assert STANDARD_CLASS_NAMES == ["floor", "ceiling", "wall", "door", "vent"]
+
+
+class TestBuildCheckOutputSchema:
+    """DA-3359: the shared check-node output-contract builder."""
+
+    def test_default_vocab_and_shape(self) -> None:
+        schema = build_check_output_schema()
+        assert schema["properties"]["verdict"]["enum"] == ["PASS", "FAIL", "NOT_EVALUABLE"]
+        assert schema["properties"]["result"]["required"] == ["verdict"]
+        assert "additionalProperties" not in schema
+
+    def test_custom_vocab(self) -> None:
+        schema = build_check_output_schema(("CLEAR", "VIOLATION"), "Seam check.")
+        assert schema["properties"]["verdict"]["enum"] == ["CLEAR", "VIOLATION"]
+        assert schema["properties"]["result"]["description"] == "Seam check."
+
+    def test_closed_flag_both_levels(self) -> None:
+        schema = build_check_output_schema(closed=True)
+        assert schema["additionalProperties"] is False
+        assert schema["properties"]["result"]["additionalProperties"] is False
+        # the error property survives the closure so ErrorOutputNode appends validate
+        assert "error" in schema["properties"]
+
+    def test_closed_schema_accepts_error_append(self) -> None:
+        import jsonschema
+
+        schema = build_check_output_schema(closed=True)
+        payload = {
+            "verdict": "FAIL",
+            "result": {"verdict": "FAIL"},
+            "error": {"message": "boom"},
+        }
+        jsonschema.validate(payload, schema)
+
+    def test_open_schema_rejects_unknown_when_validated(self) -> None:
+        import jsonschema
+
+        schema = build_check_output_schema()
+        jsonschema.validate({"verdict": "PASS", "result": {"verdict": "PASS"}}, schema)
+
+
+class TestValidateVerdictFields:
+    def test_accepts_valid_payload(self) -> None:
+        validate_verdict_fields({"verdict": "PASS", "result": {"verdict": "PASS"}})
+
+    def test_rejects_off_vocab_headline(self) -> None:
+        with pytest.raises(ValueError, match="verdict"):
+            validate_verdict_fields({"verdict": "SKIP", "result": {"verdict": "PASS"}})
+
+    def test_rejects_missing_result(self) -> None:
+        with pytest.raises(ValueError, match="result"):
+            validate_verdict_fields({"verdict": "PASS"})
+
+    def test_rejects_off_vocab_result_verdict(self) -> None:
+        with pytest.raises(ValueError, match="result.verdict"):
+            validate_verdict_fields({"verdict": "PASS", "result": {"verdict": "MAYBE"}})
+
+
+class TestImportGraph:
+    """DA-3359: contracts is opt-in — core modules never import it."""
+
+    @pytest.mark.parametrize("module_name", ["app", "base"])
+    def test_core_modules_do_not_import_contracts(self, module_name: str) -> None:
+        import ast
+        import importlib.util
+
+        spec = importlib.util.find_spec(f"canvastekk_workflow_sdk.{module_name}")
+        assert spec is not None and spec.origin
+        tree = ast.parse(open(spec.origin).read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                assert all("contracts" not in a.name for a in node.names), node.names
+            elif isinstance(node, ast.ImportFrom):
+                assert "contracts" not in (node.module or ""), node.module

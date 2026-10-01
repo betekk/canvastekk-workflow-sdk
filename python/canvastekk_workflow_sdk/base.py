@@ -496,6 +496,11 @@ class BaseNode(ABC):
         Returns:
             NodeExecutionResponse with pass/fail status
         """
+        # DA-3359: entrypoint horizon gate (import stays log-only).
+        from canvastekk_workflow_sdk._horizon import enforce_support_horizon
+
+        enforce_support_horizon()
+
         execution_id = str(uuid.uuid4())
         start_time = time.perf_counter()
 
@@ -529,6 +534,13 @@ class BaseNode(ABC):
                 self._validate_outputs(outputs)
 
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
+
+                # DA-3359: one structured execution line per run (local-dev story).
+                logger.info(
+                    "execution slug=%s status=pass duration_ms=%d",
+                    self.definition.slug,
+                    duration_ms,
+                )
 
                 for mw in self._middleware:
                     mw.on_after_execute(inputs, outputs, context, duration_ms)
@@ -631,6 +643,14 @@ class BaseNode(ABC):
             mw.on_error(request.inputs, error, context, duration_ms)
 
         error_code = getattr(error, "error_code", None)
+        # DA-3359: one structured execution line per run — failure chokepoint
+        # (every failure path funnels through _record_error).
+        logger.info(
+            "execution slug=%s status=fail duration_ms=%d error_type=%s",
+            self.definition.slug,
+            duration_ms,
+            type(error).__name__,
+        )
         self._metrics_collector.record(
             ExecutionMetric(
                 run_id=request.run_id,

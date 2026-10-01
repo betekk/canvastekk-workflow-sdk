@@ -16,9 +16,16 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator, model_serializer, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_validator, model_serializer, model_validator
 
+from canvastekk_workflow_sdk._version import __version__ as _sdk_version_stamp
 from canvastekk_workflow_sdk.exceptions import NodeValidationError
+
+
+def _stamped_sdk_version() -> str:
+    """DA-3359 stamp factory — the installed SDK version (version leaf module)."""
+    return _sdk_version_stamp
+
 
 # DA-2627: DeprecationWarning is hidden by default outside __main__; surface the
 # legacy-construction warning to node authors explicitly (scoped to this module).
@@ -249,13 +256,30 @@ class WorkflowNodeManifest(BaseModel):
         default=None,
         description="Minimum canvastekk-workflow-sdk version this node requires "
         "(X.Y.Z). Exported in the register payload constraints so the engine can "
-        "flag incompatible hosts (drift report engine_compatible).",
+        "flag incompatible hosts (drift report engine_compatible). DA-3359: "
+        "legacy — superseded by the stamped `sdk_version`; dual-written in "
+        "register payloads for one release and dropped in 0.38.",
     )
     maximum_sdk_version: str | None = Field(
         default=None,
         description="Maximum canvastekk-workflow-sdk version this node supports "
         "(X.Y.Z, inclusive). Exported in the register payload constraints.",
     )
+
+    # DA-3359: SDK provenance is STAMPED, not declared. The stamp is computed
+    # from the installed SDK version at instantiation; it is not a constructor
+    # field (kwargs rejected) and the property is read-only (assignment
+    # rejected) — manual overrides are impossible by construction.
+    _sdk_version: str = PrivateAttr(default_factory=lambda: _stamped_sdk_version())
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def sdk_version(self) -> str:
+        """Stamped SDK provenance (DA-3359): auto-filled from the installed
+        SDK version, read-only. Exported in register payload constraints
+        (with a legacy ``minimum_sdk_version`` dual-write for one release);
+        the engine's admission gate dual-reads either key."""
+        return self._sdk_version
 
     # Documentation links (optional — DA-1937 preview surface)
     docs_url: str | None = Field(
@@ -342,8 +366,7 @@ class WorkflowNodeManifest(BaseModel):
             )
         elif has_slug and has_title:
             warnings.warn(
-                "NodeDefinition received both slug= and title=; title is ignored "
-                "(display name comes from name=).",
+                "NodeDefinition received both slug= and title=; title is ignored (display name comes from name=).",
                 DeprecationWarning,
                 stacklevel=2,
             )

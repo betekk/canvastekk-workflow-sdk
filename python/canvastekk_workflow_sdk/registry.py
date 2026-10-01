@@ -294,6 +294,10 @@ def build_registry_payload(
     ):
         if value is not None and key not in resolved_constraints:
             resolved_constraints[key] = value
+    # DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
+    # Explicit caller constraints always win over the merge.
+    resolved_constraints.setdefault("sdk_version", definition.sdk_version)
+    resolved_constraints.setdefault("minimum_sdk_version", definition.sdk_version)
 
     payload: dict[str, Any] = {
         "name": definition.slug,

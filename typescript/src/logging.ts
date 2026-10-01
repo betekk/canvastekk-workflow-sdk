@@ -109,7 +109,9 @@ function getEnvLogLevel(): LogLevel {
 
 /** Reads CANVASTEKK_LOG_FORMAT from env, defaulting to "json". */
 function getEnvLogFormat(): string {
-  return (process.env.CANVASTEKK_LOG_FORMAT ?? "json").toLowerCase();
+  // DA-3359: console output is the default; "json" opts into one-line JSON.
+  const raw = (process.env.CANVASTEKK_LOG_FORMAT ?? "console").toLowerCase();
+  return raw === "json" ? "json" : "console";
 }
 
 /**
@@ -119,7 +121,7 @@ function getEnvLogFormat(): string {
 export function configureLogging(opts?: { level?: LogLevel; format?: string }): void {
   const level = opts?.level ?? getEnvLogLevel();
   const fmt = opts?.format ?? getEnvLogFormat();
-  const formatter = fmt === "text" ? new HumanReadableFormatter() : new StructuredJsonFormatter();
+  const formatter = fmt === "json" ? new StructuredJsonFormatter() : new HumanReadableFormatter();
   const minLevel = LOG_LEVELS[level] ?? LOG_LEVELS.info;
 
   loggers.set("canvastekk_workflow_sdk", { name: "canvastekk_workflow_sdk", formatter, minLevel });

@@ -192,6 +192,9 @@ def create_node_app(
     """
     Create a FastAPI application with standard node endpoints.
 
+    DA-3359: raises once the SDK's support horizon has passed (break-glass:
+    ``CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1``).
+
     This function creates an HTTP server that implements the node contract:
     - POST /execute - Execute the node with given inputs
     - GET /health - Return node health status
@@ -227,6 +230,11 @@ def create_node_app(
 
         # Run with: uvicorn handler:app --port 8001
     """
+    # DA-3359: entrypoint horizon gate (import stays log-only).
+    from canvastekk_workflow_sdk._horizon import enforce_support_horizon
+
+    enforce_support_horizon()
+
     resolved_auth: _AuthBackend | None
     if auth is None or isinstance(auth, _AuthBackend):
         resolved_auth = auth
@@ -283,7 +291,7 @@ def create_node_app(
                 yield
 
     app = FastAPI(lifespan=_node_lifespan, **default_kwargs)
-    app.add_middleware(SDKVersionMiddleware)
+    app.add_middleware(SDKVersionMiddleware, node_slug=getattr(getattr(node, "definition", None), "slug", None))
     app.add_middleware(_BodySizeLimitMiddleware)
 
     # DA-2603: code digest computed once at startup — sha256 over the source

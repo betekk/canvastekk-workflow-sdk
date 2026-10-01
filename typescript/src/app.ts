@@ -6,6 +6,7 @@ import { VERSION } from "./version.js";
 import { getNodeId, getFileOutputFields } from "./definition.js";
 import { NodeTimeoutError, NodeExecutionError, getHttpStatusForError } from "./exceptions.js";
 import { configureLogging } from "./logging.js";
+import { enforceSupportHorizon } from "./support-horizon.js";
 import { SDKVersionMiddleware } from "./middleware.js";
 import { CANVASTEKK_AUTH_MARKER } from "./auth.js";
 import type { BaseNode } from "./base-node.js";
@@ -102,7 +103,8 @@ export function createNodeApp(
     );
   }
 
-  const sdkVersion = new SDKVersionMiddleware(VERSION);
+  enforceSupportHorizon(); // DA-3359: entrypoint gate
+  const sdkVersion = new SDKVersionMiddleware(VERSION, node.definition.slug);
   app.use(sdkVersion.handler());
 
   if (opts.dependencies) {
@@ -360,6 +362,7 @@ export function createMultiNodeApp(
   const app = express();
   app.use(express.json({ limit: "50mb" }));
 
+  enforceSupportHorizon(); // DA-3359: entrypoint gate
   const sdkVersion = new SDKVersionMiddleware(VERSION);
   app.use(sdkVersion.handler());
 
