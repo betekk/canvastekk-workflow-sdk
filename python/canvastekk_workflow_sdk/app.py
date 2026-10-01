@@ -291,7 +291,7 @@ def create_node_app(
                 yield
 
     app = FastAPI(lifespan=_node_lifespan, **default_kwargs)
-    app.add_middleware(SDKVersionMiddleware)
+    app.add_middleware(SDKVersionMiddleware, node_slug=getattr(getattr(node, "definition", None), "slug", None))
     app.add_middleware(_BodySizeLimitMiddleware)
 
     # DA-2603: code digest computed once at startup — sha256 over the source

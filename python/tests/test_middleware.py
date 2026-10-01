@@ -212,3 +212,44 @@ class TestSDKVersionMiddleware:
         client = TestClient(create_node_app(EchoNode()))
         response = client.get("/health")
         assert response.headers["x-sdk-version"] == __version__
+
+
+class TestNodeSlugHeader:
+    """DA-3359: X-Canvastekk-Node-Slug beside the version header."""
+
+    def test_slug_present_on_single_node_app(self) -> None:
+        from starlette.testclient import TestClient
+
+        from canvastekk_workflow_sdk.app import create_node_app
+
+        client = TestClient(create_node_app(EchoNode()))
+        response = client.get("/health")
+        assert response.headers["x-canvastekk-node-slug"] == EchoNode().definition.slug
+
+    def test_exactly_one_version_header(self) -> None:
+        from starlette.testclient import TestClient
+
+        from canvastekk_workflow_sdk.app import create_node_app
+
+        client = TestClient(create_node_app(EchoNode()))
+        response = client.get("/health")
+        assert response.headers["x-sdk-version"] == __version__
+
+    def test_middleware_accepts_absent_slug(self) -> None:
+        from starlette.applications import Starlette
+        from starlette.responses import PlainTextResponse
+        from starlette.testclient import TestClient
+
+        from canvastekk_workflow_sdk.middleware import SDKVersionMiddleware
+
+        app = Starlette()
+        app.add_middleware(SDKVersionMiddleware)  # multi-node: no slug to stamp
+
+        async def _home(request):  # type: ignore[no-untyped-def]
+            return PlainTextResponse("ok")
+
+        app.add_route("/", _home, methods=["GET"])
+        client = TestClient(app)
+        response = client.get("/")
+        assert response.headers["x-sdk-version"] == __version__
+        assert "x-canvastekk-node-slug" not in response.headers

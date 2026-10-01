@@ -51,7 +51,12 @@ def _get_env_log_level() -> int:
 
 
 def _get_env_log_format() -> str:
-    return os.environ.get("CANVASTEKK_LOG_FORMAT", "json").lower()
+    """DA-3359: human/console output by default; ``json`` opts into one-line JSON.
+
+    Accepts ``console`` (or the legacy ``text`` alias) and ``json``.
+    """
+    raw = os.environ.get("CANVASTEKK_LOG_FORMAT", "console").lower()
+    return "json" if raw == "json" else "console"
 
 
 class StructuredJsonFormatter(logging.Formatter):
@@ -165,8 +170,8 @@ def configure_logging(
     Args:
         level: Override log level (e.g. ``logging.DEBUG``).
             Defaults to ``CANVASTEKK_LOG_LEVEL`` env var or ``INFO``.
-        fmt: Override format (``"json"`` or ``"text"``).
-            Defaults to ``CANVASTEKK_LOG_FORMAT`` env var or ``"json"``.
+        fmt: Override format (``"json"`` or ``"console"``/``"text"``).
+            Defaults to ``CANVASTEKK_LOG_FORMAT`` env var or ``"console"``.
     """
     actual_level = level if level is not None else _get_env_log_level()
     if fmt is not None:

@@ -234,15 +234,21 @@ class TimingMiddleware:
 
 
 class SDKVersionMiddleware(BaseHTTPMiddleware):
-    """Inject ``X-SDK-Version`` header into every HTTP response.
+    """Inject ``X-SDK-Version`` and ``X-Canvastekk-Node-Slug`` into responses.
 
     Industry-standard pattern (Stripe, AWS SDKs, Twilio) that enables
     engine-side version-aware routing and debugging without parsing
-    the response body.
+    the response body. DA-3359 adds the node slug beside the version
+    header (still exactly one version header); the slug is present when
+    the app factory knows its node (single-node apps).
     """
 
+    def __init__(self, app: Any, node_slug: str | None = None) -> None:
+        super().__init__(app)
+        self._node_slug = node_slug
+
     async def dispatch(self, request: Request, call_next: Any) -> Response:
-        """Inject X-SDK-Version header into response.
+        """Inject X-SDK-Version (and the node slug) into the response.
 
         Args:
             request: FastAPI request object.
@@ -255,4 +261,6 @@ class SDKVersionMiddleware(BaseHTTPMiddleware):
         import canvastekk_workflow_sdk
 
         response.headers["X-SDK-Version"] = canvastekk_workflow_sdk.__version__
+        if self._node_slug:
+            response.headers["X-Canvastekk-Node-Slug"] = self._node_slug
         return response

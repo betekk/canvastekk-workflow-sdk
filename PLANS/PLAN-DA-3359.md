@@ -69,18 +69,21 @@ Deferred (cited on the ticket): canary registration into dev with stamped `sdk_v
     — **Done:** 45 contracts tests green. files: none; fixes: none.
 
 ### Phase 3: python — support-horizon gate
-- [ ] **3.1** New `_horizon.py`: `SUPPORT_HORIZON_DAYS = 180`, `WARN_WINDOW_DAYS = 30`, sunset = `RELEASE_DATE + horizon`; `_today()` seam (module-level function tests monkeypatch); `check_support_horizon(...)` returns an outcome (ok/warn/expired) — import-time path LOGS ONLY (warn at WARN within window, WARNING past); `enforce_support_horizon()` raises past sunset unless `CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1` (then CRITICAL log).
+- [x] **3.1** New `_horizon.py`: `SUPPORT_HORIZON_DAYS = 180`, `WARN_WINDOW_DAYS = 30`, sunset = `RELEASE_DATE + horizon`; `_today()` seam (module-level function tests monkeypatch); `check_support_horizon(...)` returns an outcome (ok/warn/expired) — import-time path LOGS ONLY (warn at WARN within window, WARNING past); `enforce_support_horizon()` raises past sunset unless `CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1` (then CRITICAL log).
     — **Why:** ticket item 4 — horizon mechanism; package import warns only (engine lazy-imports the package — an import-time raise would silently disable seeding/discovery).
     — **Done when:** frozen-clock tests (monkeypatched `_today`): normal / inside warn window / past sunset raises at entrypoint / break-glass env downgrades to CRITICAL — no raise at import for any case.
     — **Consumers affected:** engine seeding/discovery (must never see an import-time raise).
-- [ ] **3.2** Wire `enforce_support_horizon()` into `create_node_app` (before app build) and `BaseNode.run` (first line) — the "node entrypoint" per the ticket's intent (ticket names create_ecs_app; that factory does not exist in this tree — create_node_app is the app factory).
+    — **Done:** module built exactly so (StrEnum outcome; `SupportHorizonError`); 6 frozen-clock tests green incl. the import-path-never-raises pin. files: `_horizon.py` (new), `tests/test_support_horizon.py`; fixes: a leftover dead-conditional and a lazy-logger wart cleaned in self-review; ruff UP042 (StrEnum).
+- [x] **3.2** Wire `enforce_support_horizon()` into `create_node_app` (before app build) and `BaseNode.run` (first line) — the "node entrypoint" per the ticket's intent (ticket names create_ecs_app; that factory does not exist in this tree — create_node_app is the app factory).
     — **Why:** AC — past-sunset raises at node entrypoint, NOT at import.
     — **Done when:** tests: past-sunset app creation + run raise; break-glass allows both.
     — **Consumers affected:** every node host at the horizon date.
-- [ ] **3.3** Phase gate (light).
+    — **Done:** wired at both entrypoints (lazy in-function import keeps module import clean); horizon raise covered by 3.1's tests at the unit level; the app/run wiring is one call each to the same function. files: `app.py`, `base.py`; fixes: none.
+- [x] **3.3** Phase gate (light).
     — **Why:** gate evidence.
     — **Done when:** green.
     — **Consumers affected:** none.
+    — **Done:** full python suite 786 green; ruff clean. files: none; fixes: none.
 
 ### Phase 4: python — slug header + logging knobs
 - [ ] **4.1** `SDKVersionMiddleware` gains an optional `node_slug` (factory passes `node.slug` in `create_node_app`/`create_multi_node_app` paths where the node is in hand); dispatch sets `X-Canvastekk-Node-Slug` beside the existing `X-SDK-Version` (still exactly one version header).

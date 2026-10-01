@@ -535,6 +535,13 @@ class BaseNode(ABC):
 
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
 
+                # DA-3359: one structured execution line per run (local-dev story).
+                logger.info(
+                    "execution slug=%s status=pass duration_ms=%d",
+                    self.definition.slug,
+                    duration_ms,
+                )
+
                 for mw in self._middleware:
                     mw.on_after_execute(inputs, outputs, context, duration_ms)
 
@@ -636,6 +643,14 @@ class BaseNode(ABC):
             mw.on_error(request.inputs, error, context, duration_ms)
 
         error_code = getattr(error, "error_code", None)
+        # DA-3359: one structured execution line per run — failure chokepoint
+        # (every failure path funnels through _record_error).
+        logger.info(
+            "execution slug=%s status=fail duration_ms=%d error_type=%s",
+            self.definition.slug,
+            duration_ms,
+            type(error).__name__,
+        )
         self._metrics_collector.record(
             ExecutionMetric(
                 run_id=request.run_id,
