@@ -30,22 +30,26 @@ Deferred (cited on the ticket): canary registration into dev with stamped `sdk_v
 ## Implementation Phases
 
 ### Phase 1: python — version module + sdk_version auto-stamp + dual-write
-- [ ] **1.1** Create `python/canvastekk_workflow_sdk/_version.py` (`__version__ = "0.37.0"`, `RELEASE_DATE = "2026-10-01"`); `__init__.py` imports/re-exports from it (removes the :179 literal); update the three deferred consumers (app.py, middleware.py, __main__.py) and the two test imports to keep working.
+- [x] **1.1** Create `python/canvastekk_workflow_sdk/_version.py` (`__version__ = "0.37.0"`, `RELEASE_DATE = "2026-10-01"`); `__init__.py` imports/re-exports from it (removes the :179 literal); update the three deferred consumers (app.py, middleware.py, __main__.py) and the two test imports to keep working.
     — **Why:** ticket item 1 — `__version__` moves to `_version.py` (breaks the init cycle) so non-package modules (horizon, stamp factory) can read the version without importing the package root.
     — **Done when:** `python -m pytest ../python/tests -q` (wd python) green; `__version__` importable from the package root; no literal version string left in `__init__.py`.
     — **Consumers affected:** every version reader (verified list above).
-- [ ] **1.2** Add `sdk_version: str = Field(init=False, default_factory=<stamp>)` to `WorkflowNodeManifest`; add a model after-validator that rejects manual assignment (validate_assignment on; constructor kwarg rejected via init=False); extend the semver validator to cover it.
+    — **Done:** `_version.py` created; `__init__.py` re-exports via `as` aliases (ruff F401); the three in-package consumers already read the package root lazily — no edits needed (verified). files: `_version.py` (new), `__init__.py`; fixes: none.
+- [x] **1.2** Add `sdk_version: str = Field(init=False, default_factory=<stamp>)` to `WorkflowNodeManifest`; add a model after-validator that rejects manual assignment (validate_assignment on; constructor kwarg rejected via init=False); extend the semver validator to cover it.
     — **Why:** AC — auto-filled; constructor + assignment rejected.
     — **Done when:** tests: default-filled == package version; `WorkflowNodeManifest(..., sdk_version="1.0.0")` raises; `m.sdk_version = "x"` raises; dump includes it.
     — **Consumers affected:** manifest serialization, engine registration payloads.
-- [ ] **1.3** Registry payload dual-write (registry.py:288-296): merge `sdk_version` into constraints first, then emit legacy `minimum_sdk_version = sdk_version` when the caller didn't set one (dropped in 0.38); keep `maximum_sdk_version` emission only when explicitly set. `_drop_optional_when_none` keeps min/max out of dumps when None.
+    — **Done:** mechanism = PrivateAttr `_sdk_version` + `@computed_field` read-only property (the class has no `validate_assignment`, and turning it on model-wide was too broad): stamp auto-fills from `_version.py`; constructor kwarg DROPPED (init=False semantics — served manifests legitimately carry `sdk_version`, DA-2887, and must load); assignment raises (no setter). Dump includes the stamp. files: `definition.py`, `tests/test_definition.py`; fixes: an intermediate reject-on-kwarg model_validator was removed after `test_manifest_file_registers` proved it breaks served-manifest loading — the ticket's own "manual set impossible" mechanism is the silent drop + read-only property.
+- [x] **1.3** Registry payload dual-write (registry.py:288-296): merge `sdk_version` into constraints first, then emit legacy `minimum_sdk_version = sdk_version` when the caller didn't set one (dropped in 0.38); keep `maximum_sdk_version` emission only when explicitly set. `_drop_optional_when_none` keeps min/max out of dumps when None.
     — **Why:** ticket — the engine reads `constraints` from this payload; dual-write keeps pre-0.37 engines registering 0.37 nodes for one release.
     — **Done when:** test_registry.py asserts payload constraints contain BOTH keys (and legacy equals stamp); explicit caller constraints win over the merge.
     — **Consumers affected:** engine DA-3358 dual-read (accepts either key), old-engine registration path.
-- [ ] **1.4** Phase gate (light): ruff + format + mypy + python suite green.
+    — **Done:** setdefault merge after the existing loop (explicit caller values win — tested); three pre-existing tests pinning the "no constraints by default" contract updated to the always-stamped contract (test_registry ×3, test_export_definition_with_constraints, cli whitelist test). files: `registry.py`, `tests/test_registry.py`, `tests/test_definition.py`, `tests/test_cli_register.py`; fixes: see Done notes.
+- [x] **1.4** Phase gate (light): ruff + format + mypy + python suite green.
     — **Why:** gate evidence.
     — **Done when:** green.
     — **Consumers affected:** none.
+    — **Done:** ruff check clean, 769 tests green. **Deviation:** `ruff format`/`mypy` are NOT this repo's gates (CI runs `ruff check` only, ci-python.yml:109) — an exploratory `ruff format .` reformatted 29 unrelated files and was reverted before commit; format/mypy dropped from this ticket's gate set. files: none; fixes: churn reverted.
 
 ### Phase 2: python — contracts builders + closed schemas
 - [ ] **2.1** Extend the existing `contracts.py` (geometric models stay) with `build_check_output_schema(verdicts, result_description, *, closed=False)` + `validate_verdict_fields(payload, verdicts)`: default vocab `PASS|FAIL|NOT_EVALUABLE`; output shape mirrors the ifc repo's check_output_schema (root: `result` object with `verdict` enum + `summary`/`result_description`, `error` nullable object property so error paths stay valid); `closed=True` sets `additionalProperties: false` on root + `result`.
@@ -122,6 +126,7 @@ Deferred (cited on the ticket): canary registration into dev with stamped `sdk_v
     — **Consumers affected:** PR citation.
 
 ## Technical Notes
+GATE <p1-sha> tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 1: ruff check clean; 769 python tests green)
 - Engine consumer contract (DA-3358, merged dda2b56): admission dual-reads `sdk_version`/`minimum_sdk_version`; absence → 400 for external sources. The stamped field + legacy dual-write keeps BOTH old and new engines registering.
 - `create_ecs_app` (ticket wording) does not exist in this tree — the factories are `create_node_app`/`createMultiNodeApp`; the horizon raise wires there (ticket's "node entrypoint" intent).
 - Python has no freezegun; the horizon clock is a `_today()` module seam (monkeypatch) — same determinism, no new dependency (ponytail: deletion over addition).

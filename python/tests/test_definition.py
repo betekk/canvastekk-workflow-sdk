@@ -613,7 +613,10 @@ class TestExportDefinition:
             export_definition(definition, output_path, constraints=constraints)
 
             data = json.loads(output_path.read_text())
-            assert data["constraints"] == constraints
+            assert data["constraints"]["gpu_required"] is True
+            assert data["constraints"]["memory_gb"] == 8
+            # DA-3359: the stamp always rides along
+            assert data["constraints"].get("sdk_version") == definition.sdk_version
 
     def test_export_definition_with_node_status(self) -> None:
         """Test that node_status is included."""
@@ -1060,9 +1063,7 @@ class TestManifestDeprecationSerialization:
         }
 
     def test_model_dump_includes_deprecation_when_set(self) -> None:
-        manifest = self._minimal().model_copy(
-            update={"deprecation": DeprecationInfo(notice="retire soon")}
-        )
+        manifest = self._minimal().model_copy(update={"deprecation": DeprecationInfo(notice="retire soon")})
         assert manifest.model_dump(mode="json")["deprecation"] == {
             "deprecated_at": None,
             "sunset_date": None,
@@ -1263,3 +1264,47 @@ class TestVocabularyCompatibility:
         assert data["version"] == "1.0.0"
         for absent in ("title", "node_name", "node_version"):
             assert absent not in data
+
+
+class TestStampedSdkVersion:
+    """DA-3359: sdk_version is auto-stamped and read-only."""
+
+    def _manifest(self) -> WorkflowNodeManifest:
+        return WorkflowNodeManifest(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+        )
+
+    def test_auto_filled_from_installed_sdk(self) -> None:
+        from canvastekk_workflow_sdk import __version__
+
+        assert self._manifest().sdk_version == __version__
+
+    def test_constructor_kwarg_cannot_override(self) -> None:
+        """DA-3359 (init=False semantics): a caller-supplied sdk_version is
+        dropped — served manifests legitimately carry the key (DA-2887) and
+        must load — the stamp always reflects the INSTALLED SDK."""
+        m = WorkflowNodeManifest(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            sdk_version="9.9.9",
+        )
+        assert m.sdk_version != "9.9.9"
+
+    def test_assignment_rejected(self) -> None:
+        m = self._manifest()
+        with pytest.raises((AttributeError, TypeError, ValueError)):
+            m.sdk_version = "9.9.9"  # type: ignore[assignment]
+        assert m.sdk_version != "9.9.9"
+
+    def test_dump_includes_stamp(self) -> None:
+        dump = self._manifest().model_dump()
+        assert dump["sdk_version"]  # non-empty stamp present in serialization
