@@ -27,10 +27,6 @@ BREAK_GLASS_ENV = "CANVASTEKK_SDK_ALLOW_UNSUPPORTED"
 _logger = logging.getLogger("canvastekk_workflow_sdk.support")
 
 
-def _logger_or_none():
-    return _logger
-
-
 class HorizonOutcome(StrEnum):
     OK = "ok"
     WARN = "warn"
@@ -60,7 +56,7 @@ def check_support_horizon(today: date | None = None) -> HorizonOutcome:
 def warn_support_horizon(today: date | None = None) -> HorizonOutcome:
     """Import-time path: LOG ONLY (never raises)."""
     outcome = check_support_horizon(today)
-    log = _logger_or_none()
+    log = _logger
     if outcome is HorizonOutcome.EXPIRED:
         log.warning(
             "support horizon expired: this SDK (%s) passed end-of-support on %s; "
@@ -83,7 +79,7 @@ def enforce_support_horizon(today: date | None = None) -> None:
     outcome = check_support_horizon(today)
     if outcome is not HorizonOutcome.EXPIRED:
         return
-    log = _logger_or_none()
+    log = _logger
     if os.environ.get(BREAK_GLASS_ENV) == "1":
         log.critical(
             "support horizon expired for SDK %s (sunset %s); continuing via "

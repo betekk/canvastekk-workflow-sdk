@@ -147,6 +147,7 @@ GATE ebad67b tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=
 GATE f6d0984 tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 3: 786 python tests green)
 GATE d5e70d8 tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 4: 790 python tests green)
 GATE <exit-sha> tier=full lint=t(ruff) typecheck=t(tsc noEmit) build=n.a. unit=t(py 790 + vitest 360) e2e=n.a. (TICKET EXIT GATE: schema-stability dump OK; eslint clean; both suites green)
+GATE 9f76ad9 tier=full lint=t(ruff) typecheck=t(tsc noEmit) build=n.a. unit=t(py 790 + vitest 360) e2e=n.a. (review-fix re-gate: TS stamp forced to installed VERSION [python parity]; _horizon wrapper dropped)
 - Engine consumer contract (DA-3358, merged dda2b56): admission dual-reads `sdk_version`/`minimum_sdk_version`; absence → 400 for external sources. The stamped field + legacy dual-write keeps BOTH old and new engines registering.
 - `create_ecs_app` (ticket wording) does not exist in this tree — the factories are `create_node_app`/`createMultiNodeApp`; the horizon raise wires there (ticket's "node entrypoint" intent).
 - Python has no freezegun; the horizon clock is a `_today()` module seam (monkeypatch) — same determinism, no new dependency (ponytail: deletion over addition).

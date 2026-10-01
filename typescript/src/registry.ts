@@ -81,13 +81,13 @@ export function buildRegistryPayload(
     }
   }
   // DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
-  const stamp = definition.sdk_version ?? VERSION;
-  if (!("sdk_version" in resolvedConstraints)) {
-    resolvedConstraints.sdk_version = stamp;
-  }
+  // The sdk_version stamp is ALWAYS the installed VERSION (python parity —
+  // a manifest parsed from disk carries its authoring stamp; provenance is
+  // the SDK doing the registering). The legacy key stays caller-wins.
   if (!("minimum_sdk_version" in resolvedConstraints)) {
-    resolvedConstraints.minimum_sdk_version = stamp;
+    resolvedConstraints.minimum_sdk_version = definition.sdk_version ?? VERSION;
   }
+  resolvedConstraints.sdk_version = VERSION;
 
   // DA-1955: engine RegisterWorkflowNodeRequest is extra="forbid" without
   // node_role/retry/node_status — those keys are NOT emitted here.

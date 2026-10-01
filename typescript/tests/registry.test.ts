@@ -312,13 +312,15 @@ describe("stamped dual-write (DA-3359)", () => {
     expect(constraints.minimum_sdk_version).toBe("0.37.0");
   });
 
-  it("explicit caller constraints win over the legacy merge", () => {
+  it("explicit caller constraints win over the legacy merge; stamp is forced", () => {
     const payload = buildRegistryPayload(
       { ...testDef, sdk_version: "0.40.0" },
       { constraints: { minimum_sdk_version: "0.23.1" } },
     );
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.minimum_sdk_version).toBe("0.23.1");
-    expect(constraints.sdk_version).toBe("0.40.0");
+    // the stamp is ALWAYS the installed VERSION (python parity) — a manifest
+    // claiming 0.40.0 cannot masquerade as the registering SDK
+    expect(constraints.sdk_version).toBe("0.37.0");
   });
 });
