@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.0] - 2026-10-01
+
+### Features
+
+- Sdk 0.37.0 — stamped manifests, contract builder, support horizon (py+ts) (DA-3359) (#90)
+
+
 ## [0.36.0] - 2026-09-30
 
 ### Features
 
 - **sdk**: Session-only uploads — remove legacy presigned PUT target (DA-3340) (#89) (**BREAKING**)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.36.0
 
 
 ## [0.35.2] - 2026-09-30
