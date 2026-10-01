@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.2] - 2026-10-01
+
+### Bug Fixes
+
+- **scripts**: Stamp _version.py leaf in release bump (DA-3425) (#92)
+
+
 ## [0.37.1] - 2026-10-01
 
 ### Bug Fixes
 
 - **ts-sdk**: Drop unsigned Content-MD5 from multipart part PUTs (DA-3341) (#91)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.1
 
 
 ## [0.37.0] - 2026-10-01
