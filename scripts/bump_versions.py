@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Bump version across all language config files.
 
-Usage: python3 scripts/bump_versions.py <version>
+Usage: python3 scripts/bump_versions.py <version> [release-date]
 
 Handled file types:
-  .py    — __version__ = "X.Y.Z"
+  .py    — __version__ = "X.Y.Z" (+ RELEASE_DATE = "YYYY-MM-DD" when present)
   .toml  — version = "X.Y.Z" (under [tool.poetry])
   .json  — {"version": "X.Y.Z"}
   .props — <Version>X.Y.Z</Version> (XML)
   .ts    — export const VERSION = "X.Y.Z"
+
+release-date defaults to today (UTC); it feeds the support-horizon RELEASE_DATE
+in python/canvastekk_workflow_sdk/_version.py (DA-3359 stamp source of truth).
 """
 
 from __future__ import annotations
@@ -18,18 +21,20 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 
 VERSION_FILES = {
     "python": "python/pyproject.toml",
     "python_init": "python/canvastekk_workflow_sdk/__init__.py",
+    "python_version_leaf": "python/canvastekk_workflow_sdk/_version.py",
     "typescript": "typescript/package.json",
     "typescript_version": "typescript/src/version.ts",
     "dotnet": "dotnet/Directory.Build.props",
 }
 
 
-def bump_file(path: str, version: str) -> bool:
+def bump_file(path: str, version: str, release_date: str) -> bool:
     """Bump version in a single file. Returns True if bumped."""
     if not os.path.exists(path):
         print(f"SKIP: {path} does not exist")
@@ -48,6 +53,14 @@ def bump_file(path: str, version: str) -> bool:
         if count == 0:
             print(f"WARNING: Could not find __version__ pattern in {path}")
             return False
+        # DA-3425: the version leaf also carries RELEASE_DATE (support-horizon
+        # anchor) — stamp it alongside, best-effort (only the leaf defines it).
+        new_content, _ = re.subn(
+            r'RELEASE_DATE\s*=\s*"[^"]*"',
+            f'RELEASE_DATE = "{release_date}"',
+            new_content,
+            count=1,
+        )
         with open(path, "w") as f:
             f.write(new_content)
 
@@ -107,11 +120,14 @@ def bump_file(path: str, version: str) -> bool:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        print("Usage: python3 scripts/bump_versions.py <version>")
+    if len(sys.argv) not in (2, 3):
+        print("Usage: python3 scripts/bump_versions.py <version> [release-date]")
         sys.exit(1)
 
     version = sys.argv[1].lstrip("v")
+    release_date = (
+        sys.argv[2] if len(sys.argv) == 3 else datetime.now(timezone.utc).date().isoformat()
+    )
 
     if not re.match(r"^\d+\.\d+\.\d+", version):
         print(f"ERROR: '{version}' is not a valid semver version (expected X.Y.Z)")
@@ -119,7 +135,7 @@ def main() -> None:
 
     bumped = []
     for lang, path in VERSION_FILES.items():
-        if bump_file(path, version):
+        if bump_file(path, version, release_date):
             bumped.append(lang)
 
     if not bumped:

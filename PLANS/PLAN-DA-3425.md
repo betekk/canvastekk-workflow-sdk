@@ -27,18 +27,21 @@ No runtime SDK code changes — `__init__.py` already re-exports the leaf (`from
 
 ### Phase 1: bump-script fix + test
 
-- [ ] **1.1** Add `python_version_leaf` (`python/canvastekk_workflow_sdk/_version.py`) to `VERSION_FILES`; accept optional release-date arg (default today UTC) and stamp `RELEASE_DATE` alongside `__version__` in `.py` bumps
+- [x] **1.1** Add `python_version_leaf` (`python/canvastekk_workflow_sdk/_version.py`) to `VERSION_FILES`; accept optional release-date arg (default today UTC) and stamp `RELEASE_DATE` alongside `__version__` in `.py` bumps
     — **Why:** the leaf is the DA-3359 stamp source of truth; missing it shipped a 0.37.1 wheel stamping 0.37.0 — the root cause of this ticket
     — **Done when:** running the script against a fixture tree sets both `__version__ = "<v>"` and `RELEASE_DATE = "<date>"` in the leaf
     — **Consumers affected:** release.yml bump step; every future SDK release
-- [ ] **1.2** Add `python/tests/test_bump_versions.py` — subprocess-run the script in a `tmp_path` fixture tree (leaf `_version.py`, pyproject, package.json, version.ts), assert all stamps including `RELEASE_DATE`
+— **Done:** VERSION_FILES gains python_version_leaf; RELEASE_DATE stamped alongside __version__ (optional date arg, default today UTC); files: scripts/bump_versions.py; fixes: none
+- [x] **1.2** Add `python/tests/test_bump_versions.py` — subprocess-run the script in a `tmp_path` fixture tree (leaf `_version.py`, pyproject, package.json, version.ts), assert all stamps including `RELEASE_DATE`
     — **Why:** 4b test mandate for changed logic; the script had zero coverage, which is how this defect shipped
     — **Done when:** pytest green; test fails if the leaf entry is removed from VERSION_FILES (mutation check)
     — **Consumers affected:** CI ci-python pytest job
-- [ ] **1.3** Run the gate (full tier — release tooling is a critical area): ruff + full pytest in `python/`
+— **Done:** 5 subprocess tests over a tmp_path fixture tree — leaf version+date, date default, classic targets, invalid-version rejection, summary-line membership; files: python/tests/test_bump_versions.py; fixes: UP017 datetime.UTC alias, ruff format
+- [x] **1.3** Run the gate (full tier — release tooling is a critical area): ruff + full pytest in `python/`
     — **Why:** release-tooling change feeding every consumer's stamp; exit gate for the ticket
     — **Done when:** `poetry run ruff check` + `poetry run pytest` exit 0; `tier=full` memo recorded
     — **Consumers affected:** CI on the PR
+— **Done:** ruff check green; ruff format clean on new file; 795 pytest tests green (15.13s); tier=full — release tooling is a critical-area anchor
 
 ### Phase 2: release + verify + re-target
 
@@ -50,6 +53,10 @@ No runtime SDK code changes — `__init__.py` already re-exports the leaf (`from
     — **Why:** the whole point — prove the stamp before any consumer pins it
     — **Done when:** assertions printed and comments posted
     — **Consumers affected:** DA-3419..DA-3424 bodies (0.37.1 → 0.37.2)
+
+## Trace
+
+GATE <sha-in-phase2-commit> tier=full lint=t build=-|n.a unit=t(795) e2e=-|n.a
 
 ## Technical Notes
 
