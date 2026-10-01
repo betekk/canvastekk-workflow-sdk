@@ -1,6 +1,5 @@
 import { statSync } from "node:fs";
 import { open as fsOpen } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import type { UploadSessionDescriptor } from "./uploads.js";
@@ -155,7 +154,6 @@ async function controlRequest(
 async function putPartChunk(
   url: string,
   chunk: Buffer,
-  contentMd5: string,
   contentType: string,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
@@ -163,10 +161,15 @@ async function putPartChunk(
       new URL(url),
       {
         method: "PUT",
+        // No Content-MD5 (python parity, DA-3341): the engine presigns part
+        // URLs with SignedHeaders=host only and the MD5 is unknowable at mint
+        // time, so an unsigned Content-MD5 header makes S3 reject the PUT with
+        // AccessDenied "There were headers present in the request which were
+        // not signed". Integrity rides TLS in transit plus S3's MPU etag
+        // consistency.
         headers: {
           "Content-Type": contentType,
           "Content-Length": String(chunk.length),
-          "Content-MD5": contentMd5,
         },
         timeout: PART_PUT_TIMEOUT_MS,
       },
@@ -283,11 +286,10 @@ export async function uploadViaSession(
         const results = await Promise.allSettled(
           batch.map(async (partNumber, i) => {
             const chunk = chunks[i];
-            const md5 = createHash("md5").update(chunk).digest("base64");
             let lastError: unknown;
             for (let attempt = 1; attempt <= retryAttempts; attempt++) {
               try {
-                const etag = await putPartChunk(partUrls[partNumber - 1], chunk, md5, contentType);
+                const etag = await putPartChunk(partUrls[partNumber - 1], chunk, contentType);
                 return { part_number: partNumber, etag } satisfies CompletedPart;
               } catch (err) {
                 lastError = err;

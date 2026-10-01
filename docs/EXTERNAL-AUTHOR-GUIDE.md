@@ -274,7 +274,7 @@ Uploads changed too: a failed output upload now **fails the execution** with `er
 
 Nothing changes in **your** node code — the router, not the developer, performs output uploads. What changed underneath:
 
-- The engine sends a **multipart upload-session descriptor** as the upload target: lazy initiate → bounded parallel part PUTs (per-part `Content-MD5`) → complete, with per-part retry, resume-from-server-status, and abort-on-failure.
+- The engine sends a **multipart upload-session descriptor** as the upload target: lazy initiate → bounded parallel part PUTs → complete, with per-part retry, resume-from-server-status, and abort-on-failure.
 - Since SDK **0.36.0** (DA-3340) plain-string targets are **removed**: a legacy presigned-PUT string reaching the SDK raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") and fails the execution — there is no deprecation warning and no fallback. The fix is upgrading the engine (DA-3338/DA-2887), not node changes.
 - `fail`/`UPLOAD_FAILED` semantics on terminal upload failure are unchanged (DA-1711).
 
