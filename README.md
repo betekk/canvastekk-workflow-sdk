@@ -429,7 +429,8 @@ The SDK reads the following environment variables. None are required by default 
 |----------|---------|-------------|
 | `CANVASTEKK_NODE_ENV` | `dev` | Node environment mode. `dev`/`development`/`test` → `"mode": "dev"`. `uat`/`staging` → `"mode": "uat"`. `production` → `"mode": "production"`. The engine reads this from `/manifest` to adjust routing and test behaviour. |
 | `CANVASTEKK_LOG_LEVEL` | `INFO` | SDK-wide log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
-| `CANVASTEKK_LOG_FORMAT` | `json` | `json` (one JSON object per line — CloudWatch/Datadog/ELK) or `text` (human-readable for local dev). |
+| `CANVASTEKK_LOG_FORMAT` | `console` | `console` (human-readable — the DA-3359 default for local dev) or `json` (one JSON object per line — CloudWatch/Datadog/ELK). |
+| `CANVASTEKK_SDK_ALLOW_UNSUPPORTED` | unset | DA-3359 break-glass: set to `1` to keep running past the SDK support horizon (entrypoints otherwise raise; the horizon warns at import). |
 
 ### Authentication
 
@@ -448,6 +449,21 @@ Auth environment variables are only read when the corresponding `NodeAuth` backe
 | Variable | Description |
 |----------|-------------|
 | `CANVASTEKK_DEV_MODE` | Set to `true`, `1`, or `yes` to **bypass all authentication**. Useful for local development. **Never enable in production.** |
+
+## Local Development Logging (DA-3359)
+
+Running a node locally prints one structured execution line per run:
+
+```
+execution slug=ifc-consolidate-lambda status=pass duration_ms=1420
+```
+
+- Output is human-readable by default (`CANVASTEKK_LOG_FORMAT=console`);
+  set `CANVASTEKK_LOG_FORMAT=json` for one-JSON-object-per-line output in
+  log shippers.
+- `CANVASTEKK_LOG_LEVEL` (default `INFO`) controls verbosity.
+- If your host application configures its own logging handlers, the SDK
+  leaves them untouched.
 
 ## External Author Guide
 

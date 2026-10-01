@@ -14,9 +14,9 @@ from canvastekk_workflow_sdk.contracts import (
     MeasurementSet,
     Plane,
     PlaneSet,
+    Point3D,
     build_check_output_schema,
     validate_verdict_fields,
-    Point3D,
 )
 
 

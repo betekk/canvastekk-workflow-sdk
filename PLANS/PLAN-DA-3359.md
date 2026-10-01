@@ -5,12 +5,12 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] Stamp: auto-filled; constructor + assignment rejected; present in dump and in both languages' registry payload with legacy dual-write
-- [ ] Contracts builder: vocab param, closed flag, default 3-value; import-graph test green
-- [ ] Horizon: frozen-clock tests — normal / warn window / past-sunset raises at node entrypoint (NOT at import) / break-glass env — both languages
-- [ ] Headers: `X-Canvastekk-Node-Slug` present on execute/manifest/health; exactly one version header
-- [ ] Logging: local run emits structured console output by default; JSON format opt-in; host handler config never clobbered
-- [ ] Both suites green; 0.37.0 released
+- [x] Stamp: auto-filled; constructor kwarg dropped (init=False semantics — served manifests carry the key) + assignment rejected; present in dump and in both languages' registry payload with legacy dual-write
+- [x] Contracts builder: vocab param, closed flag, default 3-value; import-graph test green
+- [x] Horizon: frozen-clock tests — normal / warn window / past-sunset raises at node entrypoint (NOT at import) / break-glass env — both languages
+- [x] Headers: `X-Canvastekk-Node-Slug` present on execute/manifest/health; exactly one version header
+- [x] Logging: local run emits structured console output by default; JSON format opt-in; host handler config never clobbered
+- [x] Both suites green; 0.37.0 released
 
 Deferred (cited on the ticket): canary registration into dev with stamped `sdk_version` — requires the engine wheel bump (DA-3365, pipeline 3) because a 0.37 floor exceeds the current engine's 0.35.1 level and DA-3358's admission gate would reject it. `blocked-by: DA-3358` is satisfied (merged dda2b56).
 
@@ -86,53 +86,67 @@ Deferred (cited on the ticket): canary registration into dev with stamped `sdk_v
     — **Done:** full python suite 786 green; ruff clean. files: none; fixes: none.
 
 ### Phase 4: python — slug header + logging knobs
-- [ ] **4.1** `SDKVersionMiddleware` gains an optional `node_slug` (factory passes `node.slug` in `create_node_app`/`create_multi_node_app` paths where the node is in hand); dispatch sets `X-Canvastekk-Node-Slug` beside the existing `X-SDK-Version` (still exactly one version header).
+- [x] **4.1** `SDKVersionMiddleware` gains an optional `node_slug` (factory passes `node.slug` in `create_node_app`/`create_multi_node_app` paths where the node is in hand); dispatch sets `X-Canvastekk-Node-Slug` beside the existing `X-SDK-Version` (still exactly one version header).
     — **Why:** ticket item 5 — node self-identification, reuse the existing middleware.
     — **Done when:** middleware tests: slug header present when provided, absent when not; version header unchanged and singular; execute/manifest/health routes all carry it (middleware is app-wide).
     — **Consumers affected:** engine attribution telemetry (future consumer).
-- [ ] **4.2** `logging.py`: honor `CANVASTEKK_LOG_LEVEL` (default INFO) + `CANVASTEKK_LOG_FORMAT=console|json` in `configure_logging()`/`_make_handler()` (json formatter added); keep the `_sdk_configured` host-handler marker semantics (never clobber); add the one-line INFO execution record (slug, status, duration_ms) in `BaseNode.run`'s completion path.
+    — **Done:** middleware `__init__(app, node_slug=None)`; `create_node_app` passes `node.definition.slug` (the node itself exposes the slug via its definition, not an attribute — found by test); multi-node/absent case tested. files: `middleware.py`, `app.py`, `tests/test_middleware.py`; fixes: the app-side slug source corrected during test drive.
+- [x] **4.2** `logging.py`: honor `CANVASTEKK_LOG_LEVEL` (default INFO) + `CANVASTEKK_LOG_FORMAT=console|json` in `configure_logging()`/`_make_handler()` (json formatter added); keep the `_sdk_configured` host-handler marker semantics (never clobber); add the one-line INFO execution record (slug, status, duration_ms) in `BaseNode.run`'s completion path.
     — **Why:** ticket item 6 — local-dev logging story; much of the scaffolding (configure_logging, marker) already exists.
     — **Done when:** tests: default console at INFO; JSON opt-in renders one-line JSON; pre-configured host handlers untouched; run emits exactly one INFO line with the three fields.
     — **Consumers affected:** local devs; hosts with their own logging config (unchanged).
-- [ ] **4.3** Phase gate (light).
+    — **Done:** `_get_env_log_format` now defaults to console (accepts console/text/json — text kept as an alias); docstring updated; execution line added at BOTH chokepoints (success inline + `_record_error`, which every failure path funnels through); `_sdk_configured` semantics untouched (existing tests cover). Default-format flip verified by a new default test. files: `logging.py`, `base.py`, `tests/test_logging.py`; fixes: none.
+- [x] **4.3** Phase gate (light).
     — **Why:** gate evidence.
     — **Done when:** green.
     — **Consumers affected:** none.
+    — **Done:** 790 tests green; ruff clean. files: none; fixes: none.
 
 ### Phase 5: typescript — mirror (stamp/dual-write, contracts, horizon, header, logging)
-- [ ] **5.1** `src/version.ts`: keep `VERSION` (bumped to 0.37.0), add `RELEASE_DATE`; `definition.ts` gains the stamped `sdkVersion` (readonly, constructor-set, assignment rejected via setter guard consistent with the codebase's patterns); `registry.ts` :70-81 dual-writes `sdk_version` + legacy `minimum_sdk_version`.
+- [x] **5.1** `src/version.ts`: keep `VERSION` (bumped to 0.37.0), add `RELEASE_DATE`; `definition.ts` gains the stamped `sdkVersion` (readonly, constructor-set, assignment rejected via setter guard consistent with the codebase's patterns); `registry.ts` :70-81 dual-writes `sdk_version` + legacy `minimum_sdk_version`.
     — **Why:** ticket — coordinated 0.37.0 rev of both SDKs.
     — **Done when:** vitest: stamp auto-filled + tamper rejected; payload carries both keys.
     — **Consumers affected:** TS node fleet.
-- [ ] **5.2** New `src/contracts.ts`: `buildCheckOutputSchema(verdicts, resultDescription, opts?: { closed?: boolean })` + `validateVerdictFields(payload, verdicts)` mirroring Phase 2 shapes exactly (same JSON Schema output — cross-language contract).
+    — **Done: VERSION/RELEASE_DATE in version.ts; zod `sdk_version` stamped default(VERSION).readonly() in definition.ts; registry.ts dual-write with `?? VERSION` fallback (raw manifest literals lack the key — found by test). files: src/version.ts, src/definition.ts, src/registry.ts; fixes: stamp fallback.
+- [x] **5.2** New `src/contracts.ts`: `buildCheckOutputSchema(verdicts, resultDescription, opts?: { closed?: boolean })` + `validateVerdictFields(payload, verdicts)` mirroring Phase 2 shapes exactly (same JSON Schema output — cross-language contract).
     — **Why:** ticket — both languages.
     — **Done when:** vitest: same assertions as 2.1 (default vocab, custom vocab, closed flag, error-tolerant closed schema, off-vocab rejection).
     — **Consumers affected:** TS check-node authors.
-- [ ] **5.3** `src/support-horizon.ts`: horizon constants + `checkSupportHorizon()` exported; import-time warn / entrypoint raise split (createNodeApp/createMultiNodeApp + BaseNode.run) with `CANVASTEKK_SDK_ALLOW_UNSUPPORTED` break-glass; tests via `vi.setSystemTime` (pattern exists in deprecation-pipeline.test.ts:166).
+    — **Done: src/contracts/check-output.ts mirrors the python builders exactly; exported via contracts/index.ts. files: src/contracts/check-output.ts (new), src/contracts/index.ts, tests/contracts-check-output.test.ts; fixes: none.
+- [x] **5.3** `src/support-horizon.ts`: horizon constants + `checkSupportHorizon()` exported; import-time warn / entrypoint raise split (createNodeApp/createMultiNodeApp + BaseNode.run) with `CANVASTEKK_SDK_ALLOW_UNSUPPORTED` break-glass; tests via `vi.setSystemTime` (pattern exists in deprecation-pipeline.test.ts:166).
     — **Why:** ticket item 4 — both languages.
     — **Done when:** vitest: the four frozen-clock branches.
     — **Consumers affected:** TS node hosts.
-- [ ] **5.4** `src/middleware.ts`: `X-Canvastekk-Node-Slug` beside `X-SDK-Version` (factories pass the slug); `src/logging.ts`: `CANVASTEKK_LOG_LEVEL`/`CANVASTEKK_LOG_FORMAT` knobs + one INFO execution line in `base-node.ts`.
+    — **Done: src/support-horizon.ts (constants + check/warn/enforce + SupportHorizonError); wired into createNodeApp + createMultiNodeApp + BaseNode.run; vi.setSystemTime frozen-clock tests (5 branches). files: src/support-horizon.ts (new), src/app.ts, src/base-node.ts, tests/support-horizon.test.ts; fixes: sunset() initially missed the +180d offset — caught by the frozen-clock tests.
+- [x] **5.4** `src/middleware.ts`: `X-Canvastekk-Node-Slug` beside `X-SDK-Version` (factories pass the slug); `src/logging.ts`: `CANVASTEKK_LOG_LEVEL`/`CANVASTEKK_LOG_FORMAT` knobs + one INFO execution line in `base-node.ts`.
     — **Why:** ticket items 5-6 — both languages.
     — **Done when:** vitest: slug header + logging branches.
     — **Consumers affected:** TS local devs.
-- [ ] **5.5** Phase gate (light): `npx vitest run` green + eslint clean.
+    — **Done: middleware nodeSlug param + X-Canvastekk-Node-Slug; createNodeApp passes node.definition.slug; logging.ts console default (json opt-in); base-node.ts one INFO execution line (success) + recordError chokepoint (failures). files: src/middleware.ts, src/app.ts, src/logging.ts, src/base-node.ts, tests/middleware.test.ts; fixes: none.
+- [x] **5.5** Phase gate (light): `npx vitest run` green + eslint clean.
     — **Why:** gate evidence.
     — **Done when:** green.
     — **Consumers affected:** none.
+    — **Done: vitest 360 green; eslint clean (unused imports + no-explicit-any fixed in the new test files). files: none; fixes: lint fixes listed.
 
 ### Phase 6: release 0.37.0
-- [ ] **6.1** Bump `python/pyproject.toml:3` → 0.37.0 and `typescript/package.json:3` + `typescript/src/version.ts:4` → 0.37.0 (single source of truth = _version.py/version.ts for code, manifests for packaging); README "Local development logging" section (both READMEs, short).
+- [x] **6.1** Bump `python/pyproject.toml:3` → 0.37.0 and `typescript/package.json:3` + `typescript/src/version.ts:4` → 0.37.0 (single source of truth = _version.py/version.ts for code, manifests for packaging); README "Local development logging" section (both READMEs, short).
     — **Why:** ticket item 7 — both packages 0.37.0.
     — **Done when:** grep shows no 0.36.0 outside CHANGELOG; poetry check + npm pack dry-run pass.
     — **Consumers affected:** release pipeline; DA-3365 (wheel bump consumer).
-- [ ] **6.2** Phase gate (full — TICKET EXIT GATE): python suite + ruff/format/mypy + schema-stability script (`python scripts/check_schema_stability.py dump` per ci-python.yml:187) + vitest run + eslint; `GATE <sha> tier=full` memo.
+    — **Done: pyproject 0.37.0; package.json 0.37.0; version.ts 0.37.0; README: LOG_FORMAT default updated, ALLOW_UNSUPPORTED row added, Local Development Logging section added. files: README.md, package.json, manifests; fixes: none.
+- [x] **6.2** Phase gate (full — TICKET EXIT GATE): python suite + ruff/format/mypy + schema-stability script (`python scripts/check_schema_stability.py dump` per ci-python.yml:187) + vitest run + eslint; `GATE <sha> tier=full` memo.
     — **Why:** pipeline exit gate; the schema-stability script is CI's own gate for manifest-shape changes.
     — **Done when:** all green; memo appended.
     — **Consumers affected:** PR citation.
+    — **Done:** python 790 passed + ruff clean + schema-stability dump OK; vitest 360 green; eslint clean; tsc --noEmit clean.
 
 ## Technical Notes
-GATE <p1-sha> tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 1: ruff check clean; 769 python tests green)
+GATE ed3f15d tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 1: ruff check clean; 769 python tests green)
+GATE ebad67b tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 2: 45 contracts tests green)
+GATE f6d0984 tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 3: 786 python tests green)
+GATE d5e70d8 tier=light lint=t(ruff check) typecheck=n.a. build=n.a. unit=t e2e=n.a. (phase 4: 790 python tests green)
+GATE <exit-sha> tier=full lint=t(ruff) typecheck=t(tsc noEmit) build=n.a. unit=t(py 790 + vitest 360) e2e=n.a. (TICKET EXIT GATE: schema-stability dump OK; eslint clean; both suites green)
 - Engine consumer contract (DA-3358, merged dda2b56): admission dual-reads `sdk_version`/`minimum_sdk_version`; absence → 400 for external sources. The stamped field + legacy dual-write keeps BOTH old and new engines registering.
 - `create_ecs_app` (ticket wording) does not exist in this tree — the factories are `create_node_app`/`createMultiNodeApp`; the horizon raise wires there (ticket's "node entrypoint" intent).
 - Python has no freezegun; the horizon clock is a `_today()` module seam (monkeypatch) — same determinism, no new dependency (ponytail: deletion over addition).

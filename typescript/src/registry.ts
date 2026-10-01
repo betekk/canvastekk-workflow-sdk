@@ -1,3 +1,4 @@
+import { VERSION } from "./version.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { WorkflowNodeManifest } from "./definition.js";
@@ -78,6 +79,14 @@ export function buildRegistryPayload(
     if (value !== null && !(key in resolvedConstraints)) {
       resolvedConstraints[key] = value;
     }
+  }
+  // DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
+  const stamp = definition.sdk_version ?? VERSION;
+  if (!("sdk_version" in resolvedConstraints)) {
+    resolvedConstraints.sdk_version = stamp;
+  }
+  if (!("minimum_sdk_version" in resolvedConstraints)) {
+    resolvedConstraints.minimum_sdk_version = stamp;
   }
 
   // DA-1955: engine RegisterWorkflowNodeRequest is extra="forbid" without

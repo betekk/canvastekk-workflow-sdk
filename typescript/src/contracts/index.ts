@@ -35,3 +35,6 @@ export const STANDARD_CLASSES: Record<number, string> = {
 };
 
 export const STANDARD_CLASS_NAMES = Object.values(STANDARD_CLASSES);
+
+export { buildCheckOutputSchema, validateVerdictFields, DEFAULT_CHECK_VERDICTS } from "./check-output.js";
+export type { CheckOutputOptions } from "./check-output.js";

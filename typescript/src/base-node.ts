@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { enforceSupportHorizon } from "./support-horizon.js";
 import { unlinkSync, statSync } from "node:fs";
 import { createWriteStream } from "node:fs";
 import { join, basename } from "node:path";
@@ -560,6 +561,8 @@ export abstract class BaseNode {
   }
 
   async run(request: NodeExecutionRequest): Promise<NodeExecutionResponse> {
+    // DA-3359: entrypoint horizon gate (import stays log-only).
+    enforceSupportHorizon();
     const executionId = randomUUID();
     const startTime = performance.now();
     const def = this.getDefinition();
@@ -594,6 +597,8 @@ export abstract class BaseNode {
         this.validateOutputs(outputs);
 
         const durationMs = Math.round(performance.now() - startTime);
+        // DA-3359: one structured execution line per run.
+        logger.info(`execution slug=${def.slug} status=pass duration_ms=${durationMs}`);
 
         for (const mw of this._middleware) {
           mw.onAfterExecute(inputs, outputs, context, durationMs);
@@ -616,7 +621,7 @@ export abstract class BaseNode {
       });
     } catch (err) {
       const durationMs = Math.round(performance.now() - startTime);
-      this.recordError(request, err as Error, durationMs);
+      this.recordError(request, err as Error, durationMs); // DA-3359: failure chokepoint logs the execution line
 
       if (err instanceof NodeExecutionError) {
         return NodeExecutionResponseFactory.failure(
