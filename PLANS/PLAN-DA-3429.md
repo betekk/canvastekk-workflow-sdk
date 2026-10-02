@@ -42,7 +42,7 @@ Behavior change is strictly narrowing: only the `suffix == ''` case stops raisin
 WORK LOG:
 - Phase 1: fix + test + gate. Exit gate ran FULL (ticket exit gate, unconditional). Escalation notes: typecheck `-` — repo CI (ci-python.yml) defines no typecheck command (ruff + pytest only); build `-` — library, no CI build step; e2e `-` — no frontend touched, no Playwright configured.
 
-GATE (appended post-commit by the end-of-ticket chore commit — names the gated implementation SHA)
+GATE 1c6442a tier=full lint=t typecheck=- build=- unit=t e2e=-
 
 ## Technical Notes
 
