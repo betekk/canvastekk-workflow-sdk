@@ -5,9 +5,9 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] `validate_file_input` passes when the downloaded file has no suffix (`suffix == ''`), even when the field declares `x-accept`
-- [ ] `validate_file_input` still raises for a non-empty suffix not in `x-accept`
-- [ ] Unit tests cover both cases; repo gate green (ruff + pytest per ci-python.yml)
+- [x] `validate_file_input` passes when the downloaded file has no suffix (`suffix == ''`), even when the field declares `x-accept`
+- [x] `validate_file_input` still raises for a non-empty suffix not in `x-accept`
+- [x] Unit tests cover both cases; repo gate green (ruff + pytest per ci-python.yml)
 
 ## Dependency & Consumer Map
 
@@ -21,18 +21,30 @@ Behavior change is strictly narrowing: only the `suffix == ''` case stops raisin
 ## Implementation Phases
 
 ### Phase 1: Tolerate extension-less downloads in x-accept validation
-- [ ] **1.1** In `validate_file_input` (python/canvastekk_workflow_sdk/definition.py), guard the `x-accept` comparison with `and file_path.suffix` so an empty suffix skips the check, with a comment citing DA-3429 (extension-less DA-3338/DA-3339 emission keys + Content-Disposition naming)
+- [x] **1.1** In `validate_file_input` (python/canvastekk_workflow_sdk/definition.py), guard the `x-accept` comparison with `and file_path.suffix` so an empty suffix skips the check, with a comment citing DA-3429 (extension-less DA-3338/DA-3339 emission keys + Content-Disposition naming)
     — **Why:** DA-3339 keys node outputs by field name from the registry-declared extension; url-loader's `buffer` declares none, so downstream SDK downloads legitimately carry no suffix and the strict check hard-fails before the handler's own converter can run
     — **Done when:** the guard is in place and a dotless temp path validates clean against an `x-accept` field
     — **Consumers affected:** all nodes with `x-accept` file inputs (rejection scope narrows)
-- [ ] **1.2** Add `test_extensionless_file_passes` to `TestValidateFileInput` (python/tests/test_definition.py): dotless file against `x-accept: ['.txt', '.csv']` must not raise; keep the existing wrong-extension test as the strictness guard
+    — **Done:** guard added at definition.py (`if x_accept and file_path.suffix:`) with DA-3429 rationale comment; files: python/canvastekk_workflow_sdk/definition.py; fixes: none
+- [x] **1.2** Add `test_extensionless_file_passes` to `TestValidateFileInput` (python/tests/test_definition.py): dotless file against `x-accept: ['.txt', '.csv']` must not raise; keep the existing wrong-extension test as the strictness guard
     — **Why:** the tolerance is a deliberate contract change — both sides need pinning
     — **Done when:** both tests pass locally
     — **Consumers affected:** CI gate
-- [ ] **1.3** Run the repo gate (ruff check + pytest in python/) and commit + push `fix(sdk): tolerate extension-less file inputs in x-accept validation (DA-3429)`
+    — **Done:** `test_extensionless_file_passes` added; TestValidateFileInput 14 tests green (86 in module); files: python/tests/test_definition.py; fixes: none
+- [x] **1.3** Run the repo gate (ruff check + pytest in python/) and commit + push `fix(sdk): tolerate extension-less file inputs in x-accept validation (DA-3429)`
     — **Why:** the pipeline's push boundary requires a green full gate on the final SHA
     — **Done when:** gate green locally and the commit is pushed to `feat/DA-3429`
     — **Consumers affected:** PR review, DA-3424's SDK pin bump
+    — **Done:** ruff pass; full pytest suite exit 0; committed + pushed (see Traceability); files: definition.py, test_definition.py, PLAN; fixes: none
+
+## Traceability
+
+WORK LOG:
+- Phase 1: fix + test + gate. Exit gate ran FULL (ticket exit gate, unconditional). Escalation notes: typecheck `-` — repo CI (ci-python.yml) defines no typecheck command (ruff + pytest only); build `-` — library, no CI build step; e2e `-` — no frontend touched, no Playwright configured.
+
+GATE (appended post-commit by the end-of-ticket chore commit — names the gated implementation SHA)
+
+## Technical Notes
 
 ## Technical Notes
 - Root cause chain: url-loader 1.1.1 declares `buffer` output `x-accept: []` → DA-3339 emission key `.../outputs/url-load-1/buffer` (no extension) → engine presigns with `Content-Disposition: filename="buffer"` → SDK BaseNode auto-download names the local file `pcd_path_buffer` → `validate_file_input` raises on suffix `''`. Evidence: dev run `e5aa5f51-47df-4dcb-92e9-8d3ec589ef60` failed at ff-1.

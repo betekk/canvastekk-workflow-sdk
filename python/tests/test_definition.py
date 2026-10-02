@@ -710,6 +710,16 @@ class TestValidateFileInput:
         with pytest.raises(Exception, match="not allowed"):
             definition.validate_file_input("file", f)
 
+    def test_extensionless_file_passes(self, tmp_path) -> None:
+        # DA-3429: extension-less artifacts (e.g. DA-3339 emission keys named
+        # by field, Content-Disposition filenames without an extension) must
+        # not hard-fail the x-accept check — the handler's own content
+        # handling stays responsible for correctness.
+        definition = self._make_definition()
+        f = tmp_path / "pcd_path_buffer"
+        f.write_text("binary-ish content")
+        definition.validate_file_input("file", f)
+
     def test_rejects_oversized_file(self, tmp_path) -> None:
         definition = self._make_definition()
         f = tmp_path / "data.txt"
