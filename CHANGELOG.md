@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.3] - 2026-10-02
+
+### Bug Fixes
+
+- **sdk**: Tolerate extension-less file inputs in x-accept validation (DA-3429) (#93)
+
+
 ## [0.37.2] - 2026-10-01
 
 ### Bug Fixes
 
 - **scripts**: Stamp _version.py leaf in release bump (DA-3425) (#92)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.2
 
 
 ## [0.37.1] - 2026-10-01

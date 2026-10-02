@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "canvastekk-workflow-sdk"
-version = "0.37.2"
+version = "0.37.3"
 description = "Node SDK for CanvasTEKK Workflow Engine - handles HTTP endpoint boilerplate"
 authors = ["BETEKK"]
 license = "Apache-2.0"
