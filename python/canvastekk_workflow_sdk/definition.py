@@ -448,7 +448,13 @@ class WorkflowNodeManifest(BaseModel):
         schema = properties.get(field_name, {})
 
         x_accept = schema.get("x-accept")
-        if x_accept:
+        if x_accept and file_path.suffix:
+            # DA-3429: an empty suffix means the artifact carries no declarable
+            # extension (e.g. DA-3339 emission keys named by field, or
+            # Content-Disposition filenames without one). Skipping the check
+            # here restores the pre-0.35 tolerance — the handler's own content
+            # handling (e.g. ensure_las conversion) stays responsible for
+            # correctness. Files with a real extension are still validated.
             if file_path.suffix.lower() not in [ext.lower() for ext in x_accept]:
                 raise NodeValidationError(
                     f"File extension '{file_path.suffix}' is not allowed for field '{field_name}'. "
