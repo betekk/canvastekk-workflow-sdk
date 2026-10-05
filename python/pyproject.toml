@@ -9,12 +9,12 @@ packages = [{ include = "canvastekk_workflow_sdk" }]
 include = [
     { path = "canvastekk_workflow_sdk/data/**/*", format = ["sdist", "wheel"] },
 ]
-repository = "https://github.com/nus-cee/canvastekk-workflow-sdk"
-homepage = "https://github.com/nus-cee/canvastekk-workflow-sdk"
+repository = "https://github.com/betekk/canvastekk-workflow-sdk"
+homepage = "https://github.com/betekk/canvastekk-workflow-sdk"
 
 [[tool.poetry.source]]
 name = "github"
-url = "https://pypi.pkg.github.com/nus-cee/"
+url = "https://pypi.pkg.github.com/betekk/"
 priority = "supplemental"
 
 [tool.poetry.dependencies]

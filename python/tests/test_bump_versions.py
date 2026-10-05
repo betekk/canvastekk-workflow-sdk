@@ -31,7 +31,7 @@ def _make_fixture_tree(root: Path) -> None:
     ts_dir = root / "typescript" / "src"
     ts_dir.mkdir(parents=True)
     (ts_dir.parent / "package.json").write_text(
-        json.dumps({"name": "@nus-cee/canvastekk-workflow-sdk", "version": "0.0.1"}),
+        json.dumps({"name": "@betekk/canvastekk-workflow-sdk", "version": "0.0.1"}),
         encoding="utf-8",
     )
     (ts_dir / "version.ts").write_text('export const VERSION = "0.0.1";\n', encoding="utf-8")

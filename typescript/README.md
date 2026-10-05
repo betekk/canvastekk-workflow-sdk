@@ -9,7 +9,7 @@ Node SDK for CanvasTEKK Workflow Engine. Handles HTTP endpoint boilerplate so no
 ### From GitHub Packages (recommended)
 
 ```bash
-npm install canvastekk-workflow-sdk --registry https://npm.pkg.github.com/@nus-cee
+npm install canvastekk-workflow-sdk --registry https://npm.pkg.github.com/@betekk
 ```
 
 ### For Development
@@ -71,7 +71,7 @@ npm run build
 ### Step 1: Install the SDK
 
 ```bash
-npm install canvastekk-workflow-sdk --registry https://npm.pkg.github.com/@nus-cee
+npm install canvastekk-workflow-sdk --registry https://npm.pkg.github.com/@betekk
 ```
 
 ### Step 2: Define Your Node
@@ -1273,4 +1273,4 @@ The SDK is a convenience layer, not a hard dependency. Nodes can "eject" by copy
 
 Releases are automated via [git-cliff](https://git-cliff.org/) based on conventional commits. See the [Python README](../python/README.md#releasing) for the full release workflow details.
 
-The TypeScript package version lives in `typescript/package.json` and is published to GitHub Packages under `@nus-cee`.
+The TypeScript package version lives in `typescript/package.json` and is published to GitHub Packages under `@betekk`.

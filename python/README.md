@@ -12,13 +12,13 @@ Node SDK for CanvasTEKK Workflow Engine. Handles HTTP endpoint boilerplate so no
 
 ```bash
 pip install canvastekk-workflow-sdk \
-  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/nus-cee/
+  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 ```
 
 ### From GitHub Releases (no auth)
 
 ```bash
-# Download the .whl from https://github.com/nus-cee/canvastekk-workflow-sdk/releases
+# Download the .whl from https://github.com/betekk/canvastekk-workflow-sdk/releases
 pip install canvastekk_workflow_sdk-VERSION-py3-none-any.whl
 ```
 
@@ -75,10 +75,10 @@ poetry run pytest --cov=canvastekk_workflow_sdk --cov-report=term-missing
 ```bash
 # From GitHub Packages (requires PAT with read:packages scope)
 pip install canvastekk-workflow-sdk \
-  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/nus-cee/
+  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 
 # Or from GitHub Releases (no auth — download the .whl first)
-# https://github.com/nus-cee/canvastekk-workflow-sdk/releases
+# https://github.com/betekk/canvastekk-workflow-sdk/releases
 pip install canvastekk_workflow_sdk-VERSION-py3-none-any.whl
 ```
 

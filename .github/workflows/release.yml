@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
-  # Use an org `local` self-hosted runner (nus-cee pool) when one is online+idle,
+  # Use an org `local` self-hosted runner (org pool) when one is online+idle,
   # else ubuntu-latest. Probe/API failures degrade to ubuntu-latest with a
   # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
   # loudly (by design — managed credentials).
@@ -34,13 +34,13 @@ jobs:
         with:
           app-id: ${{ vars.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: nus-cee
+          owner: ${{ github.repository_owner }}
       - id: pick
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           probe() {
-            gh api orgs/nus-cee/actions/runners --paginate \
+            gh api orgs/${{ github.repository_owner }}/actions/runners --paginate \
               --jq '[.runners[] | select(.labels[].name=="local") | select(.status=="online" and .busy==false)] | length' 2>/dev/null
           }
           # Retry: a transient API failure must not cost us the local pool
@@ -229,8 +229,8 @@ jobs:
         run: |
           pip install twine
           python -m twine upload \
-            --repository-url "https://pypi.pkg.github.com/nus-cee/" \
-            --username "nus-cee" \
+            --repository-url "https://pypi.pkg.github.com/betekk/" \
+            --username "betekk" \
             --password "${GITHUB_TOKEN}" \
             --disable-progress-bar \
             dist/canvastekk_workflow_sdk-*.whl
@@ -250,7 +250,7 @@ jobs:
           python3 -m venv "$VENV"
 
           # Install from GitHub Packages with auth + retry for propagation latency
-          INDEX_URL="https://nus-cee:${GITHUB_TOKEN}@pypi.pkg.github.com/nus-cee/"
+          INDEX_URL="https://betekk:${GITHUB_TOKEN}@pypi.pkg.github.com/betekk/"
           INSTALL_SUCCESS=false
           for i in 1 2 3; do
             if "$VENV/bin/pip" install \
@@ -289,7 +289,7 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@nus-cee'
+          scope: '@betekk'
 
       - name: Install TypeScript dependencies
         if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
@@ -313,7 +313,7 @@ jobs:
           # wheel channel; no registry token needed by consumers).
           npm pack --pack-destination .
           VERSION_NUM="${NEW_VERSION#v}"
-          mv "nus-cee-canvastekk-workflow-sdk-${VERSION_NUM}.tgz" \
+          mv "betekk-canvastekk-workflow-sdk-${VERSION_NUM}.tgz" \
              "canvastekk-workflow-sdk-${VERSION_NUM}.tgz"
           gh release upload "${NEW_VERSION}" "canvastekk-workflow-sdk-${VERSION_NUM}.tgz"
 
@@ -337,13 +337,13 @@ jobs:
           cd "$TEMP_DIR"
 
           npm init -y > /dev/null 2>&1
-          echo "@nus-cee:registry=https://npm.pkg.github.com" > .npmrc
+          echo "@betekk:registry=https://npm.pkg.github.com" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
 
-          npm install "@nus-cee/canvastekk-workflow-sdk@${VERSION_NUM}" --legacy-peer-deps 2>&1
+          npm install "@betekk/canvastekk-workflow-sdk@${VERSION_NUM}" --legacy-peer-deps 2>&1
 
           node -e "
-          const { VERSION, WorkflowBuilder, ResolverError } = require('@nus-cee/canvastekk-workflow-sdk');
+          const { VERSION, WorkflowBuilder, ResolverError } = require('@betekk/canvastekk-workflow-sdk');
           if (VERSION !== '${VERSION_NUM}') {
             console.error('Version mismatch: expected ${VERSION_NUM}, got ' + VERSION);
             process.exit(1);
@@ -418,7 +418,7 @@ jobs:
         with:
           app-id: ${{ vars.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: nus-cee
+          owner: ${{ github.repository_owner }}
           repositories: canvastekk-workflow-nodes
 
       - name: Notify Nodes repo of SDK release (dispatch rebuild)
@@ -427,7 +427,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.nodes-token.outputs.token }}
-          repository: nus-cee/canvastekk-workflow-nodes
+          repository: betekk/canvastekk-workflow-nodes
           event-type: sdk-released
           client-payload: |
             {

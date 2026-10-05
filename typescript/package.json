@@ -1,5 +1,5 @@
 {
-  "name": "@nus-cee/canvastekk-workflow-sdk",
+  "name": "@betekk/canvastekk-workflow-sdk",
   "version": "0.37.3",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -53,7 +53,7 @@
     "vitest": "^3"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@nus-cee"
+    "registry": "https://npm.pkg.github.com/@betekk"
   },
   "license": "Apache-2.0"
 }

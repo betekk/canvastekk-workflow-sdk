@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
-  # Use an org `local` self-hosted runner (nus-cee pool) when one is online+idle,
+  # Use an org `local` self-hosted runner (org pool) when one is online+idle,
   # else ubuntu-latest. Probe/API failures degrade to ubuntu-latest with a
   # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
   # loudly (by design — managed credentials).
@@ -39,13 +39,13 @@ jobs:
         with:
           app-id: ${{ vars.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: nus-cee
+          owner: ${{ github.repository_owner }}
       - id: pick
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           probe() {
-            gh api orgs/nus-cee/actions/runners --paginate \
+            gh api orgs/${{ github.repository_owner }}/actions/runners --paginate \
               --jq '[.runners[] | select(.labels[].name=="local") | select(.status=="online" and .busy==false)] | length' 2>/dev/null
           }
           # Retry: a transient API failure must not cost us the local pool

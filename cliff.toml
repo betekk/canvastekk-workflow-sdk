@@ -50,5 +50,5 @@ tag_pattern = "v[0-9].*"
 sort_commits = "oldest"
 
 [remote.github]
-owner = "nus-cee"
+owner = "betekk"
 repo = "canvastekk-workflow-sdk"
