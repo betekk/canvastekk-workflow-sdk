@@ -39,13 +39,13 @@ After registration, the engine can discover your node and include it in workflow
 
 ```bash
 pip install canvastekk-workflow-sdk \
-  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/nus-cee/
+  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 ```
 
 **Option B — Direct wheel download from GitHub Releases (no auth):**
 
 ```bash
-# Download the .whl from https://github.com/nus-cee/canvastekk-workflow-sdk/releases
+# Download the .whl from https://github.com/betekk/canvastekk-workflow-sdk/releases
 pip install canvastekk_workflow_sdk-VERSION-py3-none-any.whl
 ```
 
@@ -371,7 +371,7 @@ WORKDIR /app
 
 ARG SDK_PAT
 COPY pyproject.toml handler.py ./
-RUN pip install . --index-url https://nus-cee:${SDK_PAT}@pypi.pkg.github.com/nus-cee/
+RUN pip install . --index-url https://betekk:${SDK_PAT}@pypi.pkg.github.com/betekk/
 
 EXPOSE 8001
 
@@ -390,7 +390,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Download the wheel from GitHub Releases first:
-# https://github.com/nus-cee/canvastekk-workflow-sdk/releases
+# https://github.com/betekk/canvastekk-workflow-sdk/releases
 COPY canvastekk_workflow_sdk-VERSION-py3-none-any.whl ./
 COPY . ./
 
@@ -587,7 +587,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Install SDK
-        run: pip install canvastekk-workflow-sdk --index-url https://nus-cee:${{ secrets.GITHUB_TOKEN }}@pypi.pkg.github.com/nus-cee/
+        run: pip install canvastekk-workflow-sdk --index-url https://betekk:${{ secrets.GITHUB_TOKEN }}@pypi.pkg.github.com/betekk/
 
       - name: Register node with engine
         env:

@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 RUN pip install canvastekk-workflow-sdk \
-    --index-url https://pypi.pkg.github.com/nus-cee/
+    --index-url https://pypi.pkg.github.com/betekk/
 
 COPY handler.py .
 

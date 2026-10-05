@@ -1,5 +1,5 @@
 /**
- * CLI entrypoint for @nus-cee/canvastekk-workflow-sdk (DA-2603).
+ * CLI entrypoint for @betekk/canvastekk-workflow-sdk (DA-2603).
  *
  * Usage:
  *   canvastekk-workflow-sdk register --manifest <file.json|URL> --engine-url URL

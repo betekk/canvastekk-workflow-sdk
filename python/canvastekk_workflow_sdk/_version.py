@@ -6,7 +6,7 @@ root — ``__init__.py`` imports middleware at module top, so anything that
 imported the version from the root risked a cycle.
 """
 
-__version__ = "0.37.0"
+__version__ = "0.37.3"
 
 #: Release date of this version (UTC) — the support-horizon sunset is
 #: computed from this date (+ SUPPORT_HORIZON_DAYS).

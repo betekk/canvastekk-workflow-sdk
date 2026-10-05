@@ -9,7 +9,7 @@
  * - Contract types for Point3D, Instance, Measurement, Plane
  * - Node registration with CanvasTEKK registry
  *
- * @see https://github.com/nus-cee/canvastekk-workflow-sdk
+ * @see https://github.com/betekk/canvastekk-workflow-sdk
  */
 export { VERSION } from "./version.js";
 export {

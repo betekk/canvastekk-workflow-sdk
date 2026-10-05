@@ -7,7 +7,7 @@ Multi-language SDK for building CanvasTEKK Workflow Engine nodes. Each language 
 | Language | Status | Package | Directory |
 |----------|--------|---------|-----------|
 | Python | Available | `canvastekk-workflow-sdk` | [`python/`](./python/) |
-| TypeScript | Available | `@nus-cee/canvastekk-workflow-sdk` | [`typescript/`](./typescript/) |
+| TypeScript | Available | `@betekk/canvastekk-workflow-sdk` | [`typescript/`](./typescript/) |
 
 ## Features
 
@@ -136,20 +136,20 @@ After engine resolution: `"13/runs/abc-123/output/zip/"`. See [EXTERNAL-AUTHOR-G
 ```bash
 # URL-embedded credentials (quick start)
 pip install canvastekk-workflow-sdk \
-  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/nus-cee/
+  --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 
 # Or use ~/.netrc (recommended for repeated use):
 # machine pypi.pkg.github.com
 #   login USERNAME
 #   password TOKEN
 pip install canvastekk-workflow-sdk \
-  --index-url https://pypi.pkg.github.com/nus-cee/
+  --index-url https://pypi.pkg.github.com/betekk/
 ```
 
 **Option B — Direct wheel download from GitHub Releases (no auth):**
 
 ```bash
-# Download from https://github.com/nus-cee/canvastekk-workflow-sdk/releases
+# Download from https://github.com/betekk/canvastekk-workflow-sdk/releases
 pip install canvastekk_workflow_sdk-VERSION-py3-none-any.whl
 ```
 
@@ -172,8 +172,8 @@ See [`python/README.md`](./python/) for full documentation.
 **Install from GitHub Packages:**
 
 ```bash
-npm install @nus-cee/canvastekk-workflow-sdk \
-  --registry https://npm.pkg.github.com/nus-cee
+npm install @betekk/canvastekk-workflow-sdk \
+  --registry https://npm.pkg.github.com/betekk
 ```
 
 **Develop locally:**
@@ -525,7 +525,7 @@ Key decisions recorded as the SDK evolves. See [`PLANS/PLAN-DA-894.md`](./PLANS/
 
 ## Repository
 
-[github.com/nus-cee/canvastekk-workflow-sdk](https://github.com/nus-cee/canvastekk-workflow-sdk)
+[github.com/betekk/canvastekk-workflow-sdk](https://github.com/betekk/canvastekk-workflow-sdk)
 
 ## Versioning
 
