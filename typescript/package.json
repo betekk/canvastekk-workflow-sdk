@@ -1,6 +1,6 @@
 {
   "name": "@betekk/canvastekk-workflow-sdk",
-  "version": "0.37.3",
+  "version": "0.37.4",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

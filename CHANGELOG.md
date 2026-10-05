@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.4] - 2026-10-05
+
+### Bug Fixes
+
+- **publish**: Move package namespace to betekk after org rename (DA-3490) (#94)
+
+
 ## [0.37.3] - 2026-10-02
 
 ### Bug Fixes
 
 - **sdk**: Tolerate extension-less file inputs in x-accept validation (DA-3429) (#93)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.3
 
 
 ## [0.37.2] - 2026-10-01
