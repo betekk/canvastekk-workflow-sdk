@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.37.5] - 2026-10-06
+
+### Testing
+
+- **parity**: Verify SDK is unaffected by engine scope rename (DA-3588) (#95)
+
+
 ## [0.37.4] - 2026-10-05
 
 ### Bug Fixes
 
 - **publish**: Move package namespace to betekk after org rename (DA-3490) (#94)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.4
 
 
 ## [0.37.3] - 2026-10-02
