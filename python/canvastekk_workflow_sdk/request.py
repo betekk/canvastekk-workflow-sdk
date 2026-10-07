@@ -33,6 +33,16 @@ class NodeExecutionRequest(BaseModel):
         pattern=_SLUG_RE,
         description="Node instance ID in workflow (slug: letters, digits, dot, underscore, hyphen)",
     )
+    execution_id: str | None = Field(
+        default=None,
+        pattern=_SLUG_RE,
+        description=(
+            "Dispatcher-minted execution id (e.g. 'ecs-<uuid>'). When provided, "
+            "progress pings carry it so the engine's forgery guard matches the "
+            "id it parked at dispatch time (#3498); when absent the node invents "
+            "a uuid4 (inline behavior, echoed back via the response)."
+        ),
+    )
 
     @model_validator(mode="after")
     def _reject_dot_segments(self) -> NodeExecutionRequest:

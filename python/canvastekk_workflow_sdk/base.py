@@ -276,7 +276,7 @@ class BaseNode(ABC):
         Returns the local path of the completed download.
         """
         max_bytes = self._max_download_bytes(field_name)
-        deadline = _download_deadline(self.definition.timeout_seconds)
+        deadline = _download_deadline(self.definition.effective_runtime_seconds)
         cancel_event = getattr(context, "cancel_event", None)
 
         current_url = validate_external_url(url)
@@ -501,7 +501,7 @@ class BaseNode(ABC):
 
         enforce_support_horizon()
 
-        execution_id = str(uuid.uuid4())
+        execution_id = request.execution_id or str(uuid.uuid4())
         start_time = time.perf_counter()
 
         try:

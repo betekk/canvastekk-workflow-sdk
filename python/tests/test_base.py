@@ -875,3 +875,45 @@ class TestBaseNodeReportProgress:
         )
         assert resp.status == "fail"
         assert execution_context_var.get() is None
+
+    def test_provided_execution_id_flows_to_pings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """#3498: a dispatcher-provided execution_id is adopted verbatim —
+        context, response, and every progress ping carry it."""
+        calls: list[tuple[str, dict]] = []
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
+        node = ProgressNode()
+        resp = node.run(
+            NodeExecutionRequest(
+                run_id="r-prog",
+                node_id="n-prog",
+                inputs={},
+                callback_url="http://engine/callbacks/r-prog/n-prog",
+                execution_id="ecs-1234",
+            )
+        )
+        assert resp.status == "pass"
+        assert resp.execution_id == "ecs-1234"
+        assert calls == [
+            (
+                "http://engine/callbacks/r-prog/n-prog/progress",
+                {"execution_id": "ecs-1234", "percent": 50, "message": "still calculating"},
+            )
+        ]
+
+    def test_fallback_invents_distinct_ids_per_run(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """#3498 back-compat: absent execution_id → uuid4 fallback (inline
+        behavior unchanged); two runs never share an id."""
+        monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: None)
+        node = ProgressNode()
+        req = NodeExecutionRequest(
+            run_id="r-fb", node_id="n-fb", inputs={},
+            callback_url="http://engine/callbacks/r-fb/n-fb",
+        )
+        a = node.run(req.model_copy())
+        b = node.run(req.model_copy())
+        assert a.execution_id != b.execution_id
+        assert len(a.execution_id) == 36  # uuid4 shape

@@ -67,3 +67,31 @@ class TestAccountIdField:
 
         req = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, future_field="x")
         assert req.account_id is None
+
+
+class TestExecutionIdField:
+    """#3498: optional dispatcher-minted execution id — pings must carry the
+    id the engine parked, else the forgery guard 403s every ping."""
+
+    def test_defaults_to_none(self) -> None:
+        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+        req = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
+        assert req.execution_id is None
+
+    def test_accepts_ecs_uuid(self) -> None:
+        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+        req = NodeExecutionRequest(
+            run_id="r1", node_id="n1", inputs={},
+            execution_id="ecs-0f2c6a1e-0000-4000-8000-000000000000",
+        )
+        assert req.execution_id.startswith("ecs-")
+
+    def test_rejects_non_slug_charset(self) -> None:
+        import pytest
+
+        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+        with pytest.raises(Exception):
+            NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, execution_id="has space")

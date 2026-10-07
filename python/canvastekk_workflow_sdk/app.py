@@ -417,7 +417,19 @@ def create_node_app(
                     )
                 except TimeoutError:
                     cancel_event.set()
-                    raise NodeTimeoutError(timeout)
+                    raise NodeTimeoutError(
+                        timeout,
+                        details={
+                            "slug": node.definition.slug,
+                            "execution_id": exec_request.execution_id,
+                            "run_id": exec_request.run_id,
+                            "node_id": exec_request.node_id,
+                            "declared_budget_s": node.definition.timeout_seconds,
+                            "hard_ceiling_s": node.definition.hard_max_runtime_seconds,
+                            "enforced_at_s": timeout,
+                            "host": "inline-lambda",
+                        },
+                    )
                 finally:
                     _ACTIVE_CANCELS.pop(cancel_key, None)
             else:
