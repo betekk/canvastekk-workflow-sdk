@@ -7,6 +7,8 @@
 - [rebase-branch-arg-switches-worktree](solutions/rebase-branch-arg-switches-worktree.md) — DA-3340: `git rebase <upstream> <branch>` checks `<branch>` out in the CURRENT worktree; rebase inside the branch's worktree or switch back before `git worktree add`
 
 ## patterns
+- [manifest-field-three-producer-rule](patterns/manifest-field-three-producer-rule.md) — a WorkflowNodeManifest field lives in three producers: registry payload (omit), /manifest dump (always), export re-add block (re-add or overrides drop)
+- [derived-bound-as-plain-property](patterns/derived-bound-as-plain-property.md) — derived bounds are plain @property, never @computed_field; the wire carries only declared inputs
 - [finally-side-defensive-helper](patterns/finally-side-defensive-helper.md) — finally-called helpers must be exception-proof by construction
 - [ambient-run-context-als-contextvars](patterns/ambient-run-context-als-contextvars.md) — per-run state on stateless nodes via AsyncLocalStorage/contextvars; store absence = no-op signal
 
@@ -17,6 +19,8 @@
 - [pick-gate-working-directory-override](solutions/pick-gate-working-directory-override.md) — DA-3160: workflow-level run defaults break the no-checkout pick gate; job-scoped cwd override, block untouched
 - [parity-port-must-widen-wire-schema](anti-patterns/parity-port-must-widen-wire-schema.md) — DA-3314: porting a protocol widening must widen the inbound parse schema (request.ts) not just the handler; descriptors died at safeParse 400 before the uploader ran
 - [parity-plans-cite-reference-constants](conventions/parity-plans-cite-reference-constants.md) — parity plans quote reference constants with file:line (backoffs/timeouts/retry rules); every deliberate divergence gets a "diverges because" note
+- [tightened-gate-updates-its-equivalence-claim](conventions/tightened-gate-updates-its-equivalence-claim.md) — a gate stricter than its authority must rename its ⇔ claim and list the new probe in the same commit
+- [host-only-manifest-fields-payload-exclusion](conventions/host-only-manifest-fields-payload-exclusion.md) — host-only manifest fields never enter build_registry_payload; pin each with a negative TestBuildRegistryPayload test (DA-1955)
 - [ts-method-syntax-bivariance-additive-widening](patterns/ts-method-syntax-bivariance-additive-widening.md) — method-syntax interface members keep parameter widening additive for implementors (bivariance); property-arrow breaks them; pin with tsconfig.tests type-fixture
 - [pipe-swallows-gate-exit-code](anti-patterns/pipe-swallows-gate-exit-code.md) — `gate | tail && merge` checks tail's exit (always 0); a red CI merged to main (DA-3314 #86). Run gates bare or capture $?
 - [release-bump-script-misses-new-version-leaf](anti-patterns/release-bump-script-misses-new-version-leaf.md) — DA-3425: adding a version-source file without widening the bump script's VERSION_FILES ships mis-stamped wheels (0.37.1 stamped 0.37.0); verify by unzipping the wheel, never trust METADATA

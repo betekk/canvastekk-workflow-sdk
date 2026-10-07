@@ -159,9 +159,14 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
     ``slug`` key, no keys outside the engine whitelist, and values inside the
     engine's request domain (category enum, timeout ceiling, name pattern —
     mirroring the engine's RegisterWorkflowNodeRequest validators).
+
+    Strictly stricter than registration: the host-ceiling probe rejects
+    budgets above the node's own ``hard_max_runtime_seconds`` which the
+    engine itself would accept, so passing here implies passing registration
+    (not biconditional).
     """
     report = _validate_definition(definition)
-    report["probes"] = ["manifest", "engine-request-mirror"]
+    report["probes"] = ["manifest", "engine-request-mirror", "host-ceiling"]
 
     payload = _build_engine_request(definition, name_suffix=name_suffix)
     missing = [k for k in _ENGINE_REQUEST_REQUIRED if payload.get(k) in (None, "", [], {})]
@@ -183,6 +188,12 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
     if definition.timeout_seconds > _ENGINE_MAX_TIMEOUT_SECONDS:
         report["valid"] = False
         report["errors"].append(f"timeout_seconds {definition.timeout_seconds} exceeds the engine ceiling 86400")
+    if definition.timeout_seconds > definition.hard_max_runtime_seconds:
+        report["valid"] = False
+        report["errors"].append(
+            f"timeout_seconds {definition.timeout_seconds} exceeds the node's "
+            f"hard_max_runtime_seconds {definition.hard_max_runtime_seconds}"
+        )
     if not re.fullmatch(_ENGINE_NAME_PATTERN, str(payload.get("name", ""))):
         report["valid"] = False
         report["errors"].append(f"engine name {payload.get('name')!r} does not match {_ENGINE_NAME_PATTERN}")

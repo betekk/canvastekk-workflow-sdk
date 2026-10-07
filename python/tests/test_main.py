@@ -388,3 +388,55 @@ definition = WorkflowNodeManifest(
         assert result.returncode == 0, (
             f"Expected exit 0, got {result.returncode}. stdout: {result.stdout}, stderr: {result.stderr}"
         )
+
+
+class TestProbeHostCeiling:
+    """#3499: the host-ceiling probe rejects budgets above the node's own
+    hard_max_runtime_seconds while the engine-mirror 86400 check is retained."""
+
+    def _manifest(self, *, timeout_seconds: int, hard_max: int | None = None):
+        from canvastekk_workflow_sdk import WorkflowNodeManifest
+
+        kwargs: dict = dict(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            timeout_seconds=timeout_seconds,
+        )
+        if hard_max is not None:
+            kwargs["hard_max_runtime_seconds"] = hard_max
+        return WorkflowNodeManifest(**kwargs)
+
+    def _probe(self, manifest):
+        from canvastekk_workflow_sdk.__main__ import _probe_definition
+
+        return _probe_definition(manifest)
+
+    def test_default_ceiling_applied_when_field_absent(self) -> None:
+        report = self._probe(self._manifest(timeout_seconds=7200))
+        assert report["valid"] is True
+        assert "host-ceiling" in report["probes"]
+
+    def test_7200_accepted_against_default_ceiling(self) -> None:
+        assert self._probe(self._manifest(timeout_seconds=7200))["valid"] is True
+
+    def test_7201_rejected_against_default_ceiling(self) -> None:
+        report = self._probe(self._manifest(timeout_seconds=7201))
+        assert report["valid"] is False
+        assert any("hard_max_runtime_seconds" in e for e in report["errors"])
+
+    def test_explicit_override_raises_the_gate(self) -> None:
+        report = self._probe(self._manifest(timeout_seconds=9000, hard_max=9000))
+        assert report["valid"] is True
+
+    def test_override_below_budget_still_rejected(self) -> None:
+        report = self._probe(self._manifest(timeout_seconds=9000, hard_max=8000))
+        assert report["valid"] is False
+
+    def test_engine_mirror_86400_still_enforced(self) -> None:
+        report = self._probe(self._manifest(timeout_seconds=86401, hard_max=100000))
+        assert report["valid"] is False
+        assert any("86400" in e for e in report["errors"])

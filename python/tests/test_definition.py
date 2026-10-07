@@ -1318,3 +1318,60 @@ class TestStampedSdkVersion:
     def test_dump_includes_stamp(self) -> None:
         dump = self._manifest().model_dump()
         assert dump["sdk_version"]  # non-empty stamp present in serialization
+
+
+class TestHardMaxRuntimeSeconds:
+    """#3499: host-enforced runtime ceiling + effective bound."""
+
+    def _manifest(self, *, timeout_seconds: int = 1800, hard_max: int | None = None) -> WorkflowNodeManifest:
+        kwargs: dict = dict(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            timeout_seconds=timeout_seconds,
+        )
+        if hard_max is not None:
+            kwargs["hard_max_runtime_seconds"] = hard_max
+        return WorkflowNodeManifest(**kwargs)
+
+    def test_default_ceiling_is_7200(self) -> None:
+        assert self._manifest().hard_max_runtime_seconds == 7200
+
+    def test_explicit_override(self) -> None:
+        assert self._manifest(hard_max=14400).hard_max_runtime_seconds == 14400
+
+    def test_ge_one_rejects_zero(self) -> None:
+        with pytest.raises(ValidationError):
+            self._manifest(hard_max=0)
+
+    def test_effective_bound_returns_budget_when_under_ceiling(self) -> None:
+        assert self._manifest(timeout_seconds=1800).effective_runtime_seconds == 1800
+
+    def test_effective_bound_returns_ceiling_when_budget_exceeds(self) -> None:
+        assert self._manifest(timeout_seconds=9000).effective_runtime_seconds == 7200
+
+    def test_effective_bound_with_raised_ceiling(self) -> None:
+        assert self._manifest(timeout_seconds=9000, hard_max=14400).effective_runtime_seconds == 9000
+
+    def test_effective_bound_not_serialized(self) -> None:
+        """Derived value — hosts compute it; the wire shape carries only the declared pair."""
+        dump = self._manifest().model_dump()
+        assert "effective_runtime_seconds" not in dump
+        assert dump["hard_max_runtime_seconds"] == 7200
+
+    def test_export_round_trip_preserves_override(self, tmp_path) -> None:
+        from canvastekk_workflow_sdk.definition import export_definition
+
+        m = self._manifest(timeout_seconds=9000, hard_max=14400)
+        out = tmp_path / "manifest.json"
+        export_definition(m, out)
+        data = json.loads(out.read_text())
+        assert data["hard_max_runtime_seconds"] == 14400
+        # Reload (identity key supplied — the export is registry-shaped, name=slug):
+        # the override must survive the export file, not silently drop to 7200.
+        reloaded = WorkflowNodeManifest.model_validate({**data, "slug": "echo"})
+        assert reloaded.hard_max_runtime_seconds == 14400
+        assert reloaded.effective_runtime_seconds == 9000

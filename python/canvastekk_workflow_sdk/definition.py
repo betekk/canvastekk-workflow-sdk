@@ -232,6 +232,17 @@ class WorkflowNodeManifest(BaseModel):
         ge=1,
         description="Maximum execution time in seconds",
     )
+    hard_max_runtime_seconds: int = Field(
+        default=7200,
+        ge=1,
+        description=(
+            "Host-enforced runtime ceiling bounding timeout_seconds. Hosts enforce "
+            "min(timeout_seconds, hard_max_runtime_seconds); a declared budget above "
+            "the ceiling fails registration unless the node explicitly overrides the "
+            "ceiling. Default: 7200 (2 hours). Host-side contract — not sent in the "
+            "engine registration request."
+        ),
+    )
     role: WorkflowNodeRole = Field(
         default=WorkflowNodeRole.OPERATION,
         description="Node role in the workflow system",
@@ -280,6 +291,16 @@ class WorkflowNodeManifest(BaseModel):
         (with a legacy ``minimum_sdk_version`` dual-write for one release);
         the engine's admission gate dual-reads either key."""
         return self._sdk_version
+
+    @property
+    def effective_runtime_seconds(self) -> int:
+        """Runtime bound every HOST enforces: the declared budget capped by
+        the hard ceiling. Hosts (inline ``app.py`` wait, external task
+        runners) must derive their runtime bound from this, never from the
+        raw ``timeout_seconds``. Internal SDK deadlines (e.g. the
+        cooperative download deadline) transition to this bound with
+        #3498."""
+        return min(self.timeout_seconds, self.hard_max_runtime_seconds)
 
     # Documentation links (optional — DA-1937 preview surface)
     docs_url: str | None = Field(
@@ -565,9 +586,13 @@ def export_definition(
     # DA-1955: full manifest shape. The exported file targets the node's
     # /manifest endpoint format (SDKNodeDefinition, extra-tolerant), not the
     # engine's extra="forbid" registration request — re-add registry-only keys.
+    # hard_max_runtime_seconds is host-side (excluded from the engine payload)
+    # but part of the /manifest shape — re-add or export round-trips drop
+    # a node's ceiling override (#3499).
     registry_dict["node_role"] = definition.role.value
     registry_dict["retry"] = definition.default_retry.model_dump(mode="json")
     registry_dict["node_status"] = node_status
+    registry_dict["hard_max_runtime_seconds"] = definition.hard_max_runtime_seconds
 
     if styles is not None:
         registry_dict["styles"] = styles

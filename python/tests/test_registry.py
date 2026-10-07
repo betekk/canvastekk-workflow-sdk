@@ -444,6 +444,14 @@ class TestBuildRegistryPayload:
         payload = build_registry_payload(definition)
         assert "node_role" not in payload
 
+    def test_hard_max_runtime_seconds_not_in_request_payload(self) -> None:
+        """#3499: hard_max_runtime_seconds is a host-side contract — the
+        engine's extra='forbid' register request would reject it."""
+        definition = self._make_definition(hard_max_runtime_seconds=14400)
+        payload = build_registry_payload(definition)
+        assert "hard_max_runtime_seconds" not in payload
+        assert definition.hard_max_runtime_seconds == 14400
+
     def test_default_node_role_is_operation(self) -> None:
         definition = self._make_definition()
         assert definition.role.value == "operation"

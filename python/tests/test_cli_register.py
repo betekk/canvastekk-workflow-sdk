@@ -72,7 +72,7 @@ class TestProbeDefinition:
     def test_valid_manifest_passes_with_engine_mirror(self) -> None:
         report = _probe_definition(_manifest())
         assert report["valid"], report["errors"]
-        assert report["probes"] == ["manifest", "engine-request-mirror"]
+        assert report["probes"] == ["manifest", "engine-request-mirror", "host-ceiling"]
 
     def test_broken_schema_fails(self) -> None:
         report = _probe_definition(_manifest(input_schema={"type": "not-a-real-type", "enum": 3}))
