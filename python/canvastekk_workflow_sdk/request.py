@@ -50,10 +50,15 @@ class NodeExecutionRequest(BaseModel):
 
         The slug charset alone still permits `..` and `.` segments; these
         flow into ``/tmp/{run_id}/{node_id}`` path construction and would
-        escape the run sandbox (DA-1711 3.1).
+        escape the run sandbox (DA-1711 3.1). ``execution_id`` joins the
+        check for cross-leg parity with the TS ``slugField`` refinement
+        (#3498 review) — it does not touch paths, but one wire field must
+        not validate differently per SDK leg.
         """
-        for field_name in ("run_id", "node_id"):
-            value = getattr(self, field_name)
+        for field_name in ("run_id", "node_id", "execution_id"):
+            value = getattr(self, field_name, None)
+            if value is None:
+                continue
             if ".." in value or value.strip(".") != value or not value.strip("."):
                 raise ValueError(f"{field_name} must not contain dot segments (got {value!r})")
         return self

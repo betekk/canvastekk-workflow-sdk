@@ -90,8 +90,20 @@ class TestExecutionIdField:
 
     def test_rejects_non_slug_charset(self) -> None:
         import pytest
+        from pydantic import ValidationError
 
         from canvastekk_workflow_sdk.request import NodeExecutionRequest
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, execution_id="has space")
+
+    def test_rejects_dot_segments_like_ts_slugfield(self) -> None:
+        """#3498 review: python and TS legs must validate execution_id
+        identically — TS slugField refines dot segments; python mirrors."""
+        import pytest
+        from pydantic import ValidationError
+
+        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+        with pytest.raises(ValidationError):
+            NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, execution_id="a..b")
