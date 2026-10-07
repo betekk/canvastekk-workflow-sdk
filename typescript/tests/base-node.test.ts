@@ -451,10 +451,12 @@ describe("download deadline (#3515 effective-bound clamp)", () => {
     } as WorkflowNodeManifest;
     const before = Date.now();
     const deadline = downloadDeadline(effectiveRuntimeSeconds(capped));
+    const after = Date.now();
     const budgetSeconds = (deadline - before) / 1000;
     // 7200 × 0.8 = 5760 s — a raw-timeout derivation would budget 7200 s.
-    expect(budgetSeconds).toBeGreaterThan(5760 - 1);
-    expect(budgetSeconds).toBeLessThanOrEqual(5760);
+    // Two-sided bracket: the producer's inner Date.now() can tick past `before`.
+    expect(budgetSeconds).toBeGreaterThanOrEqual(5760);
+    expect(budgetSeconds).toBeLessThanOrEqual(5760 + (after - before) / 1000);
   });
 });
 

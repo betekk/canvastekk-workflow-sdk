@@ -42,11 +42,12 @@ const DOWNLOAD_BUDGET_FRACTION = 0.8;
 
 /**
  * Computes a wall-clock deadline (Date.now() ms) for all file-input
- * downloads: a fraction of the node's timeout_seconds, never below 30 s
- * (matching the previous fixed behavior).
+ * downloads: a fraction of the node's runtime bound (the effective
+ * runtime ceiling — callers pass `effectiveRuntimeSeconds(def)`, #3515),
+ * never below 30 s (matching the previous fixed behavior).
  */
-export function downloadDeadline(timeoutSeconds: number | undefined): number {
-  const budget = Math.max((timeoutSeconds ?? 30) * DOWNLOAD_BUDGET_FRACTION, 30);
+export function downloadDeadline(runtimeSeconds: number | undefined): number {
+  const budget = Math.max((runtimeSeconds ?? 30) * DOWNLOAD_BUDGET_FRACTION, 30);
   return Date.now() + budget * 1000;
 }
 
