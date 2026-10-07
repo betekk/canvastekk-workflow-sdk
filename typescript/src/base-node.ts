@@ -8,7 +8,7 @@ import AjvModule from "ajv";
 const Ajv = AjvModule.default ?? AjvModule;
 import type { ValidateFunction } from "ajv";
 import type { WorkflowNodeManifest } from "./definition.js";
-import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput } from "./definition.js";
+import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds } from "./definition.js";
 import {
   DEFAULT_MAX_DOWNLOAD_BYTES,
   MAX_REDIRECT_HOPS,
@@ -256,7 +256,10 @@ export abstract class BaseNode {
     context: ExecutionContext,
   ): Promise<string> {
     const maxBytes = this.maxDownloadBytes(fieldName);
-    const deadline = downloadDeadline(this.getDefinition().timeout_seconds);
+    // DA-3499: the download budget derives from the effective runtime bound
+    // (mirrors python base.py — _download_deadline(effective_runtime_seconds)),
+    // never the raw timeout_seconds, so downloads cannot outlive the ceiling.
+    const deadline = downloadDeadline(effectiveRuntimeSeconds(this.getDefinition()));
 
     try {
       return await this.downloadOneInner(fieldName, url, context, maxBytes, deadline);
