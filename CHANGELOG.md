@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.38.0] - 2026-10-07
+
+### Features
+
+- **sdk**: Hard runtime ceiling + effective bound + host-ceiling probe (#96)
+
+
 ## [0.37.5] - 2026-10-06
 
 ### Testing
 
 - **parity**: Verify SDK is unaffected by engine scope rename (DA-3588) (#95)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.37.5
 
 
 ## [0.37.4] - 2026-10-05
