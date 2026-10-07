@@ -14,9 +14,10 @@
  * Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx/server
  * · 6 network. The token is never printed.
  *
- * probe runs fully offline: zod manifest validation plus the engine-request
- * mirror (required keys, no slug key, whitelist) — passes locally iff it
- * passes registration.
+ * probe runs fully offline: zod manifest validation, the engine-request
+ * mirror (required keys, no slug key, whitelist), and the host-ceiling
+ * check (DA-3499) — strictly stricter than registration: passing here
+ * implies registration passes (not biconditional).
  */
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -101,7 +102,7 @@ export function probeManifest(raw: unknown): {
     for (const issue of parsed.error.issues) {
       errors.push(`${issue.path.join(".")}: ${issue.message}`);
     }
-    return { valid: false, errors, warnings, probes: ["manifest", "engine-request-mirror"] };
+    return { valid: false, errors, warnings, probes: ["manifest", "engine-request-mirror", "host-ceiling"] };
   }
   const payload = buildEngineRequest(parsed.data);
   const missing = ENGINE_REQUEST_REQUIRED.filter((k) => {
@@ -118,6 +119,16 @@ export function probeManifest(raw: unknown): {
   if (parsed.data.timeout_seconds > ENGINE_MAX_TIMEOUT_SECONDS) {
     errors.push(`timeout_seconds ${parsed.data.timeout_seconds} exceeds the engine ceiling 86400`);
   }
+  // DA-3499: host-ceiling probe — strictly stricter than registration. The
+  // engine would accept a budget above the node's own hard ceiling, so
+  // passing here implies passing registration (not biconditional).
+  if (parsed.data.timeout_seconds > parsed.data.hard_max_runtime_seconds) {
+    errors.push(
+      `timeout_seconds ${parsed.data.timeout_seconds} exceeds the node's own ` +
+        `hard_max_runtime_seconds ${parsed.data.hard_max_runtime_seconds} — ` +
+        `raise the ceiling or lower the budget`,
+    );
+  }
   if (!ENGINE_NAME_PATTERN.test(String(payload.name))) {
     errors.push(`engine name '${String(payload.name)}' does not match ${ENGINE_NAME_PATTERN}`);
   }
@@ -125,7 +136,7 @@ export function probeManifest(raw: unknown): {
     valid: errors.length === 0,
     errors,
     warnings,
-    probes: ["manifest", "engine-request-mirror"],
+    probes: ["manifest", "engine-request-mirror", "host-ceiling"],
   };
 }
 

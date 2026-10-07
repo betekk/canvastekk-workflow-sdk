@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { VERSION } from "./version.js";
-import { getNodeId, getFileOutputFields } from "./definition.js";
+import { getNodeId, getFileOutputFields, effectiveRuntimeSeconds } from "./definition.js";
 import { NodeTimeoutError, NodeExecutionError, getHttpStatusForError } from "./exceptions.js";
 import { configureLogging } from "./logging.js";
 import { enforceSupportHorizon } from "./support-horizon.js";
@@ -133,7 +133,9 @@ export function createNodeApp(
     const execRequest = parsed.data;
 
     const def = node.nodeDefinition;
-    const timeout = def.timeout_seconds;
+    // DA-3499: hosts enforce the effective bound (budget capped by the hard
+    // ceiling), never the raw timeout_seconds.
+    const timeout = effectiveRuntimeSeconds(def);
 
     try {
       let response;

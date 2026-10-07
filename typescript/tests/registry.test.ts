@@ -46,6 +46,11 @@ describe("buildRegistryPayload", () => {
     expect(payload).not.toHaveProperty("default_retry");
   });
 
+  it("omits the host-side ceiling from the request payload (DA-3609)", () => {
+    const payload = buildRegistryPayload(testDef);
+    expect(payload).not.toHaveProperty("hard_max_runtime_seconds");
+  });
+
   it("includes invoke_url when provided", () => {
     const payload = buildRegistryPayload(testDef, { invokeUrl: "https://example.com" });
     expect(payload.invoke_url).toBe("https://example.com");

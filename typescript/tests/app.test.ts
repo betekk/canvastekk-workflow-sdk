@@ -72,6 +72,35 @@ describe("Express endpoints", () => {
       expect(resp.status).toBe(400);
       expect(resp.body.detail).toBeDefined();
     });
+
+    it("enforces the effective runtime bound, not the raw timeout_seconds (DA-3609)", async () => {
+      class SlowNode extends TestNode {
+        // Budget above the 1 s ceiling: the host must abort at 1 s, not 5 s.
+        definition: WorkflowNodeManifest = {
+          ...this.definition,
+          slug: "slow-node",
+          name: "Slow Node",
+          timeout_seconds: 5,
+          hard_max_runtime_seconds: 1,
+        };
+
+        override async execute(): Promise<Record<string, unknown>> {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return { result: "too late" };
+        }
+      }
+      const slowApp = createNodeApp(new SlowNode());
+
+      const started = Date.now();
+      const resp = await request(slowApp)
+        .post("/execute")
+        .send({ run_id: "run-1", node_id: "slow-1", inputs: {} });
+
+      expect(resp.status).toBe(408);
+      // Aborted at the 1 s effective bound, not the 5 s declared budget.
+      expect(Date.now() - started).toBeLessThan(2500);
+      expect(resp.body.detail).toContain("after 1s");
+    });
   });
 
   describe("GET /health", () => {
@@ -100,6 +129,13 @@ describe("Express endpoints", () => {
       expect(resp.body.version).toBe("1.0.0");
       expect(resp.body.sdk_version).toBeDefined();
       expect(resp.body.mode).toBeDefined();
+    });
+
+    it("retains hard_max_runtime_seconds through parse and serve (DA-3609)", async () => {
+      // Part of the /manifest shape (mirrors python's registry_dict re-add);
+      // the default must survive the zod round-trip intact.
+      const resp = await request(app).get("/manifest");
+      expect(resp.body.hard_max_runtime_seconds).toBe(7200);
     });
   });
 

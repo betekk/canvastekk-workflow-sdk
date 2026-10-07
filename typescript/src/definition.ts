@@ -166,6 +166,12 @@ const WorkflowNodeManifestObjectSchema = z
     default_retry: RetryConfigSchema.default(RetryConfigSchema.parse({})),
     category: z.string().default("utility"),
     timeout_seconds: z.number().int().min(1).default(30),
+    // DA-3499: host-enforced runtime ceiling bounding timeout_seconds. Hosts
+    // enforce min(timeout_seconds, hard_max_runtime_seconds); a declared
+    // budget above the ceiling fails the probe unless the node explicitly
+    // overrides the ceiling. Default: 7200 (2 hours). Host-side contract —
+    // never sent in the engine registration request.
+    hard_max_runtime_seconds: z.number().int().min(1).default(7200),
     role: WorkflowNodeRoleSchema,
     styles: WorkflowNodeStylesSchema.nullable().default(null),
     deprecation: DeprecationInfoSchema.nullable().default(null),
@@ -225,6 +231,18 @@ export const WorkflowNodeManifestSchema = z.preprocess(mapLegacyVocabulary, Work
 
 /** Complete node manifest including metadata, schemas, and configuration. */
 export type WorkflowNodeManifest = z.infer<typeof WorkflowNodeManifestSchema>;
+
+/**
+ * Runtime bound every HOST enforces: the declared budget capped by the hard
+ * ceiling (DA-3499). Hosts (the inline execute AbortController, external task
+ * runners) must derive their runtime bound from this, never from the raw
+ * `timeout_seconds`. Mirrors python's `effective_runtime_seconds` property.
+ */
+export function effectiveRuntimeSeconds(
+  def: Pick<WorkflowNodeManifest, "timeout_seconds" | "hard_max_runtime_seconds">,
+): number {
+  return Math.min(def.timeout_seconds, def.hard_max_runtime_seconds);
+}
 
 /**
  * Resolves the legacy `name`/`title` construction vocabulary (DA-2627).
