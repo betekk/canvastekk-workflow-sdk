@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.40.1] - 2026-10-07
+
+### Bug Fixes
+
+- **sdk**: Clamp TS download deadline to the effective runtime bound (#99)
+
+
 ## [0.40.0] - 2026-10-07
 
 ### Features
 
 - **sdk**: Host runtime ceiling TS parity → release v0.40.0 (#98)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.40.0
 
 
 ## [0.39.0] - 2026-10-07
