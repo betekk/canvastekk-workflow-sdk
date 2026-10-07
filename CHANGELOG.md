@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.39.0] - 2026-10-07
+
+### Features
+
+- **sdk**: Execution_id propagation (python + TS legs) — progress pings carry the dispatcher's id (#97)
+
+
 ## [0.38.0] - 2026-10-07
 
 ### Features
 
 - **sdk**: Hard runtime ceiling + effective bound + host-ceiling probe (#96)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.38.0
 
 
 ## [0.37.5] - 2026-10-06
