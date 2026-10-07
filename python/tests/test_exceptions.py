@@ -47,6 +47,30 @@ class TestNodeTimeoutError:
         err = NodeTimeoutError(60)
         assert isinstance(err, NodeExecutionError)
 
+    def test_canonical_watchdog_details_contract(self) -> None:
+        """#3499: the canonical details dict the CISA job_runner watchdog
+        (#3500) POSTs on budget enforcement. Freezing the shape here makes
+        the cross-repo contract explicit; raise-site canonical wiring lands
+        with #3498 (execution_id source)."""
+        details = {
+            "slug": "ifc-cubicle-ledge",
+            "execution_id": "ecs-0f2c6a1e-0000-4000-8000-000000000000",
+            "run_id": "run-123",
+            "declared_budget_s": 1800,
+            "hard_ceiling_s": 1800,
+            "enforced_at_s": 1710,
+            "host": "ecs-job",
+        }
+        err = NodeTimeoutError(1710, details=details)
+        assert err.error_code == "TIMEOUT"
+        assert err.timeout_seconds == 1710
+        assert err.details == details
+        assert err.to_dict() == {
+            "error_code": "TIMEOUT",
+            "message": "Node execution timed out after 1710s",
+            "details": details,
+        }
+
 
 class TestNodeValidationError:
     def test_validation_error_with_errors(self) -> None:

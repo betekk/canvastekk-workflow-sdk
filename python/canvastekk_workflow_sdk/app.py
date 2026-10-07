@@ -394,7 +394,7 @@ def create_node_app(
             )
 
         try:
-            timeout = node.definition.timeout_seconds
+            timeout = node.definition.effective_runtime_seconds
             if timeout and timeout > 0:
                 cancel_event = threading.Event()
                 cancel_key = id(exec_request)

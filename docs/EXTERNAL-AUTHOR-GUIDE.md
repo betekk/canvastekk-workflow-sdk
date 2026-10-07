@@ -266,6 +266,7 @@ The auto-download pipeline enforces an SSRF protection policy:
 - **Blocked targets**: loopback, RFC1918 private, link-local (incl. cloud metadata `169.254.254.254`), CGNAT `100.64.0.0/10`, and reserved/multicast ranges — resolved before connecting, re-validated on every redirect hop (max 5).
 - **Size caps enforced mid-stream**: `x-maxSizeBytes` aborts the download as soon as it is exceeded (no more post-hoc checks). When absent, `CANVASTEKK_MAX_DOWNLOAD_BYTES` (default 10 GiB) applies.
 - **Total download deadline**: derived from `timeout_seconds` — a timed-out request stops in-flight downloads cooperatively (`context.cancel_event` / `context.cancelSignal`; `execute()` itself cannot be interrupted).
+- **Hard runtime ceiling** (`hard_max_runtime_seconds`, default 7200): hosts enforce `min(timeout_seconds, hard_max_runtime_seconds)`, and declaring a budget above the ceiling fails registration. If a node genuinely needs longer, override the ceiling explicitly in its manifest (e.g. `hard_max_runtime_seconds: 14400` for a 4-hour budget) — the override is visible in the node repo's own PR.
 - **Allowlist escape hatch**: `CANVASTEKK_URL_ALLOWLIST` (comma-separated host suffixes, e.g. `internal.minio.example.com`) bypasses IP checks for trusted internal storage.
 
 Uploads changed too: a failed output upload now **fails the execution** with `error_code: "UPLOAD_FAILED"` instead of silently passing with a local-only path.
