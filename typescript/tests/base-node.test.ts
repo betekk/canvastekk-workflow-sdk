@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { BaseNode } from "../src/base-node.js";
+import { BaseNode, downloadDeadline } from "../src/base-node.js";
+import { effectiveRuntimeSeconds } from "../src/definition.js";
 import type { WorkflowNodeManifest } from "../src/definition.js";
 import type { ExecutionContext } from "../src/context.js";
 import { TimingMiddleware } from "../src/middleware.js";
@@ -250,6 +251,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   rmSync(tmpRoot, { recursive: true, force: true });
 });
 
@@ -415,6 +417,48 @@ class SlowProgressNode extends ProgressNode {
     return { done: true };
   }
 }
+
+describe("download deadline (#3515 effective-bound clamp)", () => {
+  it("aborts a download whose budget is already spent at the chunk check", async () => {
+    // Mirror python's `monkeypatch base._download_deadline` (test_file_download.py):
+    // force the deadline handed to the chunk loop into the past. The expiry path
+    // is the mechanism under test; the budget VALUE (effective bound) is pinned
+    // by the composition test below.
+    const inner = BaseNode.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
+    const origInner = inner.downloadOneInner;
+    vi.spyOn(inner, "downloadOneInner").mockImplementation(function (this: unknown, ...args: unknown[]) {
+      args[4] = Date.now() - 1; // deadline is the 5th parameter
+      return origInner.apply(this, args);
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => makeResponse({ chunks: ["late"] })),
+    );
+    const resp = await new DownloadNode().run({
+      run_id: "r-deadline",
+      node_id: "n-deadline",
+      inputs: { point_cloud: `https://${PUBLIC_HOST}/slow.ply` },
+    });
+    expect(resp.status).toBe("fail");
+    expect(resp.error_type).toBe("NodeIOError");
+    expect(resp.error).toContain("deadline");
+  });
+
+  it("derives the download budget from the effective bound, not raw timeout_seconds", () => {
+    const capped = {
+      timeout_seconds: 9000,
+      hard_max_runtime_seconds: 7200,
+    } as WorkflowNodeManifest;
+    const before = Date.now();
+    const deadline = downloadDeadline(effectiveRuntimeSeconds(capped));
+    const after = Date.now();
+    const budgetSeconds = (deadline - before) / 1000;
+    // 7200 × 0.8 = 5760 s — a raw-timeout derivation would budget 7200 s.
+    // Two-sided bracket: the producer's inner Date.now() can tick past `before`.
+    expect(budgetSeconds).toBeGreaterThanOrEqual(5760);
+    expect(budgetSeconds).toBeLessThanOrEqual(5760 + (after - before) / 1000);
+  });
+});
 
 describe("BaseNode.reportProgress (DA-3232)", () => {
   afterEach(() => {

@@ -8,7 +8,7 @@ import AjvModule from "ajv";
 const Ajv = AjvModule.default ?? AjvModule;
 import type { ValidateFunction } from "ajv";
 import type { WorkflowNodeManifest } from "./definition.js";
-import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput } from "./definition.js";
+import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds } from "./definition.js";
 import {
   DEFAULT_MAX_DOWNLOAD_BYTES,
   MAX_REDIRECT_HOPS,
@@ -42,11 +42,12 @@ const DOWNLOAD_BUDGET_FRACTION = 0.8;
 
 /**
  * Computes a wall-clock deadline (Date.now() ms) for all file-input
- * downloads: a fraction of the node's timeout_seconds, never below 30 s
- * (matching the previous fixed behavior).
+ * downloads: a fraction of the node's runtime bound (the effective
+ * runtime ceiling — callers pass `effectiveRuntimeSeconds(def)`, #3515),
+ * never below 30 s (matching the previous fixed behavior).
  */
-export function downloadDeadline(timeoutSeconds: number | undefined): number {
-  const budget = Math.max((timeoutSeconds ?? 30) * DOWNLOAD_BUDGET_FRACTION, 30);
+export function downloadDeadline(runtimeSeconds: number | undefined): number {
+  const budget = Math.max((runtimeSeconds ?? 30) * DOWNLOAD_BUDGET_FRACTION, 30);
   return Date.now() + budget * 1000;
 }
 
@@ -256,7 +257,10 @@ export abstract class BaseNode {
     context: ExecutionContext,
   ): Promise<string> {
     const maxBytes = this.maxDownloadBytes(fieldName);
-    const deadline = downloadDeadline(this.getDefinition().timeout_seconds);
+    // DA-3499: the download budget derives from the effective runtime bound
+    // (mirrors python base.py — _download_deadline(effective_runtime_seconds)),
+    // never the raw timeout_seconds, so downloads cannot outlive the ceiling.
+    const deadline = downloadDeadline(effectiveRuntimeSeconds(this.getDefinition()));
 
     try {
       return await this.downloadOneInner(fieldName, url, context, maxBytes, deadline);
