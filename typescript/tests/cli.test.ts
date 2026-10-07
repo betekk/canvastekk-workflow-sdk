@@ -44,6 +44,13 @@ describe("buildEngineRequest (DA-2603)", () => {
     expect("slug" in payload).toBe(false);
   });
 
+  it("never carries the host-side ceiling into the engine request (DA-3609)", () => {
+    const payload = buildEngineRequest(
+      parseManifest({ ...canonicalManifest, hard_max_runtime_seconds: 3600 }),
+    );
+    expect("hard_max_runtime_seconds" in payload).toBe(false);
+  });
+
   it("honors invokeUrl and nameSuffix", () => {
     const payload = buildEngineRequest(parseManifest(canonicalManifest), {
       invokeUrl: "https://nodes.example.com/echo/execute",
@@ -73,10 +80,10 @@ describe("buildEngineRequest (DA-2603)", () => {
 });
 
 describe("probeManifest (DA-2603, offline)", () => {
-  it("passes a canonical manifest through both probes", () => {
+  it("passes a canonical manifest through all three probes", () => {
     const report = probeManifest(canonicalManifest);
     expect(report.valid).toBe(true);
-    expect(report.probes).toEqual(["manifest", "engine-request-mirror"]);
+    expect(report.probes).toEqual(["manifest", "engine-request-mirror", "host-ceiling"]);
   });
 
   it("accepts a legacy manifest via the SDK compat layer", () => {
@@ -179,6 +186,18 @@ describe("probeManifest value domain (DA-2603 review)", () => {
     const report = probeManifest({ ...canonicalManifest, timeout_seconds: 100000 });
     expect(report.valid).toBe(false);
     expect(report.errors.some((e) => e.includes("timeout_seconds"))).toBe(true);
+  });
+
+  it("rejects a budget over the node's own hard ceiling (DA-3609)", () => {
+    const report = probeManifest({ ...canonicalManifest, timeout_seconds: 7201 });
+    expect(report.valid).toBe(false);
+    expect(report.errors.some((e) => e.includes("hard_max_runtime_seconds 7200"))).toBe(true);
+    expect(report.probes).toEqual(["manifest", "engine-request-mirror", "host-ceiling"]);
+  });
+
+  it("accepts a budget exactly at the hard ceiling (DA-3609)", () => {
+    const report = probeManifest({ ...canonicalManifest, timeout_seconds: 7200 });
+    expect(report.valid).toBe(true);
   });
 
   it("register exits 2 on a malformed --name-suffix", async () => {

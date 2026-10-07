@@ -7,6 +7,7 @@ import {
   getFileInputFields,
   getFileOutputFields,
   validateFileInput,
+  effectiveRuntimeSeconds,
 } from "../src/definition.js";
 import { NodeValidationError } from "../src/exceptions.js";
 import { diffManifests } from "../src/diff.js";
@@ -476,5 +477,38 @@ describe("WorkflowNodeManifestSchema safeParse parity (DA-2627 review)", () => {
       { name: "new-node", version: "2.0.0", input_schema: {}, output_schema: {} },
     );
     expect(diff.errors.some((e) => e.includes("slug mismatch"))).toBe(true);
+  });
+});
+
+describe("WorkflowNodeManifestSchema host runtime ceiling (DA-3609)", () => {
+  it("defaults hard_max_runtime_seconds to 7200", () => {
+    const def = WorkflowNodeManifestSchema.parse(validDefinition);
+    expect(def.hard_max_runtime_seconds).toBe(7200);
+  });
+
+  it("rejects a ceiling below 1", () => {
+    const result = WorkflowNodeManifestSchema.safeParse({
+      ...validDefinition,
+      hard_max_runtime_seconds: 0,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("effectiveRuntimeSeconds caps timeout_seconds at the ceiling", () => {
+    expect(
+      effectiveRuntimeSeconds({ timeout_seconds: 8000, hard_max_runtime_seconds: 7200 }),
+    ).toBe(7200);
+  });
+
+  it("effectiveRuntimeSeconds keeps a budget under the ceiling", () => {
+    expect(
+      effectiveRuntimeSeconds({ timeout_seconds: 600, hard_max_runtime_seconds: 7200 }),
+    ).toBe(600);
+  });
+
+  it("effectiveRuntimeSeconds handles an equal budget and ceiling", () => {
+    expect(
+      effectiveRuntimeSeconds({ timeout_seconds: 7200, hard_max_runtime_seconds: 7200 }),
+    ).toBe(7200);
   });
 });
