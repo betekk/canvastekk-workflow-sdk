@@ -124,9 +124,8 @@ export function probeManifest(raw: unknown): {
   // passing here implies passing registration (not biconditional).
   if (parsed.data.timeout_seconds > parsed.data.hard_max_runtime_seconds) {
     errors.push(
-      `timeout_seconds ${parsed.data.timeout_seconds} exceeds the node's own ` +
-        `hard_max_runtime_seconds ${parsed.data.hard_max_runtime_seconds} — ` +
-        `raise the ceiling or lower the budget`,
+      `timeout_seconds ${parsed.data.timeout_seconds} exceeds the node's ` +
+        `hard_max_runtime_seconds ${parsed.data.hard_max_runtime_seconds}`,
     );
   }
   if (!ENGINE_NAME_PATTERN.test(String(payload.name))) {
