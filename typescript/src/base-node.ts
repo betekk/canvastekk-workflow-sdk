@@ -563,7 +563,10 @@ export abstract class BaseNode {
   async run(request: NodeExecutionRequest): Promise<NodeExecutionResponse> {
     // DA-3359: entrypoint horizon gate (import stays log-only).
     enforceSupportHorizon();
-    const executionId = randomUUID();
+    // #3498: adopt the dispatcher-provided execution id so progress pings
+    // match the engine's pending-async park; fallback preserves inline
+    // behavior (engine adopts the response's execution_id).
+    const executionId = request.execution_id ?? randomUUID();
     const startTime = performance.now();
     const def = this.getDefinition();
 

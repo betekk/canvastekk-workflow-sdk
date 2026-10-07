@@ -1285,3 +1285,52 @@ class TestManifestCodeDigest:
         digest_b = TestClient(app_b).get("/manifest").json()["code_digest"]
         assert digest_a != digest_b
         assert len(digest_a) == 64 and len(digest_b) == 64
+
+
+class HangingNode(BaseNode):
+    """Sleeps past its budget — drives the inline wait_for timeout path."""
+
+    definition = WorkflowNodeManifest(
+        slug="hang",
+        version="1.0.0",
+        name="Hang",
+        description="Never finishes in time",
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+        timeout_seconds=1,
+    )
+
+    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        import time
+
+        time.sleep(5)
+        return {}
+
+
+class TestInlineTimeoutDetails:
+    """#3498: the inline raise site emits the #3499 canonical details —
+    all 7 keys present, execution_id null when the request carried none."""
+
+    def _client(self) -> TestClient:
+        app = create_node_app(HangingNode())
+        return TestClient(app, raise_server_exceptions=False)
+
+    def test_timeout_details_canonical_null_execution_id(self) -> None:
+        resp = self._client().post("/execute", json={"run_id": "r-hang", "node_id": "n-hang", "inputs": {}})
+        assert resp.status_code == 408  # TIMEOUT → 408 (ERROR_CODE_TO_HTTP_STATUS)
+        body = resp.json()
+        assert body["error_code"] == "TIMEOUT"
+        # the handler spreads details flat into the body (app.py node_error_handler)
+        assert body["slug"] == "hang"
+        assert body["execution_id"] is None  # key present, value null
+        assert body["declared_budget_s"] == 1
+        assert body["hard_ceiling_s"] == 7200
+        assert body["enforced_at_s"] == 1
+        assert body["host"] == "inline-lambda"
+
+    def test_timeout_details_carry_provided_execution_id(self) -> None:
+        resp = self._client().post(
+            "/execute",
+            json={"run_id": "r-hang", "node_id": "n-hang", "inputs": {}, "execution_id": "ecs-99"},
+        )
+        assert resp.json()["execution_id"] == "ecs-99"

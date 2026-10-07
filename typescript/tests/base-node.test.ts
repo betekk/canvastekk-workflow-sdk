@@ -487,3 +487,36 @@ describe("BaseNode.reportProgress (DA-3232)", () => {
     expect(respA.execution_id).not.toBe(respB.execution_id);
   });
 });
+
+describe("BaseNode execution_id propagation (#3498)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("adopts a dispatcher-provided execution_id — response and pings carry it", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchSpy);
+    const resp = await new ProgressNode().run({
+      run_id: "r-prov",
+      node_id: "n-prov",
+      inputs: {},
+      callback_url: "http://engine/callbacks/r-prov/n-prov",
+      execution_id: "ecs-1234",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(resp.status).toBe("pass");
+    expect(resp.execution_id).toBe("ecs-1234");
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).execution_id).toBe("ecs-1234");
+  });
+
+  it("falls back to distinct uuids per run when execution_id is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+    const node = new ProgressNode();
+    const base = { run_id: "r-fb", node_id: "n-fb", inputs: {}, callback_url: "http://engine/cb/r-fb" };
+    const a = await node.run({ ...base });
+    const b = await node.run({ ...base });
+    expect(a.execution_id).not.toBe(b.execution_id);
+    expect(a.execution_id).toHaveLength(36);
+  });
+});

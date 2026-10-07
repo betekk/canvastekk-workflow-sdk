@@ -6,6 +6,7 @@ import {
   registerNodeResultHas,
 } from "../src/registry.js";
 import { RegistrationError } from "../src/exceptions.js";
+import { VERSION } from "../src/version.js";
 import { exportDefinition } from "../src/registry.js";
 import { readFileSync, rmSync } from "node:fs";
 import * as path from "node:path";
@@ -118,7 +119,7 @@ describe("buildRegistryPayload", () => {
     expect(constraints.minimum_sdk_version).toBe("0.21.0");
     expect(constraints.gpu_required).toBe(true);
     // DA-3359: the stamp rides along (the manifest's 0.22.0 loses to the caller)
-    expect(constraints.sdk_version).toBe("0.37.0");
+    expect(constraints.sdk_version).toBe(VERSION);
   });
 
   it("always carries the stamped provenance (DA-3359 supersedes the DA-1955 omission)", () => {
@@ -308,8 +309,8 @@ describe("stamped dual-write (DA-3359)", () => {
   it("payload carries sdk_version + legacy minimum_sdk_version", () => {
     const payload = buildRegistryPayload({ ...testDef });
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
-    expect(constraints.sdk_version).toBe("0.37.0");
-    expect(constraints.minimum_sdk_version).toBe("0.37.0");
+    expect(constraints.sdk_version).toBe(VERSION);
+    expect(constraints.minimum_sdk_version).toBe(VERSION);
   });
 
   it("explicit caller constraints win over the legacy merge; stamp is forced", () => {
@@ -321,6 +322,6 @@ describe("stamped dual-write (DA-3359)", () => {
     expect(constraints.minimum_sdk_version).toBe("0.23.1");
     // the stamp is ALWAYS the installed VERSION (python parity) — a manifest
     // claiming 0.40.0 cannot masquerade as the registering SDK
-    expect(constraints.sdk_version).toBe("0.37.0");
+    expect(constraints.sdk_version).toBe(VERSION);
   });
 });
