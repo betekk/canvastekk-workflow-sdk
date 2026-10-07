@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.40.0] - 2026-10-07
+
+### Features
+
+- **sdk**: Host runtime ceiling TS parity → release v0.40.0 (#98)
+
+
 ## [0.39.0] - 2026-10-07
 
 ### Features
 
 - **sdk**: Execution_id propagation (python + TS legs) — progress pings carry the dispatcher's id (#97)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.39.0
 
 
 ## [0.38.0] - 2026-10-07
