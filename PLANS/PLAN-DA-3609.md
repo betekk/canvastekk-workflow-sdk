@@ -103,3 +103,4 @@ None upstream. Downstream: DA-3610–3614 (#3663, #3665, #3664, #3662, #3666) ar
 ## Trace
 
 GATE pre-commit-tree tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — vitest 376/376 (full suite), eslint clean, tsc --noEmit src+tests clean, tsup build ok; python regression ruff clean, pytest 822/822 (TS-only change; python untouched); backend-only -> e2e n.a.; final implementation SHA cited by PR.
+GATE review-fix-tree tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — vitest 376/376, eslint clean, tsc src+tests clean, tsup ok; ruff clean, pytest 822/822; review fix: probe ceiling message mirrors python verbatim (Minor); final implementation SHA 2c70e61 (cited by PR).
