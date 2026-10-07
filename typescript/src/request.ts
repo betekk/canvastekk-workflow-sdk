@@ -16,6 +16,12 @@ const slugField = z
 export const NodeExecutionRequestSchema = z.object({
   run_id: slugField,
   node_id: slugField,
+  // #3498: dispatcher-minted execution id (e.g. 'ecs-<uuid>'). When present,
+  // progress pings carry it so the engine's forgery guard matches the id it
+  // parked at dispatch time; when absent BaseNode.run() invents a uuid4
+  // (inline behavior, echoed back via the response). Nullish so a null
+  // value parses instead of 400ing (python `str | None` parity).
+  execution_id: slugField.nullish(),
   inputs: z.record(z.unknown()).default({}),
   callback_url: z.string().nullable().optional(),
   // DA-3314 widened targets to `string | multipart-session descriptor`

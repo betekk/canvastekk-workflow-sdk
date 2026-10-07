@@ -124,3 +124,33 @@ describe("NodeExecutionRequest output_upload_url targets (DA-3314)", () => {
     }
   });
 });
+
+describe("NodeExecutionRequestSchema.execution_id (#3498)", () => {
+  it("parses a dispatcher ecs-uuid", () => {
+    const parsed = NodeExecutionRequestSchema.safeParse({
+      run_id: "r1",
+      node_id: "n1",
+      inputs: {},
+      execution_id: "ecs-0f2c6a1e-0000-4000-8000-000000000000",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.execution_id).toBe("ecs-0f2c6a1e-0000-4000-8000-000000000000");
+  });
+
+  it("accepts null and absent (optional)", () => {
+    for (const execution_id of [null, undefined]) {
+      const parsed = NodeExecutionRequestSchema.safeParse({ run_id: "r1", node_id: "n1", inputs: {}, execution_id });
+      expect(parsed.success).toBe(true);
+    }
+  });
+
+  it("rejects non-slug charset", () => {
+    const parsed = NodeExecutionRequestSchema.safeParse({
+      run_id: "r1",
+      node_id: "n1",
+      inputs: {},
+      execution_id: "has space",
+    });
+    expect(parsed.success).toBe(false);
+  });
+});

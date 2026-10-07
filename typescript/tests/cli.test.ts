@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { VERSION } from "../src/version.js";
 import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,7 +62,7 @@ describe("buildEngineRequest (DA-2603)", () => {
     expect(constraints.minimum_sdk_version).toBe("0.27.0");
     expect(constraints.docs_url).toBe("https://docs.example.com");
     // DA-3359: the stamped provenance rides along
-    expect(constraints.sdk_version).toBe("0.37.0");
+    expect(constraints.sdk_version).toBe(VERSION);
     const allowed = new Set([
       "name", "version", "label", "description", "input_schema", "output_schema",
       "invoke_type", "invoke_url", "invoke_config", "category", "tags", "styles",
