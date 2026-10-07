@@ -294,10 +294,12 @@ class WorkflowNodeManifest(BaseModel):
 
     @property
     def effective_runtime_seconds(self) -> int:
-        """Runtime bound every host enforces: the declared budget capped by
+        """Runtime bound every HOST enforces: the declared budget capped by
         the hard ceiling. Hosts (inline ``app.py`` wait, external task
-        runners) must derive their timeout from this, never from the raw
-        ``timeout_seconds``."""
+        runners) must derive their runtime bound from this, never from the
+        raw ``timeout_seconds``. Internal SDK deadlines (e.g. the
+        cooperative download deadline) transition to this bound with
+        #3498."""
         return min(self.timeout_seconds, self.hard_max_runtime_seconds)
 
     # Documentation links (optional — DA-1937 preview surface)

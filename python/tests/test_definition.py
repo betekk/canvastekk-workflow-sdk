@@ -1344,9 +1344,6 @@ class TestHardMaxRuntimeSeconds:
         assert self._manifest(hard_max=14400).hard_max_runtime_seconds == 14400
 
     def test_ge_one_rejects_zero(self) -> None:
-        import pytest
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
             self._manifest(hard_max=0)
 
