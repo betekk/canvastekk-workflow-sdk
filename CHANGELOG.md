@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.43.0] - 2026-10-10
+
+### Features
+
+- Framework-optional core + registration-time route verifier (#109) (**BREAKING**)
+
+
 ## [0.42.0] - 2026-10-10
 
 ### Bug Fixes
 
 - **deps**: Migrate zod 3.25 to ^4.6 (#108) (**BREAKING**)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.42.0
 
 
 ## [0.41.1] - 2026-10-10
