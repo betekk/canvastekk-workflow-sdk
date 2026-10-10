@@ -122,6 +122,8 @@ None — no `blocked-by` tickets. Follow-up to #102.
 ## Trace
 <!-- gate memos append here -->
 - TICKET-EXIT GATE 98e3e7d tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — python: poetry checks + ruff + pytest 833 (9 new); typescript: audit 0 + build + vitest 378 + eslint + tsc x2; dist laziness (root 0 express refs, /express 3/3); skill mirrors in sync
+- LOG 10a rebase onto origin/main (post-#106/#105 merges): package.json union-resolved (zod ^4.6 from main + express optional peer from branch), lock regenerated via npm install; re-gate below
+- RE-GATE (post-rebase final tree) tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — TS 378/audit 0/laziness proven, py 833/poetry checks/ruff, mirrors synced (all on v0.42.0 base)
 - LOG (phase 2) fix 1: shim-block placement caused E402/I001; relocation pass corrupted router.py via partial-string cut — recovered with git checkout + line-based rewrite
 - LOG (phase 2) fix 2: PEP 562 module __getattr__ does NOT service global lookups inside the module's own functions — replaced with function-local imports; fastapi/pydantic resolve string annotations against module globals, so create_node_app + NodeAuth factories publish the lazy names via globals().update/setdefault
 - GATE (phase 2) tier=light lint=t typecheck=n.a. build=t unit=t e2e=n.a. — pytest 824 (incl. 2 lazy-server tests), ruff clean, poetry checks green
