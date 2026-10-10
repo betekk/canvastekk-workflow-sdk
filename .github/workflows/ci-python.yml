@@ -173,12 +173,12 @@ jobs:
       - name: Install dependencies (base)
         if: steps.filter.outputs.schema_files == 'true'
         working-directory: base/python
-        run: python -m poetry install --no-interaction -E fastapi
+        run: python -m poetry install --no-interaction
 
       - name: Install dependencies (PR)
         if: steps.filter.outputs.schema_files == 'true'
         working-directory: pr/python
-        run: python -m poetry install --no-interaction -E fastapi
+        run: python -m poetry install --no-interaction
 
       - name: Generate schema (base)
         if: steps.filter.outputs.schema_files == 'true'
