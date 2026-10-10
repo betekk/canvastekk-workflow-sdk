@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.41.1] - 2026-10-10
+
+### Miscellaneous Tasks
+
+- **pyproject**: Migrate metadata to PEP 621 [project] tables (#107)
+
+
 ## [0.41.0] - 2026-10-10
 
 ### Bug Fixes
 
 - **deps**: Adopt express ^5.3, repair extras, demote uvicorn (#103) (**BREAKING**)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.41.0
 
 
 ## [0.40.1] - 2026-10-07
