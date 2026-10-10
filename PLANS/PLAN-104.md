@@ -34,27 +34,27 @@ Cross-module note: `base-node.ts ↔ app.ts` and `__init__ ↔ app/auth/router` 
 ## Implementation Phases
 
 ### Phase 1: TypeScript — express to optional peer behind `/express`
-- [ ] **1.1** Create `src/express.ts` re-exporting `createNodeApp`, `createMultiNodeApp`, `CreateNodeAppOptions` from `./app.js`; add `"./express"` to `package.json` exports + `express` entry to `tsup.config.ts`
+- [x] **1.1** Create `src/express.ts` re-exporting `createNodeApp`, `createMultiNodeApp`, `CreateNodeAppOptions` from `./app.js`; add `"./express"` to `package.json` exports + `express` entry to `tsup.config.ts`
     — **Why:** the subpath is the new canonical import home; tsup must emit it as its own entry so express stays out of the root bundle
     — **Done when:** `dist/express.js` + `dist/express.d.ts` exist after build
     — **Consumers affected:** new subpath consumers
-- [ ] **1.2** `package.json`: move `express` from `dependencies` to `peerDependencies` (`"^5.3"`) with `peerDependenciesMeta.express.optional = true`
+- [x] **1.2** `package.json`: move `express` from `dependencies` to `peerDependencies` (`"^5.3"`) with `peerDependenciesMeta.express.optional = true`
     — **Why:** optional peers are not auto-installed — the core install sheds express entirely
     — **Done when:** `dependencies` lacks express; `peerDependenciesMeta.express.optional` is true
     — **Consumers affected:** all installers (AC-1)
-- [ ] **1.3** `src/index.ts`: remove the four express-coupled exports (`createNodeApp`, `createMultiNodeApp`, `CreateNodeAppOptions`, app-types line)
+- [x] **1.3** `src/index.ts`: remove the four express-coupled exports (`createNodeApp`, `createMultiNodeApp`, `CreateNodeAppOptions`, app-types line)
     — **Why:** any static path from the root entry to app.ts pulls express into the core bundle — the re-export must go for the split to exist
     — **Done when:** `grep -n "app.js" src/index.ts` is empty; `npx tsc --noEmit` flags every in-repo root-importer (all fixed in 1.4/1.5)
     — **Consumers affected:** root-entry consumers (breaking — CHANGELOG subject carries it)
-- [ ] **1.4** `src/base-node.ts`: `createApp` becomes async via dynamic import (`const { createNodeApp } = await import("./app.js")`), returning `Promise<unknown>`; update every in-repo caller to `await` (tests included)
+- [x] **1.4** `src/base-node.ts`: `createApp` becomes async via dynamic import (`const { createNodeApp } = await import("./app.js")`), returning `Promise<unknown>`; update every in-repo caller to `await` (tests included)
     — **Why:** the last static edge from core to app.ts; dynamic import lets tsup code-split express out of the root bundle while `node.createApp()` keeps working (express must be installed when called)
     — **Done when:** `grep -n 'from "./app.js"' src/base-node.ts` shows only the dynamic import; vitest green with awaited callers
     — **Consumers affected:** node authors using `node.createApp()` (breaking: async — CHANGELOG)
-- [ ] **1.5** `src/auth.ts`: replace `import type { Request, Response, NextFunction } from "express"` with minimal structural handler types local to core
+- [x] **1.5** `src/auth.ts`: replace `import type { Request, Response, NextFunction } from "express"` with minimal structural handler types local to core
     — **Why:** the emitted `auth.d.ts` would force `@types/express` resolution on every core consumer's typecheck even without express installed; structural types keep `NodeAuth` in core cleanly
     — **Done when:** `grep -n "from \"express\"" src/auth.ts` is empty; `tsc --noEmit` green
     — **Consumers affected:** `NodeAuth` consumers (no runtime change — types only)
-- [ ] **1.6** Gate Phase 1: `npm run build` + verify laziness (`grep -c "from\"express\"" dist/index.js` is 0 AND `dist/express.js` contains it), `vitest run`, `eslint`, `tsc --noEmit` ×2, `npm pack --dry-run` shows no express in deps
+- [x] **1.6** Gate Phase 1: `npm run build` + verify laziness (`grep -c "from\"express\"" dist/index.js` is 0 AND `dist/express.js` contains it), `vitest run`, `eslint`, `tsc --noEmit` ×2, `npm pack --dry-run` shows no express in deps
     — **Why:** the AC-1 proof — root artifact express-free, subpath artifact express-wired, suite green
     — **Done when:** all commands green; both grep assertions hold
     — **Consumers affected:** CI node jobs
@@ -121,3 +121,10 @@ None — no `blocked-by` tickets. Follow-up to #102.
 
 ## Trace
 <!-- gate memos append here -->
+- GATE (phase 1) tier=light lint=t typecheck=t build=t unit=t e2e=n.a. — dist laziness proven: root bundle 0 express refs, /express entry 3/3 artifacts
+    — **Done:** src/express.ts created; exports map + tsup entry added; dist/express.{js,cjs,d.ts} emitted; files: src/express.ts, package.json, tsup.config.ts; fixes: none
+    — **Done:** express → peerDependencies ^5.3 with peerDependenciesMeta.optional; added to devDependencies (tests exercise the adapter); dependencies block now ajv+zod only; files: package.json, package-lock.json; fixes: 1 (fresh-worktree npm ci was missing before typecheck)
+    — **Done:** index.ts express re-exports removed; tsc surfaced no other root importers (tests import src/app.js directly); files: src/index.ts; fixes: none
+    — **Done:** createApp async via dynamic import; core-safe structural CreateNodeAppOptions defined in base-node (express-typed version stays on the subpath; documented cast at the dynamic boundary); no in-repo .createApp() callers to await; files: src/base-node.ts; fixes: none
+    — **Done:** express type import replaced by AuthRequest/AuthResponse/AuthNext structural types + header() helper; all 4 middleware annotations + unauthorized() migrated; files: src/auth.ts; fixes: 1 (initial edit dropped isDevMode — restored)
+    — **Done:** build OK; dist/index.js express refs 0; dist/express.{js,cjs,d.ts} 3/3; vitest 378; eslint OK; tsc tests OK; files: none; fixes: none

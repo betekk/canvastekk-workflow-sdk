@@ -29,8 +29,16 @@ import {
   NodeConfigurationError,
 } from "./exceptions.js";
 import { createLogger } from "./logging.js";
-import { createNodeApp } from "./app.js";
-import type { CreateNodeAppOptions } from "./app.js";
+/**
+ * Options for building a node's HTTP server. Structural core-safe view —
+ * the `/express` subpath exposes the precisely-typed express version.
+ */
+export interface CreateNodeAppOptions {
+  /** Middleware applied to every route (express-compatible handlers). */
+  dependencies?: unknown[];
+  /** Extra routers to mount (express Router instances — typed on the subpath). */
+  extraRoutes?: unknown[];
+}
 
 const ajv = new Ajv({ strict: false });
 
@@ -716,10 +724,17 @@ export abstract class BaseNode {
 
   /**
    * Creates an Express app for this node.
+   *
+   * Lazily loads the express adapter (`@betekk/canvastekk-workflow-sdk/express`);
+   * express is an optional peer dependency and must be installed when this is
+   * called.
    * @param opts - App creation options
-   * @returns Express application
+   * @returns Promise resolving to the Express application
    */
-  createApp(opts?: CreateNodeAppOptions): unknown {
-    return createNodeApp(this, opts);
+  async createApp(opts?: CreateNodeAppOptions): Promise<unknown> {
+    // The dynamically-loaded adapter narrows opts to the express-typed
+    // CreateNodeAppOptions; callers get full typing on the /express subpath.
+    const { createNodeApp } = await import("./app.js");
+    return createNodeApp(this, opts as Parameters<typeof createNodeApp>[1]);
   }
 }
