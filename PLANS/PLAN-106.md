@@ -5,11 +5,11 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] `typescript/package.json` pins `zod ^4.6`; lockfile updated
-- [ ] Full TS gate green: build, vitest, eslint, `tsc --noEmit` (src + tests)
-- [ ] No `zod/v3` or `zod/v4` subpath imports in `src/` (top-level `from "zod"` everywhere)
-- [ ] Public schema surface documented: any consumer-visible validation-message/shape changes listed in the PR body
-- [ ] CHANGELOG note renders via commit subject (no hand-editing the generated file)
+- [x] `typescript/package.json` pins `zod ^4.6`; lockfile updated
+- [x] Full TS gate green: build, vitest, eslint, `tsc --noEmit` (src + tests)
+- [x] No `zod/v3` or `zod/v4` subpath imports in `src/` (top-level `from "zod"` everywhere)
+- [x] Public schema surface documented: any consumer-visible validation-message/shape changes listed in the PR body
+- [x] CHANGELOG note renders via commit subject (no hand-editing the generated file)
 
 ## Dependency & Consumer Map
 
@@ -26,29 +26,29 @@ Cross-module note: no in-repo module redesign — version bump + API spelling fi
 ## Implementation Phases
 
 ### Phase 1: Bump and migrate
-- [ ] **1.1** Bump `zod` to `^4.6` in `typescript/package.json`; `npm install`
+- [x] **1.1** Bump `zod` to `^4.6` in `typescript/package.json`; `npm install`
     — **Why:** every later step compiles/tests against the new major; install first so breakage surfaces in one sweep
     — **Done when:** lock resolves zod 4.6.x; `node -e "console.log(require('zod/package.json').version)"` prints 4.x
     — **Consumers affected:** npm consumers (dedupe note in PR body)
-- [ ] **1.2** Run `tsc --noEmit` + `vitest run` and fix every surfaced breakage in `src/` (imports stay top-level `from "zod"`)
+- [x] **1.2** Run `tsc --noEmit` + `vitest run` and fix every surfaced breakage in `src/` (imports stay top-level `from "zod"`)
     — **Why:** the compiler+suite is the authoritative inventory of v3-only API usage; fixing against real errors beats spec-guessing
     — **Done when:** both commands exit 0
     — **Consumers affected:** the four zod-importing modules and their exports
-- [ ] **1.3** Modernize deprecated-in-v4 spellings surfaced by the sweep (known: `z.string().date()` → `z.iso.date()`); keep still-supported APIs (`.superRefine()`, `.preprocess()`) unless the compiler/deprecation warnings say otherwise
+- [x] **1.3** Modernize deprecated-in-v4 spellings surfaced by the sweep (known: `z.string().date()` → `z.iso.date()`); keep still-supported APIs (`.superRefine()`, `.preprocess()`) unless the compiler/deprecation warnings say otherwise
     — **Why:** migrating onto deprecated shims re-creates this ticket's work at zod 5; modern spellings are the migration's point
     — **Done when:** `grep -rn "string().date()" src/` is empty; no new deprecation warnings in build output
     — **Consumers affected:** `definition.ts` date-field validation (behavior-equivalent strict YYYY-MM-DD)
-- [ ] **1.4** Gate Phase 1: `npm audit --omit=dev`, `npm run build`, `vitest run`, `npm run lint`, `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json`
+- [x] **1.4** Gate Phase 1: `npm audit --omit=dev`, `npm run build`, `vitest run`, `npm run lint`, `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json`
     — **Why:** the ticket's green-bar definition; audit proves the bump brings no new advisories
     — **Done when:** all commands exit 0
     — **Consumers affected:** CI node jobs
 
 ### Phase 2: Contract checks and exit gate
-- [ ] **2.1** Verify no subpath imports: `grep -rn "zod/v3\|zod/v4" src/ tests/` is empty; document the public schema surface in the PR body (exported schema names from `definition/request/response/uploads` + any validation-message changes observed in test diffs)
+- [x] **2.1** Verify no subpath imports: `grep -rn "zod/v3\|zod/v4" src/ tests/` is empty; document the public schema surface in the PR body (exported schema names from `definition/request/response/uploads` + any validation-message changes observed in test diffs)
     — **Why:** AC contract — consumers must know exactly what moved and how to build schemas against the SDK
     — **Done when:** grep clean; PR body section drafted
     — **Consumers affected:** schema-builder consumers
-- [ ] **2.2** Ticket exit gate: full tier re-run on the final tree; `tier=full` memo appended to `## Trace`
+- [x] **2.2** Ticket exit gate: full tier re-run on the final tree; `tier=full` memo appended to `## Trace`
     — **Why:** the run's last gate is full; its memo is the Step 10a citation
     — **Done when:** `GATE <sha> tier=full` recorded for the final tree SHA
     — **Consumers affected:** PR creation (Step 10a cites this memo)
@@ -68,3 +68,10 @@ None — no `blocked-by` tickets.
 
 ## Trace
 <!-- gate memos append here -->
+- TICKET-EXIT GATE (impl tree) tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — audit 0, build OK, vitest 378, eslint OK, tsc src+tests OK, subpath grep 0
+    — **Done:** zod 4.6.5 resolved; files: typescript/package.json, typescript/package-lock.json; fixes: none
+    — **Done:** two breakage classes fixed — (a) `.refine(fn, messageFn)` → `.refine(fn, { error: (iss) => ... })` ×5 in definition.ts (v4 removed function-params; `iss.input` carries the value), (b) one-arg `z.record(v)` → `z.record(z.string(), v)` ×6 across definition/request/response; files: src/definition.ts, src/request.ts, src/response.ts; fixes: none
+    — **Done:** `deprecated_at`/`sunset_date` → `z.iso.date()`; `.superRefine`/`.preprocess` kept (v4-supported, compile-clean, suite green); files: src/definition.ts; fixes: none
+    — **Done:** audit 0, build OK, vitest 378 passed, eslint OK, tsc src+tests OK; files: none; fixes: none
+    — **Done:** grep count 0; PR body section drafted at Step 10a; files: none; fixes: none
+    — **Done:** full tier green on the final tree (audit 0 / build / vitest 378 / eslint / tsc ×2); files: PLANS/PLAN-106.md; fixes: none

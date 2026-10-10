@@ -76,8 +76,8 @@ export const DeprecationInfoSchema = z
     // Strict YYYY-MM-DD (zod .date()) so lexicographic ordering in the
     // superRefine check and the runtime sunset guard stays chronological —
     // Python types these as pydantic `date` (DA-2312 parity).
-    deprecated_at: z.string().date().nullable().default(null),
-    sunset_date: z.string().date().nullable().default(null),
+    deprecated_at: z.iso.date().nullable().default(null),
+    sunset_date: z.iso.date().nullable().default(null),
     replacement_slug: z.string().nullable().default(null),
     migration_url: z.string().nullable().default(null),
     notice: z.string(),
@@ -155,13 +155,13 @@ const WorkflowNodeManifestObjectSchema = z
         });
       }
     }),
-    version: z.string().refine((v) => SEMVER_PATTERN.test(v), (v) => ({
-      message: `Node version must be semantic version (X.Y.Z). Got: '${v}'`,
-    })),
+    version: z.string().refine((v) => SEMVER_PATTERN.test(v), {
+      error: (iss) => `Node version must be semantic version (X.Y.Z). Got: '${iss.input}'`,
+    }),
     name: z.string(),
     description: z.string(),
-    input_schema: z.record(z.unknown()),
-    output_schema: z.record(z.unknown()),
+    input_schema: z.record(z.string(), z.unknown()),
+    output_schema: z.record(z.string(), z.unknown()),
     token_cost: z.number().min(0.0).default(0.0),
     default_retry: RetryConfigSchema.default(RetryConfigSchema.parse({})),
     category: z.string().default("utility"),
@@ -183,30 +183,30 @@ const WorkflowNodeManifestObjectSchema = z
       .readonly(),
     minimum_sdk_version: z
       .string()
-      .refine((v) => SEMVER_PATTERN.test(v), (v) => ({
-        message: `SDK version must be semantic version (X.Y.Z). Got: '${v}'`,
-      }))
+      .refine((v) => SEMVER_PATTERN.test(v), {
+        error: (iss) => `SDK version must be semantic version (X.Y.Z). Got: '${iss.input}'`,
+      })
       .nullable()
       .default(null),
     maximum_sdk_version: z
       .string()
-      .refine((v) => SEMVER_PATTERN.test(v), (v) => ({
-        message: `SDK version must be semantic version (X.Y.Z). Got: '${v}'`,
-      }))
+      .refine((v) => SEMVER_PATTERN.test(v), {
+        error: (iss) => `SDK version must be semantic version (X.Y.Z). Got: '${iss.input}'`,
+      })
       .nullable()
       .default(null),
     docs_url: z
       .string()
-      .refine((v) => v.startsWith("http://") || v.startsWith("https://"), (v) => ({
-        message: `docs_url must be an http(s) URL. Got: '${v}'`,
-      }))
+      .refine((v) => v.startsWith("http://") || v.startsWith("https://"), {
+        error: (iss) => `docs_url must be an http(s) URL. Got: '${iss.input}'`,
+      })
       .nullable()
       .default(null),
     changelog_url: z
       .string()
-      .refine((v) => v.startsWith("http://") || v.startsWith("https://"), (v) => ({
-        message: `changelog_url must be an http(s) URL. Got: '${v}'`,
-      }))
+      .refine((v) => v.startsWith("http://") || v.startsWith("https://"), {
+        error: (iss) => `changelog_url must be an http(s) URL. Got: '${iss.input}'`,
+      })
       .nullable()
       .default(null),
   })
