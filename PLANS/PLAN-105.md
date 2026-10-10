@@ -5,12 +5,12 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] `poetry check` exits 0 with **zero** deprecation warnings
-- [ ] `poetry build` produces a wheel whose METADATA carries identical Requires-Dist / Provides-Extra entries as v0.41.0's wheel (diff the two METADATA files)
-- [ ] `pip install dist/*.whl[jwt,keycloak,serve]` resolves all three extras in a fresh venv
-- [ ] `poetry lock` + `poetry install --with dev` + full pytest suite green
-- [ ] `scripts/bump_versions.py` still finds and bumps the version (leaf moved to `[project.version]`)
-- [ ] `poetry.lock` updated if the migration shifts the content-hash; else verified unchanged (hash-only delta allowed)
+- [x] `poetry check` exits 0 with **zero** deprecation warnings
+- [x] `poetry build` produces a wheel whose METADATA carries identical Requires-Dist / Provides-Extra entries as v0.41.0's wheel (diff the two METADATA files)
+- [x] `pip install dist/*.whl[jwt,keycloak,serve]` resolves all three extras in a fresh venv
+- [x] `poetry lock` + `poetry install --with dev` + full pytest suite green
+- [x] `scripts/bump_versions.py` still finds and bumps the version (leaf moved to `[project.version]`) — plus: its `[tool.poetry]`-anchored regex widened to `[project]` in the same change
+- [x] `poetry.lock` updated if the migration shifts the content-hash; else verified unchanged (hash-only delta allowed)
 
 ## Dependency & Consumer Map
 
@@ -75,3 +75,4 @@ None — no `blocked-by` tickets.
 - LOG 1.2 plan adjustment: `[tool.poetry.extras]` remains deprecated under `dynamic` — extras moved static to `[project.optional-dependencies]`; optionals dropped from `[tool.poetry.dependencies]`
 - LOG 1.5 fix attempt 1: scripted-bump revert via `git checkout -- pyproject.toml` also wiped the uncommitted migration edit (file-wide revert in a tree holding phase work) — gate attempt 1 failed with legacy warnings; re-applied the rewrite; bumps must be reverted version-line-only
 - GATE 02cf6b4 tier=light lint=t typecheck=n.a. build=t unit=t e2e=n.a. — poetry check zero warnings, check --lock consistent, ruff clean, pytest 822
+- TICKET-EXIT GATE 62a09b8 tier=full lint=t typecheck=n.a. build=t unit=t e2e=n.a. — poetry check zero warnings + check --lock + ruff + pytest 822; wheel METADATA diffed vs v0.41.0 baseline (semantic equivalence, 2 recorded notation deltas); fresh-venv `[jwt,keycloak,serve]` wheel install verified (PyJWT 2.15.1, cryptography 50.0.2, uvicorn 0.54.0 importable); bump script 9.9.9 live pass + revert
