@@ -71,7 +71,7 @@ from canvastekk_workflow_sdk.exceptions import (
     WorkflowValidationError,
 )
 from canvastekk_workflow_sdk.logging import StructuredJsonFormatter, configure_logging, get_node_logger
-from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, SDKVersionMiddleware, TimingMiddleware
+from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, TimingMiddleware
 from canvastekk_workflow_sdk.observability import ExecutionMetric, MetricsCollector
 from canvastekk_workflow_sdk.registry import (
     RegisterNodeResult,
@@ -185,6 +185,7 @@ _LAZY_SERVER_EXPORTS = {
     "create_node_app": "canvastekk_workflow_sdk.app",
     "create_multi_node_app": "canvastekk_workflow_sdk.router",
     "NodeAuth": "canvastekk_workflow_sdk.auth",
+    "SDKVersionMiddleware": "canvastekk_workflow_sdk._server_middleware",
 }
 
 

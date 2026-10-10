@@ -17,12 +17,14 @@ _PROBE = textwrap.dedent(
     import sys
 
     sys.modules["fastapi"] = None  # block: any `import fastapi` raises
+    sys.modules["starlette"] = None  # block: the starlette transitive too
 
     import canvastekk_workflow_sdk
 
     assert "create_node_app" in canvastekk_workflow_sdk.__all__
     assert "create_multi_node_app" in canvastekk_workflow_sdk.__all__
     assert "NodeAuth" in canvastekk_workflow_sdk.__all__
+    assert "SDKVersionMiddleware" in canvastekk_workflow_sdk.__all__
 
     try:
         canvastekk_workflow_sdk.create_node_app
@@ -30,6 +32,13 @@ _PROBE = textwrap.dedent(
         assert "[fastapi]" in str(exc), f"unguided error: {exc}"
     else:
         raise SystemExit("expected guided ImportError for create_node_app")
+
+    try:
+        canvastekk_workflow_sdk.SDKVersionMiddleware
+    except ImportError as exc:
+        assert "[fastapi]" in str(exc), f"unguided error: {exc}"
+    else:
+        raise SystemExit("expected guided ImportError for SDKVersionMiddleware")
 
     try:
         canvastekk_workflow_sdk.NodeAuth
