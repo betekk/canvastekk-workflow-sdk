@@ -46,18 +46,21 @@ Cross-module note: consumers are external (end-user installs, CI), not in-repo c
     — **Done:** poetry check exit 0 (deprecation warnings only — deferred item), ruff clean, pytest 822 passed; files: python/tests/test_base.py; fixes: 1 (test_create_app route introspection moved to `app.openapi()["paths"]` — fastapi 0.143 nests routes under `_IncludedRouter`)
 
 ### Phase 2: TypeScript security upgrade
-- [ ] **2.1** Edit `typescript/package.json`: `express` `^4.21` → `^5.3`
+- [x] **2.1** Edit `typescript/package.json`: `express` `^4.21` → `^5.3`
     — **Why:** express 4's `qs ~6.15.1` pin caps below the 6.16.0 fix — v4 can never clear the 2 DoS moderates; 5.3.0 also pins `proxy-addr ^2.0.8` (critical fix) and matches the already-used `@types/express ^5`
     — **Done when:** `grep '"express"' package.json` shows `^5.3`
     — **Consumers affected:** `extra_routes` consumers must pass express 5 routers (CHANGELOG note in Phase 3)
-- [ ] **2.2** Refresh `typescript/package-lock.json` (`npm install`)
+    — **Done:** constraint set to `^5.3`; files: typescript/package.json; fixes: none
+- [x] **2.2** Refresh `typescript/package-lock.json` (`npm install`)
     — **Why:** lockfile must carry express 5.3.0 + patched transitives (qs 6.16.0, proxy-addr 2.0.8, fast-uri fix)
     — **Done when:** lock resolves express 5.3.0; `npm ls qs proxy-addr` shows 6.16.x / 2.0.8+; `npm ci` dry-run consistent
     — **Consumers affected:** CI node jobs
-- [ ] **2.3** Gate Phase 2: `npm audit --omit=dev` (0 vulnerabilities), `npm run build`, `vitest run`, `eslint`, `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json`
+    — **Done:** lock has express 5.3.0, qs 6.16.0, proxy-addr 2.0.8, body-parser 2.3.0; fast-uri needed `npm update fast-uri` (3.1.2 → 3.1.8 — ajv caps ^3.0.1, fixes are in-range patches `npm install` won't bump); files: typescript/package-lock.json; fixes: 1
+- [x] **2.3** Gate Phase 2: `npm audit --omit=dev` (0 vulnerabilities), `npm run build`, `vitest run`, `eslint`, `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json`
     — **Why:** proves the express 5 runtime migration against the SDK's test suite (routes are static paths; no wildcard patterns exist)
     — **Done when:** audit reports 0 vulnerabilities and every command exits 0
     — **Consumers affected:** none beyond the repo gates
+    — **Done:** audit 0 vulnerabilities; build, vitest (378 passed), eslint, tsc src+tests all green; files: none beyond 2.1/2.2; fixes: none
 
 ### Phase 3: Documentation and exit gate
 - [ ] **3.1** Add CHANGELOG.md entries: express 5 consumer note (`extra_routes` must be express 5), uvicorn → `[serve]` extra demotion (install uvicorn separately or via the extra), `jwt`/`keycloak` extras repair, fastapi/pydantic bumps
@@ -91,3 +94,5 @@ None — no `blocked-by` tickets.
 <!-- gate memos append here -->
 - LOG 1.3 fix attempt 1: fastapi 0.143 nests the router under `_IncludedRouter` in `app.routes`; `test_create_app` now asserts via `app.openapi()["paths"]` (public, version-stable surface)
 - GATE 3add7ee tier=light lint=t typecheck=n.a. build=n.a. unit=t e2e=n.a.
+- LOG 2.2 fix attempt 1: `npm install` never bumps locked transitives — fast-uri needed `npm update fast-uri` (3.1.2 → 3.1.8, in ajv's ^3.0.1 range; 8 advisories all patched ≤3.1.8)
+- GATE ba12624 tier=light lint=t typecheck=t build=t unit=t e2e=n.a.
