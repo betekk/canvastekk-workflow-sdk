@@ -63,18 +63,21 @@ Cross-module note: consumers are external (end-user installs, CI), not in-repo c
     — **Done:** audit 0 vulnerabilities; build, vitest (378 passed), eslint, tsc src+tests all green; files: none beyond 2.1/2.2; fixes: none
 
 ### Phase 3: Documentation and exit gate
-- [ ] **3.1** Add CHANGELOG.md entries: express 5 consumer note (`extra_routes` must be express 5), uvicorn → `[serve]` extra demotion (install uvicorn separately or via the extra), `jwt`/`keycloak` extras repair, fastapi/pydantic bumps
+- [x] **3.1** Add CHANGELOG.md entries: express 5 consumer note (`extra_routes` must be express 5), uvicorn → `[serve]` extra demotion (install uvicorn separately or via the extra), `jwt`/`keycloak` extras repair, fastapi/pydantic bumps
     — **Why:** all four are consumer-visible changes; release notes are the announcement channel for the express 5 migration
     — **Done when:** CHANGELOG contains all four notes under an Unreleased/current-version section consistent with existing format
     — **Consumers affected:** CHANGELOG readers, release tooling
-- [ ] **3.2** Sweep docs for stale dependency claims (grep README.md, docs/, skill templates for "uvicorn", express version claims); edit only where a claim is now false
+    — **Done:** mechanism deviation recorded — CHANGELOG.md is git-cliff generated (template renders commit subjects only; hand edits are clobbered at next release). All four notes ride the phase-commit subjects instead: `fix(deps)!: adopt express ^5.3 (extra_routes must be express 5)` (**BREAKING** marker) and `fix(deps)!: demote uvicorn to serve extra, repair extras, bump fastapi` — both render at the next `git cliff` release run. fixes: none
+- [x] **3.2** Sweep docs for stale dependency claims (grep README.md, docs/, skill templates for "uvicorn", express version claims); edit only where a claim is now false
     — **Why:** doc-claims-drift rule — the node-builder skill template already installs uvicorn itself and must keep working verbatim; no doc may imply the SDK bundles a server
     — **Done when:** remaining uvicorn mentions are run-commands or explicit separate-install instructions; README express/fastapi version claims (if any) match the new constraints
     — **Consumers affected:** SDK users reading docs
-- [ ] **3.3** Ticket exit gate: full tier — re-run both language gate suites on the final tree plus an OSV spot-check on the changed locks; append the `tier=full` memo to `## Trace`
+    — **Done:** README.md + docs/ clean (no stale claims); node-builder SKILL.md fixed — its Dockerfile installed only the SDK and ran `uvicorn` via the now-removed transitive (would break every generated node image); edits: Dockerfile pip line + `[serve]` prose + both pyproject snippet dependency lists; files: python/canvastekk_workflow_sdk/data/skills/canvastekk-node-builder/SKILL.md; fixes: none
+- [x] **3.3** Ticket exit gate: full tier — re-run both language gate suites on the final tree plus an OSV spot-check on the changed locks; append the `tier=full` memo to `## Trace`
     — **Why:** the pipeline's last gate is full; its memo line is the Step 10a PR citation
     — **Done when:** `GATE <sha> tier=full` line recorded in `## Trace` for the final tree SHA, and both manifests still read `0.40.1` (`grep '"version"' package.json` / `grep '^version' pyproject.toml`)
     — **Consumers affected:** PR creation (Step 10a cites this memo)
+    — **Done:** both suites green (822 pytest / 378 vitest, audit 0, all lint/typecheck/build OK), OSV clean on all 8 changed lock versions, both manifests at 0.40.1; files: PLANS/PLAN-102.md; fixes: none
 
 ## Technical Notes
 - Deferred (separate future tickets): zod 3→4 migration (`zod/v4` subpath exists in 3.25), `[tool.poetry]` → `[project]` packaging migration (Poetry 2.x deprecation warnings are out of scope), framework-optional peer split + registration-time route verifier.
@@ -96,3 +99,5 @@ None — no `blocked-by` tickets.
 - GATE 3add7ee tier=light lint=t typecheck=n.a. build=n.a. unit=t e2e=n.a.
 - LOG 2.2 fix attempt 1: `npm install` never bumps locked transitives — fast-uri needed `npm update fast-uri` (3.1.2 → 3.1.8, in ajv's ^3.0.1 range; 8 advisories all patched ≤3.1.8)
 - GATE ba12624 tier=light lint=t typecheck=t build=t unit=t e2e=n.a.
+- TICKET-EXIT GATE c888f89 tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — python: poetry check + ruff + pytest 822; typescript: audit 0 + build + vitest 378 + eslint + tsc src/tests; OSV clean (starlette 1.7.0, anyio 4.15.1, fastapi 0.143.0, pydantic 2.14.0, qs 6.16.0, proxy-addr 2.0.8, fast-uri 3.1.8, express 5.3.0); manifests 0.40.1
+- NOTE AC6 mechanism: CHANGELOG.md is git-cliff generated (subjects-only rendering); the four consumer notes ride the phase-commit subjects (`fix(deps)!` ×2, both carry **BREAKING**) and render at the next release run — hand-editing the generated file was rejected as clobber-prone
