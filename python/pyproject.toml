@@ -19,15 +19,18 @@ priority = "supplemental"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = "^0.135"
+fastapi = "^0.143"
 pydantic = "^2.12"
-uvicorn = "^0.43"
 httpx = "^0.28"
 jsonschema = "^4.26.0"
+PyJWT = { version = "^2.15", optional = true }
+cryptography = { version = "^50", optional = true }
+uvicorn = { version = "^0.54", optional = true }
 
 [tool.poetry.extras]
 jwt = ["PyJWT"]
 keycloak = ["PyJWT", "cryptography"]
+serve = ["uvicorn"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0"

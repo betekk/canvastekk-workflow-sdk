@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "ajv": "^8",
-    "express": "^4.21",
+    "express": "^5.3",
     "zod": "^3.25"
   },
   "optionalDependencies": {
