@@ -29,18 +29,21 @@ Cross-module note: consumers are external (end-user installs, CI), not in-repo c
 ## Implementation Phases
 
 ### Phase 1: Python dependency repair
-- [ ] **1.1** Edit `python/pyproject.toml`: bump `fastapi` constraint `^0.135` → `^0.143`; remove `uvicorn` from `[tool.poetry.dependencies]`; declare `PyJWT = {version = "^2.15", optional = true}` and `cryptography = {version = "^50", optional = true}`; add `serve = ["uvicorn"]` extra plus `uvicorn = {version = "^0.54", optional = true}` dependency
+- [x] **1.1** Edit `python/pyproject.toml`: bump `fastapi` constraint `^0.135` → `^0.143`; remove `uvicorn` from `[tool.poetry.dependencies]`; declare `PyJWT = {version = "^2.15", optional = true}` and `cryptography = {version = "^50", optional = true}`; add `serve = ["uvicorn"]` extra plus `uvicorn = {version = "^0.54", optional = true}` dependency
     — **Why:** fastapi bump is the only path to patched starlette/anyio; undeclared extras make `poetry check` fail and `pip install ...[jwt]` a no-op; uvicorn is never imported (FastAPI's own convention: no bundled server, extras encode the serving standard)
     — **Done when:** `grep` shows `fastapi = "^0.143"`, no bare `uvicorn =` in the main dependency block, `optional = true` on PyJWT/cryptography/uvicorn, extras `jwt`/`keycloak`/`serve` all reference declared names
     — **Consumers affected:** end-user installs (smaller base footprint), `[serve]` users (new extra)
-- [ ] **1.2** Regenerate `python/poetry.lock` (`poetry lock`) and sync the venv (`poetry install --with dev`)
+    — **Done:** manifest rewritten with all three optional deps + serve extra; files: python/pyproject.toml; fixes: none
+- [x] **1.2** Regenerate `python/poetry.lock` (`poetry lock`) and sync the venv (`poetry install --with dev`)
     — **Why:** the lockfile must reflect the manifest or CI/dev diverge; the venv must match for the phase gates to be meaningful
     — **Done when:** lock contains fastapi 0.143.x, starlette ≥1.3.1, anyio ≥4.14.2, pydantic 2.14.0; no `uvicorn` entry outside extras-conditional paths; `poetry install` exits 0
     — **Consumers affected:** CI python jobs
-- [ ] **1.3** Gate Phase 1: `poetry check` (must exit 0 — extras resolve), `pytest` (green), `ruff check` (green)
+    — **Done:** lock regenerated (fastapi 0.143.0, starlette 1.7.0, anyio 4.15.1, pyjwt 2.15.1, cryptography 50.0.2, uvicorn 0.54.0) + `poetry update pydantic --lock` (2.14.0); files: python/poetry.lock; fixes: none
+- [x] **1.3** Gate Phase 1: `poetry check` (must exit 0 — extras resolve), `pytest` (green), `ruff check` (green)
     — **Why:** proves the extras repair and the fastapi 0.143 runtime compatibility against the SDK's behavior suite
     — **Done when:** all three commands exit 0
     — **Consumers affected:** none beyond the repo gates
+    — **Done:** poetry check exit 0 (deprecation warnings only — deferred item), ruff clean, pytest 822 passed; files: python/tests/test_base.py; fixes: 1 (test_create_app route introspection moved to `app.openapi()["paths"]` — fastapi 0.143 nests routes under `_IncludedRouter`)
 
 ### Phase 2: TypeScript security upgrade
 - [ ] **2.1** Edit `typescript/package.json`: `express` `^4.21` → `^5.3`
@@ -86,3 +89,5 @@ None — no `blocked-by` tickets.
 
 ## Trace
 <!-- gate memos append here -->
+- LOG 1.3 fix attempt 1: fastapi 0.143 nests the router under `_IncludedRouter` in `app.routes`; `test_create_app` now asserts via `app.openapi()["paths"]` (public, version-stable surface)
+- GATE 3add7ee tier=light lint=t typecheck=n.a. build=n.a. unit=t e2e=n.a.

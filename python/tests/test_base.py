@@ -214,11 +214,13 @@ class TestBaseNode:
         node = EchoNode()
         app = node.create_app()
         assert app is not None
-        # Check that routes exist
-        routes = [route.path for route in app.routes]
-        assert "/execute" in routes
-        assert "/health" in routes
-        assert "/manifest" in routes
+        # Check that routes exist. fastapi >=0.143 nests the router under an
+        # _IncludedRouter in app.routes, so introspect via the public
+        # openapi paths instead of iterating app.routes.
+        paths = set(app.openapi()["paths"])
+        assert "/execute" in paths
+        assert "/health" in paths
+        assert "/manifest" in paths
 
 
 class TestBaseNodeTypedExceptions:
