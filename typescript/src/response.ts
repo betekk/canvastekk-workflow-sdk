@@ -3,7 +3,7 @@ import { z } from "zod";
 export const NodeExecutionResponseSchema = z.object({
   execution_id: z.string(),
   status: z.union([z.literal("pass"), z.literal("fail")]),
-  outputs: z.record(z.unknown()).nullable().default(null),
+  outputs: z.record(z.string(), z.unknown()).nullable().default(null),
   token_usage: z.number().min(0.0).default(0.0),
   duration_ms: z.number().int().min(0).default(0),
   error: z.string().nullable().default(null),
@@ -96,7 +96,7 @@ export const HealthResponseSchema = z.object({
   ]),
   node_id: z.string(),
   version: z.string(),
-  checks: z.record(z.boolean()).default({}),
+  checks: z.record(z.string(), z.boolean()).default({}),
 });
 
 /** Node health check response. */

@@ -22,7 +22,7 @@ export const NodeExecutionRequestSchema = z.object({
   // (inline behavior, echoed back via the response). Nullish so a null
   // value parses instead of 400ing (python `str | None` parity).
   execution_id: slugField.nullish(),
-  inputs: z.record(z.unknown()).default({}),
+  inputs: z.record(z.string(), z.unknown()).default({}),
   callback_url: z.string().nullable().optional(),
   // DA-3314 widened targets to `string | multipart-session descriptor`
   // (DA-2886) so a descriptor value must not 400 at this parse. Since
@@ -31,7 +31,7 @@ export const NodeExecutionRequestSchema = z.object({
   // payload fails loudly instead of as an opaque 400 (python
   // request.py `dict[str, str | UploadSession]` parity).
   output_upload_url: z
-    .union([z.record(z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
+    .union([z.record(z.string(), z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
     .optional()
     .default(null),
 });
