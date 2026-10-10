@@ -5,7 +5,7 @@ Usage: python3 scripts/bump_versions.py <version> [release-date]
 
 Handled file types:
   .py    — __version__ = "X.Y.Z" (+ RELEASE_DATE = "YYYY-MM-DD" when present)
-  .toml  — version = "X.Y.Z" (under [tool.poetry])
+  .toml  — version = "X.Y.Z" (under [project] or [tool.poetry])
   .json  — {"version": "X.Y.Z"}
   .props — <Version>X.Y.Z</Version> (XML)
   .ts    — export const VERSION = "X.Y.Z"
@@ -66,7 +66,7 @@ def bump_file(path: str, version: str, release_date: str) -> bool:
 
     elif path.endswith(".toml"):
         new_content, count = re.subn(
-            r'(\[tool\.poetry\][^\[]*?)version\s*=\s*"[^"]*"',
+            r'(\[(?:project|tool\.poetry)\][^\[]*?)version\s*=\s*"[^"]*"',
             rf'\1version = "{version}"',
             content,
             flags=re.DOTALL,

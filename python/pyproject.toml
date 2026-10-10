@@ -1,16 +1,27 @@
-[tool.poetry]
+[project]
 name = "canvastekk-workflow-sdk"
 version = "0.41.0"
 description = "Node SDK for CanvasTEKK Workflow Engine - handles HTTP endpoint boilerplate"
-authors = ["BETEKK"]
+authors = [{ name = "BETEKK" }]
 license = "Apache-2.0"
 readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+jwt = ["PyJWT>=2.15,<3"]
+keycloak = ["PyJWT>=2.15,<3", "cryptography>=50,<51"]
+serve = ["uvicorn>=0.54,<0.55"]
+
+[project.urls]
+Repository = "https://github.com/betekk/canvastekk-workflow-sdk"
+Homepage = "https://github.com/betekk/canvastekk-workflow-sdk"
+
+[tool.poetry]
 packages = [{ include = "canvastekk_workflow_sdk" }]
 include = [
     { path = "canvastekk_workflow_sdk/data/**/*", format = ["sdist", "wheel"] },
 ]
-repository = "https://github.com/betekk/canvastekk-workflow-sdk"
-homepage = "https://github.com/betekk/canvastekk-workflow-sdk"
 
 [[tool.poetry.source]]
 name = "github"
@@ -18,19 +29,10 @@ url = "https://pypi.pkg.github.com/betekk/"
 priority = "supplemental"
 
 [tool.poetry.dependencies]
-python = "^3.12"
 fastapi = "^0.143"
 pydantic = "^2.12"
 httpx = "^0.28"
 jsonschema = "^4.26.0"
-PyJWT = { version = "^2.15", optional = true }
-cryptography = { version = "^50", optional = true }
-uvicorn = { version = "^0.54", optional = true }
-
-[tool.poetry.extras]
-jwt = ["PyJWT"]
-keycloak = ["PyJWT", "cryptography"]
-serve = ["uvicorn"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0"
@@ -51,5 +53,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
