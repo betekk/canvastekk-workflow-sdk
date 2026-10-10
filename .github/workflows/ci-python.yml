@@ -103,7 +103,7 @@ jobs:
         run: pip install "poetry>=2.2"
 
       - name: Install dependencies
-        run: python -m poetry install --no-interaction
+        run: python -m poetry install --no-interaction -E fastapi
 
       - name: Lint with Ruff
         run: python -m poetry run ruff check canvastekk_workflow_sdk/ tests/

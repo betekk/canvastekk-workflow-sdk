@@ -12,6 +12,7 @@ dynamic = ["dependencies"]
 jwt = ["PyJWT>=2.15,<3"]
 keycloak = ["PyJWT>=2.15,<3", "cryptography>=50,<51"]
 serve = ["uvicorn>=0.54,<0.55"]
+fastapi = ["fastapi>=0.143.0,<0.144"]
 
 [project.urls]
 Repository = "https://github.com/betekk/canvastekk-workflow-sdk"
@@ -29,7 +30,6 @@ url = "https://pypi.pkg.github.com/betekk/"
 priority = "supplemental"
 
 [tool.poetry.dependencies]
-fastapi = "^0.143"
 pydantic = "^2.12"
 httpx = "^0.28"
 jsonschema = "^4.26.0"

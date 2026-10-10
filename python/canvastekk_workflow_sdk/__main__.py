@@ -551,6 +551,9 @@ def main() -> None:
         print("                                        [--staged S] [--dry-run] — drain retired slugs and assert staged presence")
         print("  diff <old.json> <new.json> [--json]   Classify breaking changes between manifests")
         print("  init [--agents-md] [--force]          Scaffold AI agent skills into your project")
+        print(
+            "  verify <url> [--api-key KEY] [--timeout S]  Probe a deployed node's HTTP contract"
+        )
         print()
         print("Options:")
         print("  --json         Output validation results as JSON")
@@ -565,6 +568,33 @@ def main() -> None:
 
         print(f"canvastekk-workflow-sdk {__version__}")
         sys.exit(0)
+
+    if args[0] == "verify":
+        url: str | None = None
+        v_api_key: str | None = None
+        v_timeout = 10.0
+        v_rest = args[1:]
+        i = 0
+        while i < len(v_rest):
+            if v_rest[i] == "--api-key" and i + 1 < len(v_rest):
+                v_api_key = v_rest[i + 1]
+                i += 2
+            elif v_rest[i] == "--timeout" and i + 1 < len(v_rest):
+                v_timeout = float(v_rest[i + 1])
+                i += 2
+            elif not url:
+                url = v_rest[i]
+                i += 1
+            else:
+                i += 1
+        if not url:
+            print("Usage: python -m canvastekk_workflow_sdk verify <url> [--api-key KEY] [--timeout S]", file=sys.stderr)
+            sys.exit(2)
+        from canvastekk_workflow_sdk.conformance import verify_node
+
+        report = verify_node(url, timeout=v_timeout, api_key=v_api_key)
+        print(report.summary())
+        sys.exit(0 if report.ok else 1)
 
     if args[0] == "register":
         sys.exit(_run_register(args[1:]))

@@ -305,7 +305,7 @@ app = MyNode().create_app(dependencies=[Depends(auth)])
 pip install canvastekk-workflow-sdk --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 ```
 
-Optional extras: `canvastekk-workflow-sdk[jwt]`, `canvastekk-workflow-sdk[keycloak]`, or `canvastekk-workflow-sdk[serve]` (bundles uvicorn for container serving — since SDK 0.41 the base install no longer includes uvicorn)
+Optional extras: `canvastekk-workflow-sdk[jwt]`, `[keycloak]`, `[serve]` (uvicorn), `[fastapi]` (server imports — required since SDK 0.43 for `create_node_app`; the base install ships without fastapi). Node templates use `[fastapi,serve]`.
 
 ---
 
@@ -455,7 +455,7 @@ WORKDIR /app
 
 # Install SDK from GitHub Packages
 COPY pyproject.toml ./
-RUN pip install "canvastekk-workflow-sdk>=0.5.2" uvicorn \
+RUN pip install "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2" \
     --index-url https://betekk:${SDK_PAT}@pypi.pkg.github.com/betekk/
 
 # Copy node code
@@ -495,7 +495,7 @@ version = "{{version}}"
 description = "{{description}}"
 requires-python = ">=3.12"
 dependencies = [
-    "canvastekk-workflow-sdk>=0.5.2",
+    "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2",
     "uvicorn>=0.54",
 ]
 
@@ -508,7 +508,7 @@ build-backend = "poetry.core.masonry.api"
 
 ```toml
 dependencies = [
-    "canvastekk-workflow-sdk>=0.5.2",
+    "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2",
     "uvicorn>=0.54",
     "numpy>=1.26",
     "open3d>=0.18",

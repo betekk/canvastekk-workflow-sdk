@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.js",
+      "require": "./dist/express.cjs"
     }
   },
   "engines": {
@@ -35,10 +40,19 @@
     "express": "^5.3",
     "zod": "^4.6.5"
   },
+  "peerDependencies": {
+    "express": "^5.3"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    }
+  },
   "optionalDependencies": {
     "jsonwebtoken": "^9"
   },
   "devDependencies": {
+    "express": "^5.3",
     "@eslint/js": "^9.39.5",
     "@types/express": "^5",
     "@types/jsonwebtoken": "^9",

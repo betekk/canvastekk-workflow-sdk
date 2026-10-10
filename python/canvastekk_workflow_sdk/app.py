@@ -25,18 +25,21 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, Request
-from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from canvastekk_workflow_sdk._url import is_dev_mode as _is_dev_mode
 from canvastekk_workflow_sdk.auth import NodeAuth, _AuthBackend
 from canvastekk_workflow_sdk.exceptions import NodeExecutionError, NodeTimeoutError, get_http_status_for_error
 from canvastekk_workflow_sdk.logging import configure_logging
-from canvastekk_workflow_sdk.middleware import SDKVersionMiddleware
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
 from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionResponse
 from canvastekk_workflow_sdk.uploads import UploadTarget, get_default_uploader
+
+if TYPE_CHECKING:  # pragma: no cover - import-time only
+    from fastapi import APIRouter, Depends, FastAPI, Request  # noqa: F401
+    from fastapi.responses import JSONResponse  # noqa: F401
+
+
 
 # Registry of cancel events for in-flight timed executions (cooperative
 # cancellation — see BaseNode._set_cancel_event / context.cancel_event).
@@ -234,6 +237,23 @@ def create_node_app(
     from canvastekk_workflow_sdk._horizon import enforce_support_horizon
 
     enforce_support_horizon()
+
+    # Lazy fastapi imports: the core package installs without fastapi (#104).
+    from fastapi import APIRouter, Depends, FastAPI, Request
+    from fastapi.responses import JSONResponse
+
+    from canvastekk_workflow_sdk._server_middleware import SDKVersionMiddleware
+
+    # Route handlers and options carry fastapi names as string annotations
+    # (PEP 563); fastapi/pydantic resolve hints against this module's
+    # globals at registration — publish the lazily-imported names there.
+    globals().update(
+        APIRouter=APIRouter,
+        Depends=Depends,
+        FastAPI=FastAPI,
+        Request=Request,
+        JSONResponse=JSONResponse,
+    )
 
     resolved_auth: _AuthBackend | None
     if auth is None or isinstance(auth, _AuthBackend):

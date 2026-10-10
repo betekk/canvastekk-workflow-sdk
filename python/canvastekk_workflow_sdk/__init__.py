@@ -38,8 +38,6 @@ Philosophy:
     Nodes can "eject" by copying SDK code if true independence is needed.
 """
 
-from canvastekk_workflow_sdk.app import create_node_app
-from canvastekk_workflow_sdk.auth import NodeAuth
 from canvastekk_workflow_sdk.base import BaseNode
 from canvastekk_workflow_sdk.context import ExecutionContext
 from canvastekk_workflow_sdk.contracts import (
@@ -73,7 +71,7 @@ from canvastekk_workflow_sdk.exceptions import (
     WorkflowValidationError,
 )
 from canvastekk_workflow_sdk.logging import StructuredJsonFormatter, configure_logging, get_node_logger
-from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, SDKVersionMiddleware, TimingMiddleware
+from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, TimingMiddleware
 from canvastekk_workflow_sdk.observability import ExecutionMetric, MetricsCollector
 from canvastekk_workflow_sdk.registry import (
     RegisterNodeResult,
@@ -83,7 +81,6 @@ from canvastekk_workflow_sdk.registry import (
 )
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
 from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionResponse
-from canvastekk_workflow_sdk.router import create_multi_node_app
 from canvastekk_workflow_sdk.testing import LocalFileServer, serve_files
 from canvastekk_workflow_sdk.uploads import (
     OutputUploader,
@@ -180,3 +177,31 @@ __all__ = [
 # import cycle); re-exported for backwards compatibility.
 from canvastekk_workflow_sdk._version import RELEASE_DATE as RELEASE_DATE  # noqa: E402, F401
 from canvastekk_workflow_sdk._version import __version__ as __version__  # noqa: E402, F401
+
+# Server symbols live behind lazily-imported fastapi-backed modules; the
+# core package imports (and installs) without fastapi. Access raises a
+# guided ImportError when the `[fastapi]` extra is missing.
+_LAZY_SERVER_EXPORTS = {
+    "create_node_app": "canvastekk_workflow_sdk.app",
+    "create_multi_node_app": "canvastekk_workflow_sdk.router",
+    "NodeAuth": "canvastekk_workflow_sdk.auth",
+    "SDKVersionMiddleware": "canvastekk_workflow_sdk._server_middleware",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    if name in _LAZY_SERVER_EXPORTS:
+        try:
+            import fastapi  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                f"{name!r} requires the fastapi-backed server modules; "
+                "install the extra: pip install canvastekk-workflow-sdk[fastapi]"
+            ) from exc
+        import importlib
+
+        module = importlib.import_module(_LAZY_SERVER_EXPORTS[name])
+        value = getattr(module, name)
+        globals()[name] = value  # cache: subsequent lookups skip this hook
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

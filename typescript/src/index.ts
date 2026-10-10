@@ -77,8 +77,6 @@ export {
   type ExecutionMetric,
 } from "./observability.js";
 export { BaseNode } from "./base-node.js";
-export { createNodeApp, createMultiNodeApp } from "./app.js";
-export type { CreateNodeAppOptions } from "./app.js";
 export { NodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
 export type { AuthMiddleware, AuthResult } from "./auth.js";
 export { S3PresignedUploader, getDefaultUploader, UploadSessionDescriptorSchema } from "./uploads.js";

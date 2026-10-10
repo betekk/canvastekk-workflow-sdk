@@ -240,7 +240,7 @@ class TestNodeSlugHeader:
         from starlette.responses import PlainTextResponse
         from starlette.testclient import TestClient
 
-        from canvastekk_workflow_sdk.middleware import SDKVersionMiddleware
+        from canvastekk_workflow_sdk._server_middleware import SDKVersionMiddleware
 
         app = Starlette()
         app.add_middleware(SDKVersionMiddleware)  # multi-node: no slug to stamp

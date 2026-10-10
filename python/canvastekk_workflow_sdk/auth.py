@@ -32,9 +32,13 @@ import logging
 import os
 import time as _time
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import Depends, HTTPException, Request
+if TYPE_CHECKING:  # pragma: no cover - import-time only
+    from fastapi import HTTPException, Request
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +64,11 @@ class _AuthBackend(ABC):
 
     def as_dependency(self) -> Any:
         """Return a FastAPI ``Depends()`` callable for this backend."""
+        from fastapi import Depends, Request  # lazy: core installs without fastapi (#104)
+
+        # `authenticate(request: Request)` is a string annotation (PEP 563);
+        # fastapi resolves hints against this module's globals at wiring time.
+        globals().setdefault("Request", Request)
         return Depends(self.authenticate)
 
     def __call__(self, request: Request) -> dict[str, Any]:
@@ -89,6 +98,7 @@ class _ApiKeyAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``X-API-Key`` header against the configured env var."""
+        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
         if _is_dev_mode():
             logger.debug("Dev mode: skipping API key authentication")
             return {"auth_mode": "dev_bypass"}
@@ -143,6 +153,7 @@ class _JwtAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``Authorization: Bearer`` JWT token."""
+        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
         if _is_dev_mode():
             logger.debug("Dev mode: skipping JWT authentication")
             return {"auth_mode": "dev_bypass"}
@@ -263,6 +274,7 @@ class _KeycloakAuth(_AuthBackend):
         Raises:
             HTTPException: 401 if authentication fails, 503 if JWKS fetch fails
         """
+        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
         if _is_dev_mode():
             logger.debug("Dev mode: skipping Keycloak authentication")
             return {"auth_mode": "dev_bypass"}
@@ -364,6 +376,8 @@ class NodeAuth:
 
     @staticmethod
     def api_key(key_env_var: str = "CANVASTEKK_API_KEY") -> _ApiKeyAuth:
+        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        globals().setdefault("Request", Request)
         """Create an API key authentication backend.
 
         Args:
@@ -380,6 +394,8 @@ class NodeAuth:
         algorithm: str = "HS256",
         audience: str | None = None,
     ) -> _JwtAuth:
+        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        globals().setdefault("Request", Request)
         """Create a JWT (HMAC-SHA256) authentication backend.
 
         Requires the ``PyJWT`` package.
@@ -401,6 +417,8 @@ class NodeAuth:
         audience: str | None = None,
         algorithm: str = "RS256",
     ) -> _KeycloakAuth:
+        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        globals().setdefault("Request", Request)
         """Create a Keycloak RS256 JWT authentication backend.
 
         Requires the ``PyJWT`` and ``cryptography`` packages.

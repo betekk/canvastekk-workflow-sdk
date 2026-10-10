@@ -1,5 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import type { Request, Response, NextFunction } from "express";
 
 /**
  * Checks if dev mode is enabled via CANVASTEKK_DEV_MODE env var.
@@ -13,18 +12,43 @@ function isDevMode(): boolean {
   );
 }
 
+/**
+ * Minimal request surface read by auth middleware. Structural — express's
+ * `Request` satisfies it without importing express types into the core
+ * declaration output.
+ */
+export interface AuthRequest {
+  /** Raw headers; narrow with the module-local `header()` helper. */
+  headers: unknown;
+}
+
+/** Minimal response surface used by auth middleware (express-compatible). */
+export interface AuthResponse {
+  status(code: number): { json(body: unknown): unknown };
+}
+
+/** Continuation callback for auth middleware (express-compatible). */
+export type AuthNext = () => void;
+
 /** Authentication result. */
 export interface AuthResult {
   authMode: string;
   payload?: Record<string, unknown>;
 }
 
-/** Express middleware function for authentication. */
+/** Server middleware function for authentication. */
 export type AuthMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
+  req: AuthRequest,
+  res: AuthResponse,
+  next: AuthNext,
 ) => void;
+
+/** Reads a single header value as a string (first member when repeated). */
+function header(req: AuthRequest, name: string): string | undefined {
+  const raw = (req.headers as Record<string, unknown> | null | undefined)?.[name];
+  if (Array.isArray(raw)) return typeof raw[0] === "string" ? raw[0] : undefined;
+  return typeof raw === "string" ? raw : undefined;
+}
 
 /**
  * Property tagged on middleware produced by NodeAuth factories so callers
@@ -44,7 +68,7 @@ function markAuth<T extends AuthMiddleware>(mw: T): T {
  * @param res - Express response object
  * @param detail - Error detail message
  */
-function unauthorized(res: Response, detail: string): void {
+function unauthorized(res: AuthResponse, detail: string): void {
   res.status(401).json({ detail });
 }
 
@@ -58,7 +82,7 @@ export class NodeAuth {
    * @returns Express middleware function
    */
   static apiKey(keyEnvVar = "CANVASTEKK_API_KEY"): AuthMiddleware {
-    return markAuth((req: Request, res: Response, next: NextFunction) => {
+    return markAuth((req: AuthRequest, res: AuthResponse, next: AuthNext) => {
       if (isDevMode()) {
         next();
         return;
@@ -76,7 +100,7 @@ export class NodeAuth {
         return;
       }
 
-      const providedKey = req.headers["x-api-key"] as string ?? "";
+      const providedKey = header(req, "x-api-key") ?? "";
       const provided = Buffer.from(providedKey);
 
       const matches = expectedKeys.some((key) => {
@@ -107,7 +131,7 @@ export class NodeAuth {
     const algorithm = opts?.algorithm ?? "HS256";
     const audience = opts?.audience;
 
-    return markAuth(async (req: Request, res: Response, next: NextFunction) => {
+    return markAuth(async (req: AuthRequest, res: AuthResponse, next: AuthNext) => {
       if (isDevMode()) {
         next();
         return;
@@ -119,7 +143,7 @@ export class NodeAuth {
         return;
       }
 
-      const authHeader = req.headers.authorization ?? "";
+      const authHeader = header(req, "authorization") ?? "";
       if (!authHeader.startsWith("Bearer ")) {
         unauthorized(res, "Missing Bearer token");
         return;
@@ -225,13 +249,13 @@ export class NodeAuth {
       return map;
     }
 
-    return markAuth(async (req: Request, res: Response, next: NextFunction) => {
+    return markAuth(async (req: AuthRequest, res: AuthResponse, next: AuthNext) => {
       if (isDevMode()) {
         next();
         return;
       }
 
-      const authHeader = req.headers.authorization ?? "";
+      const authHeader = header(req, "authorization") ?? "";
       if (!authHeader.startsWith("Bearer ")) {
         unauthorized(res, "Missing Bearer token");
         return;
