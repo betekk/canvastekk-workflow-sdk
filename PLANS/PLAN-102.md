@@ -5,13 +5,13 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] `npm audit --omit=dev` reports 0 vulnerabilities
-- [ ] OSV clean for locked starlette, anyio, qs, proxy-addr, fast-uri, express, fastapi, pydantic
-- [ ] `poetry check` exits 0; `jwt`/`keycloak` extras resolve
-- [ ] Base install excludes uvicorn; `canvastekk-workflow-sdk[serve]` installs it
-- [ ] Python `pytest` + `ruff check` green; TS `vitest` + `eslint` + `tsc --noEmit` + build green
-- [ ] CHANGELOG documents the express 5 consumer note, uvicorn demotion, extras fix
-- [ ] Both manifests still at 0.40.1 (release script owns the bump)
+- [x] `npm audit --omit=dev` reports 0 vulnerabilities
+- [x] OSV clean for locked starlette, anyio, qs, proxy-addr, fast-uri, express, fastapi, pydantic
+- [x] `poetry check` exits 0; `jwt`/`keycloak` extras resolve
+- [x] Base install excludes uvicorn; `canvastekk-workflow-sdk[serve]` installs it
+- [x] Python `pytest` + `ruff check` green; TS `vitest` + `eslint` + `tsc --noEmit` + build green
+- [x] CHANGELOG documents the express 5 consumer note, uvicorn demotion, extras fix
+- [x] Both manifests still at 0.40.1 (release script owns the bump)
 
 ## Dependency & Consumer Map
 
