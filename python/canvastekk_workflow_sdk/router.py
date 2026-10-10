@@ -25,9 +25,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI
-
 from canvastekk_workflow_sdk.app import create_node_app
+
+if TYPE_CHECKING:  # pragma: no cover - import-time only
+    from fastapi import FastAPI
+
+
 
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.base import BaseNode
@@ -67,6 +70,8 @@ def create_multi_node_app(
         # POST /segment/execute, GET /segment/health, ...
         # POST /measure/execute, GET /measure/health, ...
     """
+    from fastapi import FastAPI  # lazy: core installs without fastapi (#104)
+
     app = FastAPI(**fastapi_kwargs)
 
     node_apps: list[tuple[str, Any]] = []

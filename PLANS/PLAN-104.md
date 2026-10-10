@@ -60,23 +60,23 @@ Cross-module note: `base-node.ts ↔ app.ts` and `__init__ ↔ app/auth/router` 
     — **Consumers affected:** CI node jobs
 
 ### Phase 2: Python — fastapi to `[fastapi]` extra with lazy imports
-- [ ] **2.1** `python/pyproject.toml`: move `fastapi` from `[tool.poetry.dependencies]` to a new `[fastapi]` extra (`^0.143`); `poetry lock` + `poetry install --with dev` (lock: content-hash + fastapi optional-marker delta expected)
+- [x] **2.1** `python/pyproject.toml`: move `fastapi` from `[tool.poetry.dependencies]` to a new `[fastapi]` extra (`^0.143`); `poetry lock` + `poetry install --with dev` (lock: content-hash + fastapi optional-marker delta expected)
     — **Why:** the pip-side mirror of AC-2; #105's `[project]` layout makes this a two-line edit
     — **Done when:** base deps exclude fastapi; `[fastapi]` extra present; `poetry check` + `check --lock` green
     — **Consumers affected:** pip installers (AC-2)
-- [ ] **2.2** `python/app.py`, `router.py`, `auth.py`: move `from fastapi import ...` to a `TYPE_CHECKING` block (annotations — modules already use `from __future__ import annotations`) and function-local imports for runtime symbols (`FastAPI`, `APIRouter`, `Depends`, `HTTPException`, `JSONResponse`); no import-path changes
+- [x] **2.2** `python/app.py`, `router.py`, `auth.py`: move `from fastapi import ...` to a `TYPE_CHECKING` block (annotations — modules already use `from __future__ import annotations`) and function-local imports for runtime symbols (`FastAPI`, `APIRouter`, `Depends`, `HTTPException`, `JSONResponse`); no import-path changes
     — **Why:** import paths stay stable for existing consumers (ticket AC-2 "import path documented and lazy") while `import canvastekk_workflow_sdk` stops pulling fastapi
     — **Done when:** `grep -n "^from fastapi" python/canvastekk_workflow_sdk/{app,router,auth}.py` is empty; pytest green
     — **Consumers affected:** module-level import time only
-- [ ] **2.3** `python/__init__.py`: replace the three static imports with a PEP 562 module `__getattr__` lazy-loading `create_node_app`, `create_multi_node_app`, `NodeAuth` — raising ImportError naming `[fastapi]` when fastapi is absent; keep `__all__` unchanged
+- [x] **2.3** `python/__init__.py`: replace the three static imports with a PEP 562 module `__getattr__` lazy-loading `create_node_app`, `create_multi_node_app`, `NodeAuth` — raising ImportError naming `[fastapi]` when fastapi is absent; keep `__all__` unchanged
     — **Why:** the core import must not touch fastapi; the error must teach the fix (`pip install canvastekk-workflow-sdk[fastapi]`)
     — **Done when:** subprocess `python -c "import sys; sys.modules['fastapi']=None; import canvastekk_workflow_sdk"` succeeds; attribute access raises the `[fastapi]`-naming error (new test)
     — **Consumers affected:** every Python importer (transparent when fastapi installed)
-- [ ] **2.4** New test: fastapi-blocked subprocess import + lazy attribute error message; plus existing suite green (fastapi installed — lazy path invisible)
+- [x] **2.4** New test: fastapi-blocked subprocess import + lazy attribute error message; plus existing suite green (fastapi installed — lazy path invisible)
     — **Why:** AC-2's mechanical proof — the same suite that runs WITH fastapi must also prove the WITHOUT path
     — **Done when:** new test passes; full pytest green
     — **Consumers affected:** none beyond repo gates
-- [ ] **2.5** Gate Phase 2: `poetry check` + `check --lock`, `ruff check .`, `pytest`
+- [x] **2.5** Gate Phase 2: `poetry check` + `check --lock`, `ruff check .`, `pytest`
     — **Why:** phase green-bar
     — **Done when:** all exit 0
     — **Consumers affected:** CI python jobs
@@ -121,6 +121,9 @@ None — no `blocked-by` tickets. Follow-up to #102.
 
 ## Trace
 <!-- gate memos append here -->
+- LOG (phase 2) fix 1: shim-block placement caused E402/I001; relocation pass corrupted router.py via partial-string cut — recovered with git checkout + line-based rewrite
+- LOG (phase 2) fix 2: PEP 562 module __getattr__ does NOT service global lookups inside the module's own functions — replaced with function-local imports; fastapi/pydantic resolve string annotations against module globals, so create_node_app + NodeAuth factories publish the lazy names via globals().update/setdefault
+- GATE (phase 2) tier=light lint=t typecheck=n.a. build=t unit=t e2e=n.a. — pytest 824 (incl. 2 lazy-server tests), ruff clean, poetry checks green
 - GATE (phase 1) tier=light lint=t typecheck=t build=t unit=t e2e=n.a. — dist laziness proven: root bundle 0 express refs, /express entry 3/3 artifacts
     — **Done:** src/express.ts created; exports map + tsup entry added; dist/express.{js,cjs,d.ts} emitted; files: src/express.ts, package.json, tsup.config.ts; fixes: none
     — **Done:** express → peerDependencies ^5.3 with peerDependenciesMeta.optional; added to devDependencies (tests exercise the adapter); dependencies block now ajv+zod only; files: package.json, package-lock.json; fixes: 1 (fresh-worktree npm ci was missing before typecheck)
@@ -128,3 +131,8 @@ None — no `blocked-by` tickets. Follow-up to #102.
     — **Done:** createApp async via dynamic import; core-safe structural CreateNodeAppOptions defined in base-node (express-typed version stays on the subpath; documented cast at the dynamic boundary); no in-repo .createApp() callers to await; files: src/base-node.ts; fixes: none
     — **Done:** express type import replaced by AuthRequest/AuthResponse/AuthNext structural types + header() helper; all 4 middleware annotations + unauthorized() migrated; files: src/auth.ts; fixes: 1 (initial edit dropped isDevMode — restored)
     — **Done:** build OK; dist/index.js express refs 0; dist/express.{js,cjs,d.ts} 3/3; vitest 378; eslint OK; tsc tests OK; files: none; fixes: none
+    — **Done:** fastapi → [fastapi] extra (PEP 508 range mirrors ^0.143); poetry lock regenerated; check + check --lock green; files: python/pyproject.toml, python/poetry.lock; fixes: none
+    — **Done:** PEP 562 lazy shims attempted first, then replaced after gate failure: module __getattr__ serves EXTERNAL attribute access only — internal global lookups (FastAPI(, JSONResponse( inside create_node_app) bypass it. Final: TYPE_CHECKING blocks + function-local imports at runtime sites (create_node_app imports the five names and publishes to globals() for fastapi/pydantic hint resolution; NodeAuth factories + as_dependency inject Request); import paths unchanged; files: app.py, router.py, auth.py; fixes: 2
+    — **Done:** __init__ __getattr__ with fastapi probe: missing extra → guided ImportError naming [fastapi]; present → resolves + caches; files: __init__.py; fixes: 1 (probe added after first proof showed attribute access returning the raw function unguided)
+    — **Done:** tests/test_lazy_server.py: subprocess probe with sys.modules['fastapi']=None proves core import + guided errors; with-fastapi test proves resolution; 2 passed; ci-python.yml poetry install lines gained -E fastapi (3 sites); files: tests/test_lazy_server.py, .github/workflows/ci-python.yml; fixes: none
+    — **Done:** poetry check + check --lock + ruff + pytest 824 all green; files: none; fixes: 3 (E402/ruff block relocation + router corruption recovered via git checkout; PEP 562 internal-lookup discovery; string-annotation hint resolution via globals injection)
