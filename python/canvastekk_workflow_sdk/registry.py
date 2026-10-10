@@ -356,6 +356,8 @@ def register_node(
     tags: list[str] | None = None,
     invoke_config: dict[str, Any] | None = None,
     timeout: int = 30,
+    verify: bool = False,
+    verify_timeout: float = 10.0,
 ) -> RegisterNodeResult:
     """Register a node with the workflow engine registry.
 
@@ -387,6 +389,11 @@ def register_node(
         tags: Optional searchable tags for the registry.
         invoke_config: Optional extra invocation parameters.
         timeout: Request timeout in seconds.
+        verify: When True (and ``invoke_type == "http"``), probe the node's
+            HTTP contract (``verify_node``) before registering; raises
+            :class:`RegistrationError` if any route fails. Opt-in — the
+            default registers without probing.
+        verify_timeout: Per-probe timeout in seconds when ``verify`` is True.
 
     Returns:
         A :class:`RegisterNodeResult` containing the registered node data,
@@ -430,6 +437,22 @@ def register_node(
         raise ValueError(
             f"Invalid invoke_type '{invoke_type}'. Must be one of: {', '.join(sorted(VALID_INVOKE_TYPES))}"
         )
+
+    if verify:
+        from canvastekk_workflow_sdk.conformance import (
+            verify_node,  # noqa: PLC0415 — lazy keeps httpx probing out of the default flow
+        )
+
+        if invoke_type != "http":
+            raise ValueError("verify=True requires invoke_type='http' (nothing to probe).")
+        if not invoke_url:
+            raise ValueError("verify=True requires invoke_url (no probe target).")
+        report = verify_node(invoke_url, timeout=verify_timeout, api_key=api_key)
+        if not report.ok:
+            raise RegistrationError(
+                "Node failed conformance verification; refusing to register.\n"
+                + report.summary()
+            )
 
     manifest = build_registry_payload(
         node.definition,

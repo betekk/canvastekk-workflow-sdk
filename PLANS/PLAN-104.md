@@ -5,12 +5,12 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] Fresh `npm install @betekk/canvastekk-workflow-sdk` does NOT install express; `import { createNodeApp }` from the `/express` subpath works with express peer-installed
-- [ ] Fresh `pip install canvastekk-workflow-sdk` does NOT install fastapi/uvicorn; `[fastapi]` extra provides them; `create_node_app` import path documented and lazy
-- [ ] `register_node(verify=True)` refuses registration when `/health`, `/manifest`, or `/execute` are missing/malformed; registers when a conforming self-hosted node (non-SDK server) passes
-- [ ] `verify` CLI command prints per-route conformance results
-- [ ] node-builder skill template updated to the subpath/extra imports
-- [ ] Both test suites green; consumer migration notes in CHANGELOG (commit subjects — git-cliff renders them)
+- [x] Fresh `npm install @betekk/canvastekk-workflow-sdk` does NOT install express; `import { createNodeApp }` from the `/express` subpath works with express peer-installed
+- [x] Fresh `pip install canvastekk-workflow-sdk` does NOT install fastapi/uvicorn; `[fastapi]` extra provides them; `create_node_app` import path documented and lazy
+- [x] `register_node(verify=True)` refuses registration when `/health`, `/manifest`, or `/execute` are missing/malformed; registers when a conforming self-hosted node (non-SDK server) passes
+- [x] `verify` CLI command prints per-route conformance results
+- [x] node-builder skill template updated to the subpath/extra imports
+- [x] Both test suites green; consumer migration notes in CHANGELOG (commit subjects — git-cliff renders them)
 
 ## Dependency & Consumer Map
 
@@ -82,23 +82,23 @@ Cross-module note: `base-node.ts ↔ app.ts` and `__init__ ↔ app/auth/router` 
     — **Consumers affected:** CI python jobs
 
 ### Phase 3: Route verifier + registration gate
-- [ ] **3.1** New `python/canvastekk_workflow_sdk/conformance.py`: `verify_node(base_url, *, timeout=10.0, api_key=None) -> VerifyReport` probing GET `/health` (200), GET `/manifest` (200 + jsonschema manifest validation), POST `/execute` with a malformed payload (expect 4xx contract-shape response); framework-free (httpx only); dataclass report with per-route results
+- [x] **3.1** New `python/canvastekk_workflow_sdk/conformance.py`: `verify_node(base_url, *, timeout=10.0, api_key=None) -> VerifyReport` probing GET `/health` (200), GET `/manifest` (200 + jsonschema manifest validation), POST `/execute` with a malformed payload (expect 4xx contract-shape response); framework-free (httpx only); dataclass report with per-route results
     — **Why:** the enforcement half of the ticket — conformance becomes checkable for ANY server, not just SDK-built ones
     — **Done when:** unit tests via `httpx.MockTransport` cover pass + each failure mode
     — **Consumers affected:** register_node, CLI
-- [ ] **3.2** `python/registry.py`: `register_node(..., verify: bool = False, verify_timeout: float = 10.0)` — when True, run `verify_node` against the invoke target first; raise `RegistrationError` naming the failing routes on failure
+- [x] **3.2** `python/registry.py`: `register_node(..., verify: bool = False, verify_timeout: float = 10.0)` — when True, run `verify_node` against the invoke target first; raise `RegistrationError` naming the failing routes on failure
     — **Why:** AC-3 — the registry refuses non-conforming nodes; the default stays False (no behavior change for existing flows)
     — **Done when:** MockTransport tests cover refuse + accept paths
     — **Consumers affected:** CI/CD registration automation (opt-in)
-- [ ] **3.3** `python/__main__.py`: `verify <url> [--api-key KEY] [--timeout S]` command printing per-route results and exiting non-zero on failure
+- [x] **3.3** `python/__main__.py`: `verify <url> [--api-key KEY] [--timeout S]` command printing per-route results and exiting non-zero on failure
     — **Why:** AC-4 — CI-usable standalone probe
     — **Done when:** CLI test covers pass + fail exit codes
     — **Consumers affected:** node authors, CI pipelines
-- [ ] **3.4** node-builder `SKILL.md` (bundled) + `.agents/` mirror: python install line → `canvastekk-workflow-sdk[fastapi,serve]`; TS install instructions → `@betekk/canvastekk-workflow-sdk` + `express` (or the `/express` subpath note)
+- [x] **3.4** node-builder `SKILL.md` (bundled) + `.agents/` mirror: python install line → `canvastekk-workflow-sdk[fastapi,serve]`; TS install instructions → `@betekk/canvastekk-workflow-sdk` + `express` (or the `/express` subpath note)
     — **Why:** AC-5; both copies must change together (skill-mirror-guard CI) — the #102 lesson
     — **Done when:** both SKILL.md copies reference the extras; `diff -r .agents/skills data/skills` clean
     — **Consumers affected:** node authors
-- [ ] **3.5** Gate Phase 3 = ticket exit gate, full tier: both language suites (pytest, ruff, poetry checks; audit/build/vitest/eslint/tsc ×2) + dist-laziness grep + mirror diff; `tier=full` memo to `## Trace`
+- [x] **3.5** Gate Phase 3 = ticket exit gate, full tier: both language suites (pytest, ruff, poetry checks; audit/build/vitest/eslint/tsc ×2) + dist-laziness grep + mirror diff; `tier=full` memo to `## Trace`
     — **Why:** the run's last gate is full; the memo is the Step 10a citation
     — **Done when:** everything green; memo recorded for the final tree SHA
     — **Consumers affected:** PR creation (Step 10a cites this memo)
@@ -121,6 +121,7 @@ None — no `blocked-by` tickets. Follow-up to #102.
 
 ## Trace
 <!-- gate memos append here -->
+- TICKET-EXIT GATE 98e3e7d tier=full lint=t typecheck=t build=t unit=t e2e=n.a. — python: poetry checks + ruff + pytest 833 (9 new); typescript: audit 0 + build + vitest 378 + eslint + tsc x2; dist laziness (root 0 express refs, /express 3/3); skill mirrors in sync
 - LOG (phase 2) fix 1: shim-block placement caused E402/I001; relocation pass corrupted router.py via partial-string cut — recovered with git checkout + line-based rewrite
 - LOG (phase 2) fix 2: PEP 562 module __getattr__ does NOT service global lookups inside the module's own functions — replaced with function-local imports; fastapi/pydantic resolve string annotations against module globals, so create_node_app + NodeAuth factories publish the lazy names via globals().update/setdefault
 - GATE (phase 2) tier=light lint=t typecheck=n.a. build=t unit=t e2e=n.a. — pytest 824 (incl. 2 lazy-server tests), ruff clean, poetry checks green
@@ -136,3 +137,8 @@ None — no `blocked-by` tickets. Follow-up to #102.
     — **Done:** __init__ __getattr__ with fastapi probe: missing extra → guided ImportError naming [fastapi]; present → resolves + caches; files: __init__.py; fixes: 1 (probe added after first proof showed attribute access returning the raw function unguided)
     — **Done:** tests/test_lazy_server.py: subprocess probe with sys.modules['fastapi']=None proves core import + guided errors; with-fastapi test proves resolution; 2 passed; ci-python.yml poetry install lines gained -E fastapi (3 sites); files: tests/test_lazy_server.py, .github/workflows/ci-python.yml; fixes: none
     — **Done:** poetry check + check --lock + ruff + pytest 824 all green; files: none; fixes: 3 (E402/ruff block relocation + router corruption recovered via git checkout; PEP 562 internal-lookup discovery; string-annotation hint resolution via globals injection)
+    — **Done:** conformance.py: verify_node probes /health (200), /manifest (200 + WorkflowNodeManifest.model_validate), /execute (malformed must 4xx); framework-free (httpx+pydantic); frozen dataclasses VerifyReport/RouteCheck with ok + summary(); files: canvastekk_workflow_sdk/conformance.py; fixes: none
+    — **Done:** register_node(..., verify=False, verify_timeout=10.0): probe-before-POST; RegistrationError carries report.summary(); requires invoke_type=http + invoke_url; files: registry.py; fixes: none
+    — **Done:** CLI `verify <url> [--api-key] [--timeout]` prints per-route PASS/FAIL + verdict, exits 0/1; files: __main__.py; fixes: none
+    — **Done:** SKILL.md bundled + mirror: install lines -> canvastekk-workflow-sdk[fastapi,serve]; extras prose updated; diff -r clean; files: data/skills/canvastekk-node-builder/SKILL.md, .agents/skills/canvastekk-node-builder/SKILL.md; fixes: none
+    — **Done:** full tier green: pytest 833 (9 new conformance/gate/CLI tests), ruff, poetry checks, audit 0, build, vitest 378, eslint, tsc x2, root dist 0 express refs, /express 3/3 artifacts, mirrors in sync; files: PLANS/PLAN-104.md; fixes: 3 on the phase-2 gate carried into this phase's tree (documented in its LOG lines)
