@@ -31,3 +31,4 @@
 - [npm-install-wont-bump-locked-transitives](solutions/npm-install-wont-bump-locked-transitives.md) — `npm install` preserves locked in-range transitives; in-range advisory fixes need `npm update <pkg>` (#102)
 - [template-runtime-binary-from-transitive-dep](anti-patterns/template-runtime-binary-from-transitive-dep.md) — templates that exec a binary (uvicorn CMD) must declare it where consumed, never ride a transitive (#102)
 - [fastapi-0143-nested-routes-openapi-introspection](solutions/fastapi-0143-nested-routes-openapi-introspection.md) — fastapi ≥0.143 nests `app.routes` under `_IncludedRouter`; assert routes via `app.openapi()["paths"]` (#102)
+- [file-wide-checkout-revert-wipes-phase-work](anti-patterns/file-wide-checkout-revert-wipes-phase-work.md) — scripted-edit verification in a tree with uncommitted phase work: revert the touched line, never `git checkout -- <file>` (#105)
