@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.42.0] - 2026-10-10
+
+### Bug Fixes
+
+- **deps**: Migrate zod 3.25 to ^4.6 (#108) (**BREAKING**)
+
+
 ## [0.41.1] - 2026-10-10
 
 ### Miscellaneous Tasks
 
 - **pyproject**: Migrate metadata to PEP 621 [project] tables (#107)
+- **release**: Prepare v0.41.1
 
 
 ## [0.41.0] - 2026-10-10
