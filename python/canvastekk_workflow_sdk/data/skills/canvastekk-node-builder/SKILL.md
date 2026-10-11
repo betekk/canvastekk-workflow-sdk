@@ -1,6 +1,6 @@
 ---
 name: canvastekk-node-builder
-description: Create CanvasTEKK workflow nodes with correct SDK patterns, schemas, file I/O, Dockerfiles, and tests. Covers BaseNode, WorkflowNodeManifest, ExecutionContext, contracts, and the complete node creation workflow from analysis to CLI validation. File inputs are auto-downloaded by the SDK before execute().
+description: Create CanvasTEKK workflow nodes with correct SDK patterns, schemas, file I/O, Dockerfiles, and tests. Covers BaseNode, WorkflowNodeManifest, ExecutionContext, contracts, engine registration (register_node, verify=True), and the complete node creation workflow from analysis to CLI validation. File inputs are auto-downloaded by the SDK before execute().
 ---
 
 ## What I do
@@ -645,6 +645,76 @@ Also run the test suite:
 
 ```bash
 pytest tests/ -v
+```
+
+---
+
+## Engine Registration (CI/CD)
+
+After the node is deployed and serving, register it with the workflow engine via `register_node` (intended for CI/CD pipelines):
+
+```python
+from canvastekk_workflow_sdk.registry import register_node
+
+result = register_node(
+    node,                                   # your BaseNode instance
+    registry_url="https://engine.example.com/api/workflows/nodes/",
+    invoke_url="https://my-node.example.com",  # where the engine reaches this node
+    invoke_type="http",                     # default; also: "lambda", "graphql"
+    service_token="svs_xxx",                # OR api_key — see credential paths
+    verify=True,                            # probe the node's HTTP contract first
+)
+print(result.action)       # "created" | "updated" | "unchanged"
+print(result.revision_id)  # e.g. "rev-abc123"
+```
+
+### Credential paths (exactly one is required — neither raises ValueError)
+
+| Parameter | Header sent | Authenticates against | Use when |
+|-----------|-------------|----------------------|----------|
+| `service_token` | `X-Service-Token` | the **engine registry** | standard CI/CD registration (engine-issued service token) |
+| `api_key` | `X-API-Key` | the **engine registry**, and the node's own routes during `verify` probes | the node is API-key-guarded; the same key verifies it |
+
+When both are provided, `api_key` takes precedence for the verify probes; the registry request still authenticates with the engine's expected credential. Read both from CI secrets/env vars — never hardcode:
+
+```bash
+CANVASTEKK_REGISTRY_URL="https://engine.example.com/api/workflows/nodes/"
+CANVASTEKK_SERVICE_TOKEN  # engine service token
+CANVASTEKK_API_KEY        # node API key (only if the node is api-key-guarded)
+```
+
+### `verify=True` — the conformance gate
+
+`verify=True` probes the deployed node's HTTP contract (`verify_node`) BEFORE registering; any failed route raises `RegistrationError` with the per-route report and nothing is registered. Two preconditions (both raise `ValueError`):
+
+- `invoke_type` must be `"http"` (there is nothing to probe otherwise)
+- `invoke_url` must be set (it is the probe target)
+
+The probe set is derived from the node's served manifest, and the engine will re-derive the same contract at runtime — a node that passes `verify=True` conforms to what it declared. Optional deeper check before registering:
+
+```bash
+python -m canvastekk_workflow_sdk verify "$CANVASTEKK_INVOKE_URL" --api-key "$CANVASTEKK_API_KEY" --dry-run
+```
+
+`--dry-run` additionally fires the positive execute probe when the node's manifest declares `capabilities.dry_run` — a safe end-to-end signal that costs nothing and changes nothing.
+
+### Full CI example
+
+```python
+import os
+
+result = register_node(
+    node,
+    registry_url=os.environ["CANVASTEKK_REGISTRY_URL"],
+    invoke_url=os.environ["CANVASTEKK_INVOKE_URL"],
+    invoke_type="http",
+    service_token=os.environ["CANVASTEKK_SERVICE_TOKEN"],
+    api_key=os.environ.get("CANVASTEKK_API_KEY"),  # only for api-key-guarded nodes
+    verify=True,
+    verify_timeout=10.0,
+    tags=["production"],
+)
+assert result.action in ("created", "updated", "unchanged")
 ```
 
 ---
