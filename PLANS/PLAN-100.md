@@ -43,10 +43,11 @@
     — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; release-lane dispatch contract untouched; files: .github/workflows/release.yml; fixes: none
 
 ### Phase 4: Bump create-github-app-token to v3
-- [ ] **4.1** Bump `actions/create-github-app-token@v2` → `@v3` at the three `pick-runner` sites (ci-python.yml:37, ci-typescript.yml:35, release.yml:32) and `@v1` → `@v3` at the release.yml nodes-token (line 417); inputs (`app-id`, `private-key`, `owner`, `repositories`) and the `token` output are unchanged in v3 — no other edits
+- [x] **4.1** Bump `actions/create-github-app-token@v2` → `@v3` at the three `pick-runner` sites (ci-python.yml:37, ci-typescript.yml:35, release.yml:32) and `@v1` → `@v3` at the release.yml nodes-token (line 417); inputs (`app-id`, `private-key`, `owner`, `repositories`) and the `token` output are unchanged in v3 — no other edits
     — **Why:** ticket AC "bumped or verified"; latest major is v3.2.0. v3 breaking changes checked: custom proxy handling removed (token steps run on hosted runners — no HTTP(S)_PROXY in play) and runner ≥ v2.327.1 for self-hosted (only the `release`-job site can land on the org pool; that step is `continue-on-error: true`, so a mint failure degrades the dispatch, not the release)
     — **Done when:** `grep -rn 'create-github-app-token@v' .github/workflows/` shows only `@v3` (4 sites) and all three files still parse via `yaml.safe_load`
     — **Consumers affected:** `pick-runner` in all 3 workflows; nodes-dispatch on release cuts
+    — **Done:** bumped create-github-app-token v2 to v3 at 3 pick-runner sites and v1 to v3 at the release.yml nodes-token; inputs/outputs unchanged; files: 3 workflow files; fixes: none
 
 ### Phase 5: Full gate
 - [ ] **5.1** Full gate on the final tree: `yaml.safe_load` parse of all three workflow files; invariant greps (zero `ubuntu-latest`, only `create-github-app-token@v3`); `git diff origin/main --stat` reviewed to confirm only the three workflow files changed
@@ -73,3 +74,5 @@ None (no `blocked-by`). Time constraint: Oct 19, 2026 migration date.
 GATE 78f0f43 tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
 
 GATE 7d07b2d tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
+
+GATE 7ba22aa tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a

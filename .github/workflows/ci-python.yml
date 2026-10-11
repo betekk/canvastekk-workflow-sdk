@@ -34,7 +34,7 @@ jobs:
       # Runner probe authenticates as the canvastekk-config-manager GitHub
       # App (org "Self-hosted runners: read-only") — a short-lived per-run
       # installation token, not a personal org PAT.
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ vars.GH_APP_ID }}
