@@ -1,0 +1,220 @@
+name: Python CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'python/**'
+      - '.agents/skills/**'
+      - '.github/workflows/ci-python.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'python/**'
+      - '.agents/skills/**'
+      - '.github/workflows/ci-python.yml'
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
+  # Use an org `local` self-hosted runner (org pool) when one is online+idle,
+  # else ubuntu-24.04. Probe/API failures degrade to ubuntu-24.04 with a
+  # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
+  # loudly (by design — managed credentials).
+  pick-runner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+    steps:
+      # Runner probe authenticates as the canvastekk-config-manager GitHub
+      # App (org "Self-hosted runners: read-only") — a short-lived per-run
+      # installation token, not a personal org PAT.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      - id: pick
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          probe() {
+            gh api orgs/${{ github.repository_owner }}/actions/runners --paginate \
+              --jq '[.runners[] | select(.labels[].name=="local") | select(.status=="online" and .busy==false)] | length' 2>/dev/null
+          }
+          # Retry: a transient API failure must not cost us the local pool
+          # when runners are actually idle. --paginate applies the jq filter
+          # PER PAGE (one count line per page) — never capture that raw into
+          # a shell variable; awk sums the pages into one scalar. The
+          # `if pages=$(probe)` form keeps Actions' default `bash -e` from
+          # errexiting the retry/degrade machinery on a hard API failure.
+          idle=""
+          for attempt in 1 2 3; do
+            if pages=$(probe); then
+              idle=$(printf '%s\n' "$pages" | awk 'NR>0 { s+=$1 } END { print s+0 }')
+              if [ "$idle" -gt 0 ]; then break; fi
+            fi
+            sleep 2
+          done
+          if [ -n "$idle" ] && [ "$idle" -gt 0 ]; then
+            echo "Local pool: $idle idle runner(s) — routing to self-hosted."
+            echo 'labels=["self-hosted","local"]' >> "$GITHUB_OUTPUT"
+          elif [ -z "$idle" ]; then
+            # Probe failed 3x: distinguish from a genuinely busy pool so the
+            # degradation is visible instead of silent.
+            echo "::warning::Runner probe failed after 3 attempts — degrading to ubuntu-24.04. Check GH_APP_ID / GH_APP_PRIVATE_KEY (canvastekk-config-manager app)."
+            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "Local pool busy (0 idle) — routing to ubuntu-24.04."
+            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  # DA-3160: workflow-level defaults.run.working-directory (<lang>/) applies to
+  # every run step INCLUDING this gate — but pick-runner has no checkout, so
+  # that directory does not exist at gate time and bash cannot start
+  # (evidence: PR #82 first runs, 2026-09-28). Override at job scope.
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+  # C11 (#101): the quality lane folds onto betekk-gha reusable-ci-python.
+  # Reusable-calling jobs can't carry strategy.matrix — the dual-python
+  # support (3.12 + 3.13) becomes two explicit calls. poetry-install-args
+  # rides v1.3.28 (-E fastapi: PEP 621 optional dep the test suite
+  # imports). run-mypy: false preserves the pre-fold gate set (no mypy
+  # config today); the coverage artifact upload is dropped — zero
+  # consumers (grep-verified), the xml report still generates in-run.
+  quality-312:
+    name: Quality (py3.12)
+    needs: [pick-runner]
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-python.yml@v1.3.28
+    with:
+      runner-labels: ${{ needs.pick-runner.outputs.labels }}
+      python-version: '3.12'
+      working-directory: python
+      poetry-install-args: '-E fastapi'
+      run-mypy: false
+      pytest-args: '-v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml'
+
+  quality-313:
+    name: Quality (py3.13)
+    needs: [pick-runner]
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-python.yml@v1.3.28
+    with:
+      runner-labels: ${{ needs.pick-runner.outputs.labels }}
+      python-version: '3.13'
+      working-directory: python
+      poetry-install-args: '-E fastapi'
+      run-mypy: false
+      pytest-args: '-v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml'
+
+  schema-stability:
+    name: Manifest schema stability
+    needs: [pick-runner]
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Check path filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            schema_files:
+              - 'python/canvastekk_workflow_sdk/definition.py'
+              - 'python/canvastekk_workflow_sdk/workflow/models.py'
+              - 'python/canvastekk_workflow_sdk/workflow/__init__.py'
+              - 'python/canvastekk_workflow_sdk/__init__.py'
+
+      - name: Skip (no schema files changed)
+        if: steps.filter.outputs.schema_files != 'true'
+        run: echo "No schema-relevant files changed — skipping stability check."
+
+      - name: Checkout base
+        if: steps.filter.outputs.schema_files == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - name: Checkout PR
+        if: steps.filter.outputs.schema_files == 'true'
+        uses: actions/checkout@v6
+        with:
+          path: pr
+
+      - name: Set up Python
+        if: steps.filter.outputs.schema_files == 'true'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        if: steps.filter.outputs.schema_files == 'true'
+        run: pip install "poetry>=2.2"
+
+      - name: Install dependencies (base)
+        if: steps.filter.outputs.schema_files == 'true'
+        working-directory: base/python
+        run: python -m poetry install --no-interaction
+
+      - name: Install dependencies (PR)
+        if: steps.filter.outputs.schema_files == 'true'
+        working-directory: pr/python
+        run: python -m poetry install --no-interaction
+
+      - name: Generate schema (base)
+        if: steps.filter.outputs.schema_files == 'true'
+        working-directory: base/python
+        # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes make fixed paths cross-run collision points
+        run: python -m poetry run python scripts/check_schema_stability.py dump > "$RUNNER_TEMP/schema-base.json"
+
+      - name: Generate schema (PR)
+        if: steps.filter.outputs.schema_files == 'true'
+        working-directory: pr/python
+        run: python -m poetry run python scripts/check_schema_stability.py dump > "$RUNNER_TEMP/schema-pr.json"
+
+      - name: Diff and classify
+        id: diff
+        if: steps.filter.outputs.schema_files == 'true'
+        working-directory: pr/python
+        run: python3 scripts/check_schema_stability.py diff "$RUNNER_TEMP/schema-base.json" "$RUNNER_TEMP/schema-pr.json"
+
+      - name: Enforce 'major' label requirement
+        if: steps.filter.outputs.schema_files == 'true' && steps.diff.outputs.breaking == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # --repo is required: the checkouts live in base/ and pr/ subdirectories,
+          # so gh cannot discover the repository from a .git at the workspace root
+          # (first exercised by a breaking diff — DA-2627).
+          LABELS=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name')
+          if echo "$LABELS" | grep -qw 'major'; then
+            echo "::warning::Breaking schema changes detected — 'major' label is present, proceeding."
+          else
+            echo "::error::Breaking schema changes detected without 'major' label."
+            echo "::error::Add the 'major' label to acknowledge, or revert the breaking changes."
+            exit 1
+          fi
+
+  skill-mirror-guard:
+    name: Skill mirrors match bundled canonical
+    needs: [pick-runner]
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: diff -r .agents/skills vs python/canvastekk_workflow_sdk/data/skills
+        run: diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills
