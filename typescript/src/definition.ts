@@ -132,6 +132,72 @@ function validateFileFieldFormats(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Serving contract (D8, #110): the manifest declares HOW a node serves.
+// Mirrors python/canvastekk_workflow_sdk/definition.py — identical closed
+// vocabulary, minimum set, and duplicate rules (parity: same change).
+// ---------------------------------------------------------------------------
+
+export const CONTRACT_ROUTE_VOCABULARY = [
+  "/execute",
+  "/health",
+  "/manifest",
+  "/hook",
+  "/metrics",
+  "/live",
+  "/ready",
+] as const;
+
+export type ContractRoute = (typeof CONTRACT_ROUTE_VOCABULARY)[number];
+
+const MINIMUM_CONTRACT_ROUTES: readonly string[] = ["/execute", "/health", "/manifest"];
+
+export const ContractCapabilitiesSchema = z.object({
+  dry_run: z.boolean().default(false),
+});
+
+export type ContractCapabilities = z.infer<typeof ContractCapabilitiesSchema>;
+
+export const NodeContractSchema = z
+  .object({
+    transport: z.literal("http").default("http"),
+    routes: z.array(z.string()),
+    capabilities: ContractCapabilitiesSchema.default(ContractCapabilitiesSchema.parse({})),
+    openapi: z.literal("3.2").default("3.2"),
+  })
+  .superRefine((contract, ctx) => {
+    const seen = new Set<string>();
+    for (const route of contract.routes) {
+      if (!(CONTRACT_ROUTE_VOCABULARY as readonly string[]).includes(route)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["routes"],
+          message: `NodeContract.routes: '${route}' is outside the closed vocabulary ${[...CONTRACT_ROUTE_VOCABULARY].sort()}`,
+        });
+        continue;
+      }
+      if (seen.has(route)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["routes"],
+          message: `NodeContract.routes: duplicate route '${route}'`,
+        });
+        continue;
+      }
+      seen.add(route);
+    }
+    const missing = MINIMUM_CONTRACT_ROUTES.filter((r) => !seen.has(r));
+    if (missing.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["routes"],
+        message: `NodeContract.routes: missing required route(s) ${missing.sort()} (every conforming node serves /execute, /health, /manifest)`,
+      });
+    }
+  });
+
+export type NodeContract = z.infer<typeof NodeContractSchema>;
+
 const WorkflowNodeManifestObjectSchema = z
   .object({
     id: z.unknown().optional(),
@@ -209,6 +275,9 @@ const WorkflowNodeManifestObjectSchema = z
       })
       .nullable()
       .default(null),
+    // Serving contract (D8, #110). Self-hosted authors declare what they
+    // serve; SDK-served nodes serialize the adapter-stamped default.
+    contract: NodeContractSchema.nullable().default(null),
   })
   .transform((data, ctx) => {
     const { id: _id, ...rest } = data;

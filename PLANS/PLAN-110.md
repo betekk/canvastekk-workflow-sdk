@@ -45,14 +45,16 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
     — **Done:** TestNodeContract class — 10 cases covering the full matrix + effective_contract default/declared; files: tests/test_definition.py; fixes: none.
 
 ### Phase 2: TypeScript ContractSpec + tests (SAME change — parity rule)
-- [ ] **2.1** Mirror in typescript/src/definition.ts: `ContractCapabilitiesSchema`, `NodeContractSchema` (zod) with the SAME closed vocabulary, minimum-set, duplicate, and literal constraints; `contract: NodeContractSchema.nullable().default(null)` on WorkflowNodeManifestObjectSchema.
+- [x] **2.1** Mirror in typescript/src/definition.ts: `ContractCapabilitiesSchema`, `NodeContractSchema` (zod) with the SAME closed vocabulary, minimum-set, duplicate, and literal constraints; `contract: NodeContractSchema.nullable().default(null)` on WorkflowNodeManifestObjectSchema.
     — **Why:** AC1 — identical accept/reject behavior both languages; the parity learning exists because a one-sided validator loop once shipped.
     — **Done when:** schema parses the same fixture set as pydantic (same cases pass/fail).
     — **Consumers affected:** 10 zod callers inherit the field (additive, nullable default).
-- [ ] **2.2** TS unit tests (definition.test.ts): the same accept/reject matrix + nullable default.
+    — **Done:** CONTRACT_ROUTE_VOCABULARY + ContractCapabilitiesSchema + NodeContractSchema (superRefine named errors) + nullable-default contract field; tsc + eslint green; files: typescript/src/definition.ts; fixes: worktree needed npm ci (no shared node_modules).
+- [x] **2.2** TS unit tests (definition.test.ts): the same accept/reject matrix + nullable default.
     — **Why:** AC1's zod half; identical matrix = the parity test.
     — **Done when:** `vitest run typescript/tests/definition.test.ts` green with mirrored cases.
     — **Consumers affected:** none (tests).
+    — **Done:** 6 mirrored cases (vocab/min/dup/accept + nullable round-trip) — 53 passed; files: typescript/tests/definition.test.ts; fixes: none.
 
 ### Phase 3: Adapters stamp the contract
 - [ ] **3.1** fastapi `create_node_app`: serve the contract on `/manifest` via a derived property — `WorkflowNodeManifest.effective_contract` (returns the declared `contract` when set, else the SDK-served default: transport http, the 7 mounted routes, dry_run False, openapi 3.2). The adapter MUTATES nothing; the property is the stamp (arch fold: single-writer discipline, matches `effective_runtime_seconds` precedent at definition.py:299).
@@ -104,3 +106,4 @@ None (root of the SDK slice). Blocks: SDK #111/#112/#113 (consume contract shape
 
 ## Trace
 GATE 2a5d587 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
+GATE cfb731b tier=light lint=t typecheck=t build=- unit=t e2e=n.a
