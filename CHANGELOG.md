@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.45.0] - 2026-10-11
+
+### Features
+
+- **sdk**: Verifier derives probes from manifest + capability-gated dry-run positive probe (#118)
+
+
 ## [0.44.1] - 2026-10-11
 
 ### Miscellaneous Tasks
 
 - **workflows**: Pin runner image to ubuntu-24.04 + bump create-github-app-token to v3 (#117)
+- **release**: Prepare v0.44.1
 
 
 ## [0.44.0] - 2026-10-11
