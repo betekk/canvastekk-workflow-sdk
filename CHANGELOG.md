@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.43.1] - 2026-10-11
+
+### Miscellaneous Tasks
+
+- **config**: Allow civiltekk-pr-workflow-skill in project config
+
+
 ## [0.43.0] - 2026-10-10
 
 ### Features
 
 - Framework-optional core + registration-time route verifier (#109) (**BREAKING**)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.43.0
 
 
 ## [0.42.0] - 2026-10-10
