@@ -6,7 +6,7 @@
 
 ## Acceptance Criteria
 - [ ] probe list = declared routes (no hardcoded route list remains in the verifier)
-- [ ] positive probe fires iff `capabilities.dry_run` declared; absent capability → skipped, not failed
+- [ ] positive probe fires iff `--dry-run` passed AND `capabilities.dry_run` declared (grilled 2026-10-11: registration-time verify stays passive); otherwise skipped, not failed
 - [ ] `verify --dry-run` prints per-route PASS/FAIL and exits non-zero on any FAIL
 - [ ] a deliberately broken route fails the check at the right route name
 
@@ -23,16 +23,18 @@ TS side: no verifier exists (`typescript/src` has no verify command) — parity 
 ## Implementation Phases
 
 ### Phase 1: Manifest-derived probe list
-- [ ] **1.1** Rewrite `verify_node` to fetch `GET /manifest` first (200 + valid `WorkflowNodeManifest` = the existing /manifest check), derive the probe list from the manifest's effective contract routes (`manifest.contract` or the SDK-served default via `effective_contract`), and generate one `RouteCheck` per derived route (health-family GETs → expect non-5xx with 200 preferred; `/manifest` keeps the body-validation check; `/execute` keeps the malformed-payload 4xx negative probe; other declared routes → must respond without 5xx). No hardcoded route list remains; a 404/5xx/unreachable on any derived route FAILs under that route's name.
+- [x] **1.1** Rewrite `verify_node` to fetch `GET /manifest` first (200 + valid `WorkflowNodeManifest` = the existing /manifest check), derive the probe list from the manifest's effective contract routes (`manifest.contract` or the SDK-served default via `effective_contract`), and generate one `RouteCheck` per derived route (health-family GETs → expect non-5xx with 200 preferred; `/manifest` keeps the body-validation check; `/execute` keeps the malformed-payload 4xx negative probe; other declared routes → must respond without 5xx). No hardcoded route list remains; a 404/5xx/unreachable on any derived route FAILs under that route's name.
     — **Why:** AC1 + AC4 — conformance must be derived from the node's own declaration (D8/#110), and a broken declared route must fail under its own name, not silently pass a 3-route checklist
     — **Done when:** `test_conformance.py` passes with cases: derived-probe-count matches a declared 4-route contract; a 404 on a declared extra route yields `FAIL` with that route's name; minimum-route node (3 routes) behaves as today; ruff clean on the file
     — **Consumers affected:** `registry.py` registration `verify=True` (signature unchanged — passive behavior preserved via new `dry_run: bool = False` default); CLI output gains derived per-route lines
+    — **Done:** verify_node now fetches /manifest first, derives probes from effective_contract.routes, per-family expectations (GET presence, execute negative, POST presence); tests updated+added (15 pass), ruff clean; files: conformance.py, test_conformance.py; fixes: 2 test-expectation fixes (dry-run skip line counts)
 
 ### Phase 2: Dry-run positive probe (flag + capability gated)
-- [ ] **2.1** Add `dry_run: bool = False` to `verify_node`; when True AND the manifest declares `contract.capabilities.dry_run`, fire one positive probe: `POST /execute` with `{"dry_run": true, "inputs": <type-seeded dummies from input_schema required fields>}` expecting 2xx; recorded as its own `RouteCheck("POST /execute (dry-run)", ...)` — a non-2xx or unreachable FAILs under that name. Capability absent → the probe is skipped with a `SKIPPED` RouteCheck detail line, never a FAIL. Wire note: the request flag is the top-level `dry_run` boolean (the #111 contract; SDK harness semantics live in #111 — this probe asserts transport conformance only, not side-effect freedom).
+- [x] **2.1** Add `dry_run: bool = False` to `verify_node`; when True AND the manifest declares `contract.capabilities.dry_run`, fire one positive probe: `POST /execute` with `{"dry_run": true, "inputs": <type-seeded dummies from input_schema required fields>}` expecting 2xx; recorded as its own `RouteCheck("POST /execute (dry-run)", ...)` — a non-2xx or unreachable FAILs under that name. Capability absent → the probe is skipped with a `SKIPPED` RouteCheck detail line, never a FAIL. Wire note: the request flag is the top-level `dry_run` boolean (the #111 contract; SDK harness semantics live in #111 — this probe asserts transport conformance only, not side-effect freedom).
     — **Why:** AC2 — a safe positive path gated on the node's own declaration; the flag gate keeps registration-time `verify=True` passive against production nodes
     — **Done when:** tests cover: capability declared + flag → positive probe fires (2xx mock → PASS; 500 mock → FAIL at `POST /execute (dry-run)`); capability declared + no flag → skipped; capability absent + flag → skipped; ruff clean
     — **Consumers affected:** CLI (`--dry-run` in Phase 3); registry path unchanged (default False)
+    — **Done:** dry_run flag AND capability gate added; positive probe seeds inputs from input_schema; skip recorded as ok RouteCheck; 4 new tests; files: conformance.py, test_conformance.py; fixes: none
 
 ### Phase 3: CLI `--dry-run` flag
 - [ ] **3.1** Extend the `verify` command parser in `__main__.py` with `--dry-run`, thread it to `verify_node(dry_run=...)`, keep the per-route PASS/FAIL print and the non-zero exit on any FAIL (existing `sys.exit(0 if report.ok else 1)`), and update the help line.
@@ -60,3 +62,6 @@ blocked-by: #110 (merged via #116). #111 is NOT a blocker per the ticket declara
 - #111 wire-field drift → single pinned field name; review-time reconciliation.
 
 ## Trace
+
+
+LOG Phases 1+2 landed as one commit — verify_node rewritten as a unit; per-phase split would be git theater (deviation visible here, gates ran scoped per concern).
