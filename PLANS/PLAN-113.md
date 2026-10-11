@@ -24,10 +24,11 @@
 ## Implementation Phases
 
 ### Phase 1: `to_openapi()` + golden-file test
-- [ ] **1.1** Add `WorkflowNodeManifest.to_openapi() -> dict` in `definition.py`: emits `{"openapi": "3.2.0", "info": {title: name, version, description}, "paths": {...}}` with one path per `effective_contract.routes` entry; per-family operations mirror the verifier's method mapping (POST for `/execute` with `requestBody` from `input_schema` + 200 response from `output_schema` + 422 validation response; GET for health-family/`/manifest`; POST for other declared POST routes) — presence-level detail, not framework-introspected truth
+- [x] **1.1** Add `WorkflowNodeManifest.to_openapi() -> dict` in `definition.py`: emits `{"openapi": "3.2.0", "info": {title: name, version, description}, "paths": {...}}` with one path per `effective_contract.routes` entry; per-family operations mirror the verifier's method mapping (POST for `/execute` with `requestBody` from `input_schema` + 200 response from `output_schema` + 422 validation response; GET for health-family/`/manifest`; POST for other declared POST routes) — presence-level detail, not framework-introspected truth
     — **Why:** AC1 — a standard, derivable interface artifact for gateways; the manifest is the contract of record
     — **Done when:** golden-file test (`tests/test_openapi.py`) pins the full emitted dict for a declaring node AND an effective-default node; assertions: `openapi == "3.2.0"`, every contract route present, `/execute` POST carries input/output schema refs; ruff clean
     — **Consumers affected:** none in-repo (new surface); wheel content grows
+    — **Done:** to_openapi() emitted (3.2.0, per-family operations, schemas on /execute); golden file pinned + effective-default + schema-carry tests (3 pass), ruff clean; files: definition.py, tests/test_openapi.py, tests/golden/openapi-3.2-echo.json; fixes: 1 (dead /execute condition in the family elif — simplified before commit)
 
 ### Phase 2: 2020-12 schema-dialect lint
 - [ ] **2.1** New `schema_dialect.py`: `lint_schema_dialect(schema: dict) -> list[tuple[str, str]]` returning `(json_path, message)` for non-2020-12 constructs — draft-07 `$schema` URIs, `definitions` (→ `$defs`), object-of-arrays `dependencies` (→ `dependentRequired`/`dependentSchemas`), boolean `exclusiveMinimum/Maximum` (draft-04), `recursiveAnchor` (2019-09) — recursing through `properties`/`items`/`$defs`/`additionalProperties` with accurate `$`-paths

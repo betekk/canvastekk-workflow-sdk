@@ -636,6 +636,68 @@ class WorkflowNodeManifest(BaseModel):
         """Convert to dictionary for JSON serialization."""
         return self.model_dump(mode="json")
 
+    def to_openapi(self) -> dict[str, Any]:
+        """Emit an OpenAPI 3.2.0 document describing this node's HTTP interface.
+
+        The manifest is the contract of record (see docs/EXTERNAL-AUTHOR-GUIDE.md
+        "OpenAPI reconciliation"): gateways and the engine read THIS document,
+        not a framework-served one. Operations are derived per contract-route
+        family — presence-level detail by design; framework introspection is
+        the served doc's job, not the manifest's.
+        """
+        contract = self.effective_contract
+        paths: dict[str, Any] = {}
+        for route in contract.routes:
+            if route == "/execute":
+                paths[route] = {
+                    "post": {
+                        "summary": f"Execute {self.name}",
+                        "requestBody": {
+                            "required": True,
+                            "content": {"application/json": {"schema": self.input_schema}},
+                        },
+                        "responses": {
+                            "200": {
+                                "description": "Execution result",
+                                "content": {"application/json": {"schema": self.output_schema}},
+                            },
+                            "422": {"description": "Input validation failure"},
+                        },
+                    }
+                }
+            elif route == "/manifest":
+                paths[route] = {
+                    "get": {
+                        "summary": f"Manifest for {self.name}",
+                        "responses": {
+                            "200": {"description": "This node's WorkflowNodeManifest"}
+                        },
+                    }
+                }
+            elif route == "/hook":
+                paths[route] = {
+                    "post": {
+                        "summary": f"POST {route} ({self.name})",
+                        "responses": {"200": {"description": "Accepted"}},
+                    }
+                }
+            else:
+                paths[route] = {
+                    "get": {
+                        "summary": f"GET {route} ({self.name})",
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+        return {
+            "openapi": "3.2.0",
+            "info": {
+                "title": self.name,
+                "version": self.version,
+                "description": self.description,
+            },
+            "paths": paths,
+        }
+
 
 def export_definition(
     definition: WorkflowNodeManifest,
