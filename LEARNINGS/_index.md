@@ -39,3 +39,4 @@
 - [selfhosted-exit127-toolcache-triage](patterns/selfhosted-exit127-toolcache-triage.md) — exit 127 loading libpythonX.so on self-hosted = corrupted setup-python toolcache; ops purge fixes it, reruns are a lottery
 - [local-red-ci-green-means-env-drift](patterns/local-red-ci-green-means-env-drift.md) — CI-green/local-red divergence is env drift until proven otherwise; diff installed pins vs lock before recording baseline failures (engine minimum_sdk_version/#123)
 - [registry-wheel-pin-triple](conventions/registry-wheel-pin-triple.md) — SDK wheel bumps move script + pyproject + poetry.lock together; CASA's drift test enforces it
+- [blanket-version-string-replace-corrupts-urls](anti-patterns/blanket-version-string-replace-corrupts-urls.md) — s|vX|vY| on pinned wheel URLs leaves the bare filename behind; full-URL replaces only, verify tag/filename agreement
