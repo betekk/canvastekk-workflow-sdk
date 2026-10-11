@@ -552,7 +552,9 @@ def main() -> None:
         print("  diff <old.json> <new.json> [--json]   Classify breaking changes between manifests")
         print("  init [--agents-md] [--force]          Scaffold AI agent skills into your project")
         print(
-            "  verify <url> [--api-key KEY] [--timeout S]  Probe a deployed node's HTTP contract"
+            "  verify <url> [--api-key KEY] [--timeout S] [--dry-run]"
+            "  Probe a node's HTTP contract; --dry-run opts in to the positive"
+            "  execute probe when the node declares the capability"
         )
         print()
         print("Options:")
@@ -573,6 +575,7 @@ def main() -> None:
         url: str | None = None
         v_api_key: str | None = None
         v_timeout = 10.0
+        v_dry_run = False
         v_rest = args[1:]
         i = 0
         while i < len(v_rest):
@@ -582,17 +585,23 @@ def main() -> None:
             elif v_rest[i] == "--timeout" and i + 1 < len(v_rest):
                 v_timeout = float(v_rest[i + 1])
                 i += 2
+            elif v_rest[i] == "--dry-run":
+                v_dry_run = True
+                i += 1
             elif not url:
                 url = v_rest[i]
                 i += 1
             else:
                 i += 1
         if not url:
-            print("Usage: python -m canvastekk_workflow_sdk verify <url> [--api-key KEY] [--timeout S]", file=sys.stderr)
+            print(
+                "Usage: python -m canvastekk_workflow_sdk verify <url> [--api-key KEY] [--timeout S] [--dry-run]",
+                file=sys.stderr,
+            )
             sys.exit(2)
         from canvastekk_workflow_sdk.conformance import verify_node
 
-        report = verify_node(url, timeout=v_timeout, api_key=v_api_key)
+        report = verify_node(url, timeout=v_timeout, api_key=v_api_key, dry_run=v_dry_run)
         print(report.summary())
         sys.exit(0 if report.ok else 1)
 
