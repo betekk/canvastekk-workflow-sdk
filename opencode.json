@@ -8,5 +8,8 @@
         "disabled": false
       }
     }
-  }
+  },
+  "permissions": [
+    { "action": "skill", "resource": "civiltekk-pr-workflow-skill", "effect": "allow" }
+  ]
 }
