@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.44.1] - 2026-10-11
+
+### Miscellaneous Tasks
+
+- **workflows**: Pin runner image to ubuntu-24.04 + bump create-github-app-token to v3 (#117)
+
+
 ## [0.44.0] - 2026-10-11
 
 ### Features
 
 - **manifest**: Manifest declares its serving contract (ContractSpec) (#110) (#116)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.44.0
 
 
 ## [0.43.1] - 2026-10-11
