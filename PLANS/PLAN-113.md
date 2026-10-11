@@ -44,10 +44,11 @@ TS side: no verifier exists (`typescript/src` has no verify command) — parity 
     — **Done:** --dry-run parsed and threaded to verify_node; help text updated; CLI threading test added (16 pass); files: __main__.py, test_conformance.py; fixes: 2 (help-string literal split across lines broke syntax — repaired with concatenated literals)
 
 ### Phase 4: Full gate
-- [ ] **4.1** Full gate on the final tree: python legs (ruff check + pytest) green; TS legs n/a (no TS files touched — justified deviation noted in Trace); `git diff origin/main --stat` scope check (conformance.py, `__main__.py`, test_conformance.py, PLAN only)
+- [x] **4.1** Full gate on the final tree: python legs (ruff check + pytest) green; TS legs n/a (no TS files touched — justified deviation noted in Trace); `git diff origin/main --stat` scope check (conformance.py, `__main__.py`, test_conformance.py, PLAN only)
     — **Why:** ticket exit gate — the last verification before PR
     — **Done when:** ruff + pytest green on the final tree; diff scope exactly as listed; `GATE <sha> tier=full` memo appended
     — **Consumers affected:** none beyond the above
+    — **Done:** full gate on final tree: ruff clean (whole python pkg), pytest 695 passed / 14 failed — all 14 proven pre-existing on clean origin/main (fastapi-env gaps, same tests fail on base), 4 fastapi-lane modules unrunnable locally (INCONCLUSIVE -> CI is the unconditional re-run); diff scope = 4 planned files; files: none (verification); fixes: none
 
 ## Technical Notes
 - Probe expectations by family (documented in `conformance.py` docstring): GET routes → 200 expected for /health, /manifest, /live, /ready (non-5xx tolerated as PASS with a detail note; 404/5xx FAIL); POST /execute → malformed payload must 4xx (negative, unchanged) + capability-gated dry-run positive.
@@ -66,3 +67,6 @@ blocked-by: #110 (merged via #116). #111 is NOT a blocker per the ticket declara
 
 
 LOG Phases 1+2 landed as one commit — verify_node rewritten as a unit; per-phase split would be git theater (deviation visible here, gates ran scoped per concern).
+
+GATE cd001ba tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+LOG Exit gate (ticket): full — ruff (repo python) + pytest 695-pass subset on cd001ba; 14 env failures + 4 fastapi-collection modules verified identical on clean origin/main (baseline worktree /tmp/opencode/base113); TS legs n.a. (no TS files touched).
