@@ -5,10 +5,10 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] AC1: contract block validated by pydantic AND zod with identical accept/reject behavior — both validator loops + parity tests land in ONE change (repo learning: validator loops must cover new fields)
-- [ ] AC2: closed route vocabulary enforced; manifests missing execute/health/manifest rejected with a named-field error
-- [ ] AC3: fastapi and express adapters stamp ContractSpec with zero author input
-- [ ] AC4: `build_registry_payload` includes the contract; TestBuildRegistryPayload pins it
+- [x] AC1: contract block validated by pydantic AND zod with identical accept/reject behavior — both validator loops + parity tests land in ONE change (repo learning: validator loops must cover new fields)
+- [x] AC2: closed route vocabulary enforced; manifests missing execute/health/manifest rejected with a named-field error
+- [x] AC3: fastapi and express adapters stamp ContractSpec with zero author input
+- [x] AC4: `build_registry_payload` includes the contract; TestBuildRegistryPayload pins it
 
 ## Dependency & Consumer Map
 
@@ -81,14 +81,16 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
     — **Done:** buildRegistryPayload (TS single source; buildEngineRequest delegates) mirrors the same constraints merge — 2 cli.test.ts cases; full suites green (py 848, ts 387).
 
 ### Phase 5: Full gate + LEARNINGS
-- [ ] **5.1** Full gate: python (ruff + pytest) and typescript (eslint + tsc --noEmit + tsc tests + vitest) — all green on the same tree.
+- [x] **5.1** Full gate: python (ruff + pytest) and typescript (eslint + tsc --noEmit + tsc tests + vitest) — all green on the same tree.
     — **Why:** ticket exit gate is unconditionally full; dual-language change needs both stacks gated.
     — **Done when:** `GATE <sha> tier=full` memo with all six legs true.
     — **Consumers affected:** PR workflow cites it.
-- [ ] **5.2** LEARNINGS capture if anything non-obvious surfaced (candidate: wire-placement rule — additive manifest fields that must cross an extra=forbid request ride an existing free-form dict until the receiver widens).
+    — **Done:** six legs green on 761ebf4 (ruff check, pytest 848, eslint, tsc src, tsc tests, vitest 387, tsup build); ruff-format NOT a repo gate (37 files unformatted at base — CI runs ruff check only, verified in ci-python.yml:109); files: —; fixes: stale-stash pop conflict in package-lock.json restored to HEAD (pre-existing stash untouched).
+- [x] **5.2** LEARNINGS capture if anything non-obvious surfaced (candidate: wire-placement rule — additive manifest fields that must cross an extra=forbid request ride an existing free-form dict until the receiver widens).
     — **Why:** the constraints-placement decision is a reusable pattern for the engine-gate tickets ahead.
     — **Done when:** entries + index rows written (swept in the end-of-ticket commit).
     — **Consumers affected:** engine#658 implementers.
+    — **Done:** additive-field-crosses-extra-forbid-rides-freeform-dict written + index row; confirmed existing patterns applied (three-producer-rule, derived-bound-as-plain-property); files: LEARNINGS/solutions/*.md, LEARNINGS/_index.md.
 
 ## Technical Notes
 - Closed vocabulary (both languages, identical): "/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready" — exactly the routes both adapters mount today (app.py :334/:497/:530/:571/:608/:623/:633; app.ts :119/:200/:229/:269/:283/:288/:293). "/hook" is unconditional (501 unless overridden).
@@ -113,3 +115,5 @@ GATE 2a5d587 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
 GATE cfb731b tier=light lint=t typecheck=t build=- unit=t e2e=n.a
 GATE b043fef tier=light lint=t typecheck=t build=- unit=t e2e=n.a
 GATE 133a7aa tier=light lint=t typecheck=t build=- unit=t e2e=n.a
+GATE 761ebf4 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Exit gate (ticket): full — ruff check + pytest 848 (py), eslint + tsc src/tests + vitest 387 + tsup build (ts), all on 761ebf4; ruff-format not a repo gate (base-state verified).
