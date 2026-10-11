@@ -349,21 +349,6 @@ class WorkflowNodeManifest(BaseModel):
         "stays active until retired).",
     )
 
-    # SDK compatibility range (optional — exported via registry constraints; DA-1955)
-    minimum_sdk_version: str | None = Field(
-        default=None,
-        description="Minimum canvastekk-workflow-sdk version this node requires "
-        "(X.Y.Z). Exported in the register payload constraints so the engine can "
-        "flag incompatible hosts (drift report engine_compatible). DA-3359: "
-        "legacy — superseded by the stamped `sdk_version`; dual-written in "
-        "register payloads for one release and dropped in 0.38.",
-    )
-    maximum_sdk_version: str | None = Field(
-        default=None,
-        description="Maximum canvastekk-workflow-sdk version this node supports "
-        "(X.Y.Z, inclusive). Exported in the register payload constraints.",
-    )
-
     # DA-3359: SDK provenance is STAMPED, not declared. The stamp is computed
     # from the installed SDK version at instantiation; it is not a constructor
     # field (kwargs rejected) and the property is read-only (assignment
@@ -374,9 +359,10 @@ class WorkflowNodeManifest(BaseModel):
     @property
     def sdk_version(self) -> str:
         """Stamped SDK provenance (DA-3359): auto-filled from the installed
-        SDK version, read-only. Exported in register payload constraints
-        (with a legacy ``minimum_sdk_version`` dual-write for one release);
-        the engine's admission gate dual-reads either key."""
+        SDK version, read-only. Exported in register payload constraints as
+        the sole version key (the legacy ``minimum_sdk_version`` dual-write
+        and manifest range fields were removed in #123/D16 — versions are
+        provenance, never admission gates)."""
         return self._sdk_version
 
     @property
@@ -429,9 +415,8 @@ class WorkflowNodeManifest(BaseModel):
     def _drop_optional_when_none(self, handler: Callable[[WorkflowNodeManifest], dict[str, Any]]) -> dict[str, Any]:
         """Serialize the manifest, omitting optional keys when they are None.
 
-        Covers ``deprecation`` plus the DA-1955 optional fields
-        (``minimum_sdk_version``/``maximum_sdk_version``/``docs_url``/
-        ``changelog_url``). Nodes that do not set them serialize
+        Covers ``deprecation`` plus the optional fields
+        (``docs_url``/``changelog_url``). Nodes that do not set them serialize
         byte-identically to the pre-DA-1955 shape, which protects the
         ``/manifest`` endpoint and contract/stability consumers that compare
         serialized output. Covers every instance-serialization path
@@ -440,8 +425,6 @@ class WorkflowNodeManifest(BaseModel):
         data = handler(self)
         for optional_key in (
             "deprecation",
-            "minimum_sdk_version",
-            "maximum_sdk_version",
             "docs_url",
             "changelog_url",
             "contract",
@@ -524,15 +507,6 @@ class WorkflowNodeManifest(BaseModel):
     def _validate_version(cls, v: str) -> str:
         if not _SEMVER_PATTERN.fullmatch(v):
             raise ValueError(f"Node version must be semantic version (X.Y.Z). Got: '{v}'")
-        return v
-
-    @field_validator("minimum_sdk_version", "maximum_sdk_version")
-    @classmethod
-    def _validate_sdk_versions(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        if not _SEMVER_PATTERN.fullmatch(v):
-            raise ValueError(f"SDK version bounds must be semantic version (X.Y.Z). Got: '{v}'")
         return v
 
     @field_validator("docs_url", "changelog_url")

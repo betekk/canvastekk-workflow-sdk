@@ -52,10 +52,10 @@ class TestBuildEngineRequest:
             "constraints", "token_cost", "timeout_seconds", "deprecation",
         }
         assert set(payload) <= allowed
+        # #123: legacy manifest key stripped at parse; constraints carry the
+        # docs field + the stamped provenance (sole version key) only.
         assert payload["constraints"] == {
-            "minimum_sdk_version": "0.27.0",
             "docs_url": "https://docs.example.com/echo",
-            # DA-3359: the stamped provenance + legacy dual-write ride along
             "sdk_version": manifest.sdk_version,
         }
 

@@ -1147,50 +1147,47 @@ class TestSdkCompatAndDocsFields:
             assert key not in data
 
     def test_set_fields_round_trip(self) -> None:
-        """Set fields are present and valid after serialization."""
+        """Docs fields round-trip; removed version keys never serialize (#123)."""
         manifest = self._minimal().model_copy(
             update={
-                "minimum_sdk_version": "0.22.0",
-                "maximum_sdk_version": "1.0.0",
                 "docs_url": "https://example.com/docs",
                 "changelog_url": "https://example.com/changelog",
             }
         )
         data = manifest.to_dict()
-        assert data["minimum_sdk_version"] == "0.22.0"
-        assert data["maximum_sdk_version"] == "1.0.0"
         assert data["docs_url"] == "https://example.com/docs"
         assert data["changelog_url"] == "https://example.com/changelog"
+        assert "minimum_sdk_version" not in data
+        assert "maximum_sdk_version" not in data
 
-    def test_invalid_sdk_version_rejected(self) -> None:
-        """Compat fields must be strict MAJOR.MINOR.PATCH semver."""
-        import pydantic
+    def test_legacy_version_keys_ignored_at_construction(self) -> None:
+        """#123/D16: the range fields are gone — legacy manifests declaring
+        them (even invalid ones) parse cleanly; the key is dropped, never
+        validated, never serialized."""
+        manifest = WorkflowNodeManifest(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            minimum_sdk_version="0.22",
+        )
+        assert not hasattr(manifest, "minimum_sdk_version")
+        assert "minimum_sdk_version" not in manifest.to_dict()
 
-        with pytest.raises(pydantic.ValidationError):
-            WorkflowNodeManifest(
-                slug="echo",
-                version="1.0.0",
-                name="Echo",
-                description="Test",
-                input_schema={"type": "object"},
-                output_schema={"type": "object"},
-                minimum_sdk_version="0.22",
-            )
-
-    def test_invalid_sdk_version_prerelease_rejected(self) -> None:
-        """Pre-release tags are rejected, matching the version field's strictness."""
-        import pydantic
-
-        with pytest.raises(pydantic.ValidationError):
-            WorkflowNodeManifest(
-                slug="echo",
-                version="1.0.0",
-                name="Echo",
-                description="Test",
-                input_schema={"type": "object"},
-                output_schema={"type": "object"},
-                maximum_sdk_version="1.0.0-rc1",
-            )
+    def test_legacy_maximum_key_ignored_at_construction(self) -> None:
+        """#123: same drop-not-validate law for the ceiling key."""
+        manifest = WorkflowNodeManifest(
+            slug="echo",
+            version="1.0.0",
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            maximum_sdk_version="1.0.0-rc1",
+        )
+        assert not hasattr(manifest, "maximum_sdk_version")
 
     def test_non_http_url_rejected(self) -> None:
         """docs_url/changelog_url must be http(s)."""
@@ -1208,11 +1205,13 @@ class TestSdkCompatAndDocsFields:
             )
 
     def test_fields_optional_in_json_schema(self) -> None:
-        """Schema stability gate: new fields listed as optional, never required."""
+        """Schema stability gate: docs fields optional; version keys GONE (#123)."""
         schema = WorkflowNodeManifest.model_json_schema()
-        for key in ("minimum_sdk_version", "maximum_sdk_version", "docs_url", "changelog_url"):
+        for key in ("docs_url", "changelog_url"):
             assert key in schema["properties"]
             assert key not in schema.get("required", [])
+        for key in ("minimum_sdk_version", "maximum_sdk_version"):
+            assert key not in schema["properties"]
 
 
 class TestVocabularyCompatibility:

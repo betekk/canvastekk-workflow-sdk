@@ -9,11 +9,13 @@ Multi-language SDK for building CanvasTEKK Workflow Engine nodes. Each language 
 | Python | Available | `canvastekk-workflow-sdk` | [`python/`](./python/) |
 | TypeScript | Available | `@betekk/canvastekk-workflow-sdk` | [`typescript/`](./typescript/) |
 
+> **Feature parity rule:** every new SDK feature ships to both `python/` and `typescript/` in the same change — a feature is "done" only when both stacks have it (verified by mirrored tests).
+
 ## Features
 
 ### SDK Version in Manifest
 
-The `/manifest` endpoint auto-injects `sdk_version` (read from the installed package version). The engine uses this to verify SDK compatibility:
+The `/manifest` endpoint auto-injects `sdk_version` (read from the installed package version). The engine records it as advisory drift telemetry — compatibility is judged by the served contract, not the wheel version:
 
 ```json
 {
@@ -437,20 +439,19 @@ the engine additionally gates MAJOR bumps with schema diffs — update
 `workflow-definitions.json` and re-run
 `POST /api/internal/reseed?force_upgrade=true` to force the upgrade.
 
-### SDK Compatibility Range
+### SDK Provenance & Docs Fields
 
-Manifests can declare which engine/SDK versions they support. Values are
-exported through the registration payload's `constraints` channel:
+Node manifests carry a **stamped** `sdk_version` (computed from the installed SDK at instantiation — authors never set it) plus optional docs links. Both are exported through the registration payload's `constraints` channel:
 
 ```python
 definition = WorkflowNodeManifest(
     ...,
-    minimum_sdk_version="0.23.0",
-    maximum_sdk_version="1.0.0",
     docs_url="https://docs.example.com/my-node",
     changelog_url="https://docs.example.com/my-node/changelog",
 )
 ```
+
+The former `minimum_sdk_version` / `maximum_sdk_version` manifest fields were **removed** (v0.48, #123 / epic D16 *contract over versions*): versions are provenance metadata for the engine's drift report, never admission gates — node admission is judged by behavior (the live contract probe). Old manifests still declaring the legacy keys parse cleanly; the keys are silently dropped.
 
 ### Auth Shorthand
 

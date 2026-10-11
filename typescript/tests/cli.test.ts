@@ -81,14 +81,16 @@ describe("buildEngineRequest (DA-2603)", () => {
     expect(constraints["contract"]).toBeUndefined();
   });
 
-  it("maps sdk constraints and stays within the engine whitelist", () => {
+  it("maps sdk constraints and stays within the engine whitelist (#123: version keys stripped)", () => {
+    // #123/D16: a legacy manifest still declaring minimum_sdk_version parses
+    // cleanly (zod strips unknown) but the key NEVER reaches the engine request.
     const payload = buildEngineRequest(
       parseManifest({ ...canonicalManifest, minimum_sdk_version: "0.27.0", docs_url: "https://docs.example.com" }),
     );
     const constraints = payload["constraints"] as Record<string, unknown>;
-    expect(constraints.minimum_sdk_version).toBe("0.27.0");
+    expect(constraints).not.toHaveProperty("minimum_sdk_version");
     expect(constraints.docs_url).toBe("https://docs.example.com");
-    // DA-3359: the stamped provenance rides along
+    // DA-3359: the stamped provenance rides along — the sole version key
     expect(constraints.sdk_version).toBe(VERSION);
     const allowed = new Set([
       "name", "version", "label", "description", "input_schema", "output_schema",

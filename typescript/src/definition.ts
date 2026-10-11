@@ -262,26 +262,13 @@ const WorkflowNodeManifestObjectSchema = z
     role: WorkflowNodeRoleSchema,
     styles: WorkflowNodeStylesSchema.nullable().default(null),
     deprecation: DeprecationInfoSchema.nullable().default(null),
-    // DA-3359: SDK provenance is STAMPED (defaults to the installed VERSION);
-    // the legacy minimum/maximum fields stay optional for one release.
+    // DA-3359: SDK provenance is STAMPED (defaults to the installed VERSION).
+    // The legacy minimum/maximum range fields were removed in #123/D16 —
+    // versions are provenance, never admission gates.
     sdk_version: z
       .string()
       .default(VERSION)
       .readonly(),
-    minimum_sdk_version: z
-      .string()
-      .refine((v) => SEMVER_PATTERN.test(v), {
-        error: (iss) => `SDK version must be semantic version (X.Y.Z). Got: '${iss.input}'`,
-      })
-      .nullable()
-      .default(null),
-    maximum_sdk_version: z
-      .string()
-      .refine((v) => SEMVER_PATTERN.test(v), {
-        error: (iss) => `SDK version must be semantic version (X.Y.Z). Got: '${iss.input}'`,
-      })
-      .nullable()
-      .default(null),
     docs_url: z
       .string()
       .refine((v) => v.startsWith("http://") || v.startsWith("https://"), {
