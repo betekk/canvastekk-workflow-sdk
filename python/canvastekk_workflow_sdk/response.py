@@ -47,6 +47,16 @@ class NodeExecutionResponse(BaseModel):
         default=None,
         description="Structured error code (e.g., TIMEOUT, VALIDATION_ERROR)",
     )
+    dry_run: bool = Field(
+        default=False,
+        description=(
+            "D10 (#111): true when this response is a validation-only dry "
+            "run — inputs were fully validated, nothing executed, "
+            "token_usage is 0, and execution_id carries the 'dryrun-' "
+            "namespace. Always serialized (explicit semantics marker, not "
+            "an optional extra)"
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -72,6 +82,7 @@ class NodeExecutionResponse(BaseModel):
         outputs: dict[str, Any],
         duration_ms: int = 0,
         token_usage: float = 0.0,
+        dry_run: bool = False,
     ) -> NodeExecutionResponse:
         """Create a successful execution response.
 
@@ -80,6 +91,7 @@ class NodeExecutionResponse(BaseModel):
             outputs: Output values matching the node's output_schema.
             duration_ms: Execution time in milliseconds.
             token_usage: Tokens consumed during execution.
+            dry_run: D10 (#111) — mark this as a validation-only response.
 
         Returns:
             A :class:`NodeExecutionResponse` with ``status="pass"``.
@@ -90,6 +102,7 @@ class NodeExecutionResponse(BaseModel):
             outputs=outputs,
             duration_ms=duration_ms,
             token_usage=token_usage,
+            dry_run=dry_run,
         )
 
     @classmethod
@@ -100,6 +113,7 @@ class NodeExecutionResponse(BaseModel):
         error_type: str | None = None,
         duration_ms: int = 0,
         error_code: str | None = None,
+        dry_run: bool = False,
     ) -> NodeExecutionResponse:
         """Create a failed execution response.
 
@@ -121,6 +135,7 @@ class NodeExecutionResponse(BaseModel):
             error_type=error_type,
             duration_ms=duration_ms,
             error_code=error_code,
+            dry_run=dry_run,
         )
 
 

@@ -10,7 +10,15 @@ import pytest
 from fastapi import APIRouter, Depends, Request
 from fastapi.testclient import TestClient
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, __version__, create_node_app
+from canvastekk_workflow_sdk import (
+    BaseNode,
+    ContractCapabilities,
+    ExecutionContext,
+    NodeContract,
+    WorkflowNodeManifest,
+    __version__,
+    create_node_app,
+)
 
 
 class EchoNode(BaseNode):
@@ -1358,3 +1366,86 @@ class TestManifestContract:
         client = TestClient(create_node_app(node))
         data = client.get("/manifest").json()
         assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
+
+
+class TestDryRunExecution:
+    """D10 (#111): validation-only execution — the positive probe #112 automates."""
+
+    def _dry_run_body(self, **extra):
+        body = {"inputs": {"message": "hi"}, "run_id": "run-dry-1", "node_id": "n1", "dry_run": True}
+        body.update(extra)
+        return body
+
+    def _declaring_client(self) -> TestClient:
+        # EchoNode.definition is a CLASS attribute — deep-copy per test so the
+        # capability mutation never leaks into sibling tests.
+        class DryEchoNode(EchoNode):
+            definition = EchoNode.definition.model_copy(deep=True)
+
+        DryEchoNode.definition.contract = NodeContract(
+            routes=["/execute", "/health", "/manifest"],
+            capabilities=ContractCapabilities(dry_run=True),
+        )
+        return TestClient(create_node_app(DryEchoNode()))
+
+    def test_dry_run_on_declaring_node_passes_with_zero_cost(self) -> None:
+        """AC4/AC2: declaring node → pass, token 0, dryrun- id, no execution."""
+        client = self._declaring_client()
+        resp = client.post("/execute", json=self._dry_run_body())
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "pass"
+        assert data["dry_run"] is True
+        assert data["token_usage"] == 0.0
+        assert data["outputs"] == {}
+        assert data["execution_id"].startswith("dryrun-")
+
+    def test_dry_run_without_capability_fails_structured(self, echo_client: TestClient) -> None:
+        """Undeclared capability → failure response with DRY_RUN_NOT_SUPPORTED."""
+        resp = echo_client.post("/execute", json=self._dry_run_body())
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "fail"
+        assert data["dry_run"] is True
+        assert data["error_code"] == "DRY_RUN_NOT_SUPPORTED"
+
+    def test_dry_run_validates_inputs_first(self) -> None:
+        """AC2: full validation — invalid input fails BEFORE the dry-run branch."""
+        resp = self._declaring_client().post(
+            "/execute",
+            json=self._dry_run_body(inputs={"message": 12345}),  # wrong type
+        )
+        data = resp.json()
+        assert data["status"] == "fail"
+
+    def test_dry_run_never_executes_handler(self) -> None:
+        """AC2: zero executor invocation — the handler would explode."""
+        from canvastekk_workflow_sdk.base import BaseNode
+
+        class BoomNode(BaseNode):
+            definition = WorkflowNodeManifest(
+                slug="boom",
+                version="1.0.0",
+                name="Boom",
+                description="explodes if executed",
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+                contract=NodeContract(
+                    routes=["/execute", "/health", "/manifest"],
+                    capabilities=ContractCapabilities(dry_run=True),
+                ),
+            )
+
+            def execute(self, inputs, context):  # type: ignore[override]
+                raise AssertionError("dry_run must never invoke execute()")
+
+        node = BoomNode()
+        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+
+        resp = node.run(
+            NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, dry_run=True)
+        )
+        assert resp.status == "pass"
+        assert resp.dry_run is True
+        assert resp.execution_id.startswith("dryrun-")
+        assert resp.token_usage == 0.0

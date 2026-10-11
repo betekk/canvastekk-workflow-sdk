@@ -454,7 +454,8 @@ def create_node_app(
             else:
                 response = await asyncio.to_thread(node.run, exec_request)
 
-            if exec_request.output_upload_url and response.status == "pass":
+            if exec_request.output_upload_url and response.status == "pass" and not response.dry_run:
+                # D10 (#111): a dry-run pass carries no outputs — never upload.
                 file_output_fields = node.definition.file_output_fields
                 if file_output_fields:
                     try:

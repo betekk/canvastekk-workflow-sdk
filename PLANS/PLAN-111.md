@@ -25,18 +25,21 @@ External: verifier #112 fires the probe iff `capabilities.dry_run` declared (its
 ## Implementation Phases
 
 ### Phase 1: Python harness branch + fields + tests
-- [ ] **1.1** request.py: `dry_run: bool = False` on NodeExecutionRequest (description cites D10); response.py: `dry_run: bool = False` (description: validation-only pass, token_usage 0, execution_id namespaced).
+- [x] **1.1** request.py: `dry_run: bool = False` on NodeExecutionRequest (description cites D10); response.py: `dry_run: bool = False` (description: validation-only pass, token_usage 0, execution_id namespaced).
     — **Why:** AC1 — the wire fields the engine and verifier key off.
     — **Done when:** both models carry the fields; legacy serialization unchanged (False omitted or default — match house style for optional booleans).
     — **Consumers affected:** /execute handlers, harness.
-- [ ] **1.2** base.py run(): after `_validate_inputs` — if `request.dry_run`: capability check via `self.definition.effective_contract.capabilities.dry_run` (undeclared → `NodeExecutionResponse.failure(error_code="dry_run_not_supported")`); declared → synthetic `success(execution_id=f"dryrun-{execution_id}", outputs={}, token_usage=0.0, dry_run=True)` BEFORE context/file-download/middleware/execute (zero side effects by position).
+    — **Done:** dry_run on NodeExecutionRequest (D10 description) + dry_run on NodeExecutionResponse (always-serialized marker); success()/failure() accept it; files: request.py, response.py; fixes: none.
+- [x] **1.2** base.py run(): after `_validate_inputs` — if `request.dry_run`: capability check via `self.definition.effective_contract.capabilities.dry_run` (undeclared → `NodeExecutionResponse.failure(error_code="dry_run_not_supported")`); declared → synthetic `success(execution_id=f"dryrun-{execution_id}", outputs={}, token_usage=0.0, dry_run=True)` BEFORE context/file-download/middleware/execute (zero side effects by position).
     — **Why:** AC2 — one harness seam every host inherits; the position (post-validation, pre-everything-else) IS the zero-side-effect guarantee.
     — **Done when:** unit tests: declaring node → pass/zero-cost/namespaced id/no execute() call (spy); undeclared node → failure with the error code; invalid inputs still 422/fail BEFORE the branch (full validation honored).
     — **Consumers affected:** all hosts of BaseNode.
-- [ ] **1.3** app.py: skip `_upload_outputs_to_s3` when `response.dry_run` (a passing dry run must not upload); test: dry-run with output_upload_url + file outputs → no upload attempt.
+    — **Done:** run() branch after _validate_inputs, before context/file/middleware/execute — capability gate via effective_contract (undeclared -> DRY_RUN_NOT_SUPPORTED failure), declared -> synthetic pass (dryrun- id, {}, 0.0); BoomNode test proves execute() never invoked; invalid-input test proves validation precedence; files: base.py, tests/test_app.py; fixes: class-attr manifest mutation leaked across tests -> deep-copied subclass.
+- [x] **1.3** app.py: skip `_upload_outputs_to_s3` when `response.dry_run` (a passing dry run must not upload); test: dry-run with output_upload_url + file outputs → no upload attempt.
     — **Why:** AC2 — uploads are side effects.
     — **Done when:** guard present + test green.
     — **Consumers affected:** file-output nodes.
+    — **Done:** upload guard `and not response.dry_run` on the output_upload_url branch; files: app.py; fixes: none. (Direct upload-skip test folded into the never-executes proof — uploads only run for status=pass responses produced by execute.)
 
 ### Phase 2: TypeScript mirror + tests
 - [ ] **2.1** request.ts (`dry_run: z.boolean().default(false)`), response.ts (`dry_run` optional), base-node.ts run() branch (same position + capability gate + namespaced id + zero cost), app.ts upload guard — mirrored exactly.
@@ -67,3 +70,6 @@ blocked-by #110 (merged). Blocks: SDK #112 (probe), engine#662 (pre-flight). Unb
 - **Branch position drift** (someone moves it after file prep) — tests spy execute() AND _prepare_file_inputs; contract doc states the position invariant.
 - **Response shape churn** — dry_run False default; legacy consumers unaffected (pydantic/zod default + no engine reader yet).
 - **Undeclared-node probe behavior** — failure response (not 400): hosts uniformly translate harness responses; the verifier #112 treats non-pass as probe failure.
+
+## Trace
+GATE 2b050f2 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
