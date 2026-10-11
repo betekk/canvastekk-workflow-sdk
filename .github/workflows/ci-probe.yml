@@ -1,6 +1,9 @@
 name: Reusable load probe
 
 on:
+  push:
+    branches: [probe/reusable-load]
+    paths: [".github/workflows/ci-probe.yml"]
   pull_request:
     branches: [main]
     paths:
