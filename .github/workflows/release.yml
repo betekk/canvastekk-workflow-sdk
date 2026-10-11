@@ -29,7 +29,7 @@ jobs:
       # Runner probe authenticates as the canvastekk-config-manager GitHub
       # App (org "Self-hosted runners: read-only") — a short-lived per-run
       # installation token, not a personal org PAT.
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         id: app-token
         with:
           app-id: ${{ vars.GH_APP_ID }}
@@ -78,14 +78,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate changelog and determine next version
         id: git-cliff
-        uses: orhun/git-cliff-action@v4.8.0
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
         with:
           config: cliff.toml
           args: --bump
@@ -101,7 +101,7 @@ jobs:
 
       - name: Set up Python
         if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
@@ -285,7 +285,7 @@ jobs:
 
       - name: Set up Node.js
         if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
@@ -414,7 +414,7 @@ jobs:
         id: nodes-token
         if: success() && steps.git-cliff.outputs.version != ''
         continue-on-error: true
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           app-id: ${{ vars.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -424,7 +424,7 @@ jobs:
       - name: Notify Nodes repo of SDK release (dispatch rebuild)
         if: success() && steps.git-cliff.outputs.version != ''
         continue-on-error: true
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
         with:
           token: ${{ steps.nodes-token.outputs.token }}
           repository: betekk/canvastekk-workflow-nodes
