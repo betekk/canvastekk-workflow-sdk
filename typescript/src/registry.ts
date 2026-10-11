@@ -10,6 +10,23 @@ export type InvokeType = "http" | "lambda" | "sagemaker" | "in-process";
 
 const VALID_INVOKE_TYPES: Set<string> = new Set(["http", "lambda", "sagemaker", "in-process"]);
 
+/**
+ * Wire form for a registry credential (#135) — follows credential type.
+ *
+ * ``ctk_`` keys ride ``Authorization: Bearer <token>`` (the engine's
+ * DA-1949 ctk_ dispatch — an ``X-Service-Token`` carrying a ctk_ value
+ * never authenticates). Legacy service tokens keep ``X-Service-Token``
+ * byte-identically (dated bridge; the engine's #699 sweep removes that
+ * leg later). Mirror of the Python SDK's ``_registry_auth_header``
+ * (#134, wheel v0.51.0).
+ */
+export function registryAuthHeader(serviceToken: string): [string, string] {
+  if (serviceToken.startsWith("ctk_")) {
+    return ["Authorization", `Bearer ${serviceToken}`];
+  }
+  return ["X-Service-Token", serviceToken];
+}
+
 /** Result from node registration. */
 export interface RegisterNodeResult {
   node: Record<string, unknown>;
@@ -200,7 +217,9 @@ export async function registerNode(
     Accept: "application/json",
   };
   if (serviceToken) {
-    headers["X-Service-Token"] = serviceToken;
+    // #135: wire form follows credential type (ctk_ → Bearer).
+    const [authName, authValue] = registryAuthHeader(serviceToken);
+    headers[authName] = authValue;
   } else if (apiKey) {
     headers["X-API-Key"] = apiKey;
   }

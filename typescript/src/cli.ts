@@ -8,8 +8,10 @@
  *
  * register maps the canonical manifest to the engine request vocabulary
  * (name=slug, label=display name; NEVER a client-sent slug key) and POSTs to
- * {engine}/api/workflows/nodes/ with X-Service-Token from
- * CANVASTEKK_REGISTRY_TOKEN, then verifies via by-name/{name}.
+ * {engine}/api/workflows/nodes/, then verifies via by-name/{name}. The
+ * credential's wire form follows its type (#135): a ctk_ token rides
+ * Authorization: Bearer (engine DA-1949); a legacy service token rides
+ * X-Service-Token. Read from CANVASTEKK_REGISTRY_TOKEN, never printed.
  *
  * Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx/server
  * · 6 network. The token is never printed.
@@ -24,7 +26,7 @@ import { pathToFileURL } from "node:url";
 import process from "node:process";
 
 import { WorkflowNodeManifestSchema, type WorkflowNodeManifest } from "./definition.js";
-import { buildRegistryPayload } from "./registry.js";
+import { buildRegistryPayload, registryAuthHeader } from "./registry.js";
 
 const ENGINE_REQUEST_ALLOWED = new Set([
   "name",
@@ -209,7 +211,9 @@ async function runRegister(args: string[]): Promise<number> {
     nameSuffix,
   });
   const base = engineUrl.replace(/\/+$/, "") + "/api/workflows/nodes/";
-  const headers = { "Content-Type": "application/json", "X-Service-Token": token };
+  // #135: wire form follows credential type (ctk_ -> Authorization: Bearer).
+  const [authName, authValue] = registryAuthHeader(token);
+  const headers = { "Content-Type": "application/json", [authName]: authValue };
 
   let resp: Response;
   try {
