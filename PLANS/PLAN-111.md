@@ -78,4 +78,5 @@ blocked-by #110 (merged). Blocks: SDK #112 (probe), engine#662 (pre-flight). Unb
 GATE 2b050f2 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
 
 
-LOG Ticket taken over from a dead parallel session (user-approved resume): rebased Phase 1 onto 01055a7, force-with-lease pushed fd539f2, completed the uncommitted Phase 2 tree.
+LOG Ticket taken over from a dead parallel session (user-approved resume): rebased Phase 1 onto 01055a7, force-with-lease pushed fd539f2, completed the uncommitted Phase 2 tree.GATE 3ba1b2a tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Exit gate (ticket): full both stacks on 3ba1b2a — TS eslint/tsc/tsc-tests/tsup/vitest 391; python ruff + pytest 695 (14 env failures = proven baseline); python fastapi-lane tests incl. TestDryRunExecution -> CI.
