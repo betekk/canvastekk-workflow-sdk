@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.47.2] - 2026-10-11
+
+### Miscellaneous Tasks
+
+- **learnings**: Pipeline run order rebuilt from stale summary after restart
+
+
 ## [0.47.1] - 2026-10-11
 
 ### Documentation
 
 - **readme**: Deployment ladder — three rungs, who-calls-invoke_url, sequence diagram (#122)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.47.1
 
 
 ## [0.47.0] - 2026-10-11
