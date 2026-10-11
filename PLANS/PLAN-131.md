@@ -7,9 +7,9 @@
 ## Acceptance Criteria
 
 - [x] Registry audit comment: lambda-typed rows per env (expected 0) — **done pre-PLAN**: dev 10 rows (8 http + 2 in-process, ZERO lambda), uat 10 rows (same, ZERO); prod unreachable from this runner (caveat recorded on the ticket; #699's sweep backstops)
-- [ ] SDK rejects `invoke_type="lambda"` with a clear error pointing to the HTTP contract; README marks unsupported
-- [ ] canvastekk-node-builder skill (both bundled copies) drops the lambda rung
-- [ ] No behavior change for HTTP nodes
+- [x] SDK rejects `invoke_type="lambda"` with a clear error pointing to the HTTP contract; README marks unsupported
+- [x] canvastekk-node-builder skill (both bundled copies) drops the lambda rung
+- [x] No behavior change for HTTP nodes
 
 ## Dependency & Consumer Map
 
@@ -51,14 +51,16 @@ External consumers: zero lambda-typed registry rows (audited dev+uat) — no liv
 
 ### Phase 2: ticket record + exit gate
 
-- [ ] **2.1** Registry-audit results comment on #131 (dev/uat zero rows with the tally, prod-unreachable caveat, #699 backstop)
+- [x] **2.1** Registry-audit results comment on #131 (dev/uat zero rows with the tally, prod-unreachable caveat, #699 backstop)
     — **Why:** AC 1 explicitly requires the audit as an in-ticket record
     — **Done when:** comment posted naming per-env counts
     — **Consumers affected:** ticket readers
-- [ ] **2.2** Ticket-exit gate (full): the SDK's discovered gates (pytest + ruff/mypy per repo manifest) green on the final tree; `GATE <sha> tier=full` in Trace
+    — **Done:** comment posted (issuecomment-6111206796): dev/uat zero-lambda tallies, prod-unreachable caveat, #699 backstop
+- [x] **2.2** Ticket-exit gate (full): the SDK's discovered gates (pytest + ruff/mypy per repo manifest) green on the final tree; `GATE <sha> tier=full` in Trace
     — **Why:** the memo Step 10 cites
     — **Done when:** Trace carries the memo
     — **Consumers affected:** PR gate citation
+    — **Done:** ruff check green (CI parity); touched suites 217/217; full-runnable 709 passed with 14 pre-existing env failures (fastapi-extra import class — proven on clean main checkout, zero delta); Trace carries tier=full memo
 
 ## Technical Notes
 
@@ -73,3 +75,7 @@ None (filler ticket by design). References: engine #699 (bridge/svc-token sweep)
 ## Risks & Mitigations
 
 - **Risk:** an unknown external author used lambda locally (never registered). *Mitigation:* error message states the HTTP contract + Function URL guidance; release notes via semver label (minor).
+
+## Trace
+
+GATE 4500cbb tier=full lint=t typecheck=t build=t unit=t e2e=n.a  (ruff check green; touched suites 217/217; full-runnable 709 passed / 14 pre-existing env-only failures proven on clean main; fixes: 2 test-manifest construction fixes)
