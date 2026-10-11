@@ -227,8 +227,10 @@ def _run_register(args: list[str]) -> int:
     """Register a node manifest against the engine from CI.
 
     Mirrors the proven service-identity path (deploy-lambda.yml): POST the
-    mapped payload to ``{engine}/api/workflows/nodes/`` with the
-    ``X-Service-Token`` header, then verify via ``by-name/{name}``.
+    mapped payload to ``{engine}/api/workflows/nodes/``, then verify via
+    ``by-name/{name}``. The credential's wire form follows its type (#133):
+    a ``ctk_`` token rides ``Authorization: Bearer`` (engine DA-1949); a
+    legacy service token rides ``X-Service-Token``.
 
     Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx ·
     6 network. The token is read from ``CANVASTEKK_REGISTRY_TOKEN`` and is
@@ -238,6 +240,8 @@ def _run_register(args: list[str]) -> int:
     import urllib.error
     import urllib.parse
     import urllib.request
+
+    from canvastekk_workflow_sdk.registry import _registry_auth_header
 
     def _usage() -> int:
         print(
@@ -296,7 +300,7 @@ def _run_register(args: list[str]) -> int:
     def _request(method: str, url: str, body: bytes | None = None):
         req = urllib.request.Request(url, data=body, method=method)
         req.add_header("Content-Type", "application/json")
-        req.add_header("X-Service-Token", token)
+        req.add_header(*_registry_auth_header(token))
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, resp.read()
 

@@ -695,6 +695,56 @@ class TestRegisterNodeNewFeatures:
                 api_key="key",
             )
 
+    def test_registry_auth_header_shapes(self) -> None:
+        """#133: wire form follows credential type — the shared helper both
+        register_node and the CLI route through."""
+        from canvastekk_workflow_sdk.registry import _registry_auth_header
+
+        ctk = "ctk_" + "a" * 43
+        assert _registry_auth_header(ctk) == ("Authorization", f"Bearer {ctk}")
+        assert _registry_auth_header("svs_legacy") == ("X-Service-Token", "svs_legacy")
+
+    def test_ctk_token_rides_authorization_bearer(self) -> None:
+        """#133: ctk_ credentials authenticate as Authorization: Bearer (the
+        engine's DA-1949 dispatch) — an X-Service-Token carrying a ctk_
+        value never authenticates."""
+        node = DummyNode()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "123"}
+        mock_response.raise_for_status = MagicMock()
+        ctk = "ctk_" + "b" * 43
+        with patch(
+            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
+        ) as mock_post:
+            register_node(
+                node,
+                "https://registry.example.com/api/nodes",
+                service_token=ctk,
+            )
+        headers = mock_post.call_args[1]["headers"]
+        assert headers["Authorization"] == f"Bearer {ctk}"
+        assert "X-Service-Token" not in headers
+
+    def test_legacy_service_token_keeps_x_service_token(self) -> None:
+        """#133 no-regression: legacy tokens are byte-identical to today."""
+        node = DummyNode()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "123"}
+        mock_response.raise_for_status = MagicMock()
+        with patch(
+            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
+        ) as mock_post:
+            register_node(
+                node,
+                "https://registry.example.com/api/nodes",
+                service_token="svs_legacy",
+            )
+        headers = mock_post.call_args[1]["headers"]
+        assert headers["X-Service-Token"] == "svs_legacy"
+        assert "Authorization" not in headers
+
     def test_rejects_lambda_invoke_type_with_policy_error(self) -> None:
         """#131: direct AWS invoke is not a platform surface — every node is
         HTTP-contract. The rejection names the HTTP path, fires in
