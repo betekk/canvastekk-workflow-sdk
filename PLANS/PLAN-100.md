@@ -5,9 +5,9 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] Every workflow file below audited (`ci-python.yml`, `ci-typescript.yml`, `release.yml`)
-- [ ] Runners pinned or verified compatible with 26.04 before Oct 19, 2026
-- [ ] `create-github-app-token` bumped or verified
+- [x] Every workflow file below audited (`ci-python.yml`, `ci-typescript.yml`, `release.yml`)
+- [x] Runners pinned or verified compatible with 26.04 before Oct 19, 2026
+- [x] `create-github-app-token` bumped or verified
 - [ ] CI green on the first run after the change
 
 ## Dependency & Consumer Map
@@ -50,10 +50,11 @@
     — **Done:** bumped create-github-app-token v2 to v3 at 3 pick-runner sites and v1 to v3 at the release.yml nodes-token; inputs/outputs unchanged; files: 3 workflow files; fixes: none
 
 ### Phase 5: Full gate
-- [ ] **5.1** Full gate on the final tree: `yaml.safe_load` parse of all three workflow files; invariant greps (zero `ubuntu-latest`, only `create-github-app-token@v3`); `git diff origin/main --stat` reviewed to confirm only the three workflow files changed
+- [x] **5.1** Full gate on the final tree: `yaml.safe_load` parse of all three workflow files; invariant greps (zero `ubuntu-latest`, only `create-github-app-token@v3`); `git diff origin/main --stat` reviewed to confirm only the three workflow files changed
     — **Why:** the exit gate is the last verification before PR; there is no local workflow test-suite, so parse + invariants + diff scope are the executable checks (real CI green on the PR is the authoritative signal, enforced by the merge watcher)
     — **Done when:** all greps/parse green; diff touches exactly `.github/workflows/{ci-python,ci-typescript,release}.yml`
     — **Consumers affected:** none beyond the above
+    — **Done:** full exit gate on final tree: 3/3 yaml parse, 0 ubuntu-latest remnants, 0 non-v3 token sites, diff scope = 3 workflow files + PLAN only; files: none (verification phase); fixes: none
 
 ## Technical Notes
 - Ticket's own sequencing adopted: pin `ubuntu-24.04` before Oct 19; relaxing back to `ubuntu-latest` requires a verified green 26.04 run and is explicitly NOT part of this ticket.
@@ -76,3 +77,6 @@ GATE 78f0f43 tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
 GATE 7d07b2d tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
 
 GATE 7ba22aa tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
+
+GATE 4c61aa6 tier=full lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
+LOG Exit gate (ticket): full — pyyaml parse 3/3 + invariant greps (ubuntu-latest=0, non-v3 tokens=0) + diff scope check, all on 4c61aa6; AC4 (CI green on first run) deliberately open — enforced by the PR merge watcher post-creation.
