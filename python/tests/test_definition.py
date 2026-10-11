@@ -515,12 +515,16 @@ class TestExportDefinition:
             output_schema={"type": "object"},
         )
 
+        # #131: "lambda" is a rejected platform surface — export_definition
+        # routes through build_registry_payload, so the choke guard fires
+        # BEFORE any file is written.
+        import pytest as _pytest
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, invoke_type="lambda")
-
-            data = json.loads(output_path.read_text())
-            assert data["invoke_type"] == "lambda"
+            with _pytest.raises(ValueError, match="not a\\s+supported platform surface"):
+                export_definition(definition, output_path, invoke_type="lambda")
+            assert not output_path.exists()
 
     def test_export_definition_with_invoke_url(self) -> None:
         """Test that invoke_url is included when provided."""

@@ -660,7 +660,7 @@ result = register_node(
     node,                                   # your BaseNode instance
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",  # where the engine reaches this node
-    invoke_type="http",                     # "http", "lambda", "sagemaker", or "in-process"
+    invoke_type="http",                     # "http" or "sagemaker"; "in-process" is engine-admin-gated; "lambda" is REJECTED (#131 — HTTP-contract only, Lambda via Function URL)
     service_token="svs_xxx",                # OR api_key — see credential paths
     verify=True,                            # probe the node's HTTP contract first
 )

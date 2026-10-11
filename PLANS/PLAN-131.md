@@ -28,22 +28,26 @@ External consumers: zero lambda-typed registry rows (audited dev+uat) — no liv
 
 ### Phase 1: the guard + docs + skill
 
-- [ ] **1.1** `build_registry_payload`: reject `invoke_type == "lambda"` with ValueError naming the platform law (every node is HTTP-contract; Lambda hosting surfaces via Function URL/gateway; register `invoke_type="http"`) — one guard, the seam every path (register_node / export_definition / CLI) routes through
+- [x] **1.1** `build_registry_payload`: reject `invoke_type == "lambda"` with ValueError naming the platform law (every node is HTTP-contract; Lambda hosting surfaces via Function URL/gateway; register `invoke_type="http"`) — one guard, the seam every path (register_node / export_definition / CLI) routes through
     — **Why:** AC "SDK rejects with a clear error"; the choke point is the root-cause location (a guard per entry point would drift)
     — **Done when:** register_node, export_definition, and the CLI all surface the rejection via their build_registry_payload routing; http/sagemaker/in-process payloads byte-identical
     — **Consumers affected:** all invoke_type paths (only the lambda arm changes)
-- [ ] **1.2** `InvokeType` docstring + the two registry.py docstrings (:270, :388) drop lambda from the documented vocabulary, note the policy; README Rung 3 rewritten (in-process only, admin-gated engine-side; lambda removed with the policy sentence); EXTERNAL-AUTHOR-GUIDE invoke_type mentions updated
+    — **Done:** UNSUPPORTED_INVOKE_TYPES map + guard at the top of build_registry_payload (the choke: register_node :463, export_definition, CLI); files: registry.py; fixes: none
+- [x] **1.2** `InvokeType` docstring + the two registry.py docstrings (:270, :388) drop lambda from the documented vocabulary, note the policy; README Rung 3 rewritten (in-process only, admin-gated engine-side; lambda removed with the policy sentence); EXTERNAL-AUTHOR-GUIDE invoke_type mentions updated
     — **Why:** AC "README marks unsupported"; docs must not teach a rejected path (deprecation-sweep discipline)
     — **Done when:** grep -i "invoke_type.*lambda\|lambda.*invoke_type" in README/docs shows only the policy note; Rung 3 carries no lambda example
     — **Consumers affected:** external authors
-- [ ] **1.3** canvastekk-node-builder SKILL.md — remove the lambda rung from templates/checklists, BOTH copies (`.agents/skills/` + `python/canvastekk_workflow_sdk/data/skills/`), kept `diff -r`-identical
+    — **Done:** both registry.py docstrings + definition.py export docstring drop lambda; README Rung 3 rewritten (in-process only + policy callout); EXTERNAL-AUTHOR-GUIDE lambda example → Function URL http example + param table updated; fixes: none
+- [x] **1.3** canvastekk-node-builder SKILL.md — remove the lambda rung from templates/checklists, BOTH copies (`.agents/skills/` + `python/canvastekk_workflow_sdk/data/skills/`), kept `diff -r`-identical
     — **Why:** AC "node-builder skill mirrors updated" — an agent loading the skill must not be taught the rejected path
     — **Done when:** `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` clean; no lambda rung in either copy
     — **Consumers affected:** skill consumers (agents)
-- [ ] **1.4** Tests: build_registry_payload lambda → ValueError with the policy message (unit); export_definition lambda → same (via routing); register_node lambda → same pre-HTTP (no network attempted); the parametrized "all four types" test (:699) drops lambda; HTTP regression: payload byte-equality for an http node pinned
+    — **Done:** both copies edited identically; diff -r clean; fixes: none
+- [x] **1.4** Tests: build_registry_payload lambda → ValueError with the policy message (unit); export_definition lambda → same (via routing); register_node lambda → same pre-HTTP (no network attempted); the parametrized "all four types" test (:699) drops lambda; HTTP regression: payload byte-equality for an http node pinned
     — **Why:** AC reject + no-behavior-change, both test-pinned; the :699 sweep would otherwise red
     — **Done when:** full pytest green; new rejection tests present
     — **Consumers affected:** CI
+    — **Done:** rejection tests ×3 (register pre-HTTP, choke direct, export no-file-written) + http byte-pin + :699 sweep drops lambda + custom-invoke test → sagemaker; 217 passed across the 4 touched suites; fixes: manifest field-order/description in new tests
 
 ### Phase 2: ticket record + exit gate
 

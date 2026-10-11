@@ -20,8 +20,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# #131: "lambda" (direct AWS Lambda API invoke) is NOT platform policy — every
+# CanvasTekk node is an HTTP-contract node; Lambda-hosted nodes surface via
+# Function URL / the gateway and register as "http". The Literal member is
+# deliberately KEPT so the rejection is a clear, actionable ValueError (a
+# typed key removed from the Literal would turn into a bare typing error).
+# Engine-side vocabulary removal rides the #699 sweep wave.
 InvokeType = Literal["http", "lambda", "sagemaker", "in-process"]
 VALID_INVOKE_TYPES: set[str] = set(get_args(InvokeType))
+UNSUPPORTED_INVOKE_TYPES: dict[str, str] = {
+    "lambda": (
+        "invoke_type='lambda' (direct AWS Lambda API invoke) is not a "
+        "supported platform surface — every node is HTTP-contract. For "
+        "Lambda-hosted nodes, expose the function via Function URL / the "
+        "gateway and register with invoke_type='http'."
+    ),
+}
 
 
 class RegistrationError(Exception):
@@ -267,8 +281,10 @@ def build_registry_payload(
 
     Args:
         definition: The SDK WorkflowNodeManifest to convert.
-        invoke_type: Invocation type (``"http"``, ``"lambda"``,
-            ``"sagemaker"``, or ``"in-process"``).
+        invoke_type: Invocation type (``"http"``, ``"sagemaker"``, or
+            ``"in-process"``). ``"lambda"`` is REJECTED (#131 — not
+            platform policy; Lambda nodes surface via Function URL /
+            gateway as ``"http"``).
         invoke_url: URL/ARN for invoking the node.
         invoke_config: Extra invocation parameters.
         tags: Searchable tags for the registry.
@@ -279,7 +295,14 @@ def build_registry_payload(
 
     Returns:
         A dict matching the engine's RegisterWorkflowNodeRequest schema.
+
+    Raises:
+        ValueError: ``invoke_type`` is a rejected platform surface (#131:
+            ``"lambda"`` — direct AWS invoke was never an intended surface;
+            every node is HTTP-contract) or not a known invoke type.
     """
+    if invoke_type in UNSUPPORTED_INVOKE_TYPES:
+        raise ValueError(UNSUPPORTED_INVOKE_TYPES[invoke_type])
     resolved_styles = None
     if definition.styles is not None:
         resolved_styles = definition.styles.model_dump(mode="json")
@@ -385,8 +408,10 @@ def register_node(
         registry_url: Full URL of the registry endpoint
             (e.g., ``"https://engine.example.com/api/workflows/nodes/"``).
         invoke_url: URL where the node is reachable.
-        invoke_type: Invocation type (``"http"``, ``"lambda"``,
-            ``"sagemaker"``, or ``"in-process"``).
+        invoke_type: Invocation type (``"http"``, ``"sagemaker"``, or
+            ``"in-process"``). ``"lambda"`` is REJECTED (#131 — not
+            platform policy; Lambda nodes surface via Function URL /
+            gateway as ``"http"``).
         api_key: Optional API key for registry authentication
             (sent as ``X-API-Key`` header).
         service_token: Optional service token for CI/CD authentication

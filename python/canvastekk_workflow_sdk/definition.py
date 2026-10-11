@@ -710,7 +710,9 @@ def export_definition(
     Args:
         definition: The SDK WorkflowNodeManifest to export.
         output_path: File path to write the JSON output.
-        invoke_type: Invocation type (http, lambda, sagemaker, in-process).
+        invoke_type: Invocation type (http, sagemaker, in-process) —
+            "lambda" is rejected (#131: not platform policy; use "http"
+            with a Function URL / gateway).
         invoke_url: URL/ARN for invoking the node. None for in-process nodes.
         node_status: Registry status (active, inactive, dead).
         tags: Searchable tags for the registry.
