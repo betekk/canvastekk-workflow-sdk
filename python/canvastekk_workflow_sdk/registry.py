@@ -244,6 +244,19 @@ class RegisterNodeResult(BaseModel):
         return self.node.get(key, default)
 
 
+def _registry_auth_header(token: str) -> tuple[str, str]:
+    """Wire form for a registry credential (#133) — follows credential type.
+
+    ``ctk_`` keys ride ``Authorization: Bearer <token>`` (the engine's
+    DA-1949 ctk_ dispatch — an ``X-Service-Token`` carrying a ctk_ value
+    never authenticates). Legacy service tokens keep ``X-Service-Token``
+    (dated bridge; the engine's #699 sweep removes that leg later).
+    """
+    if token.startswith("ctk_"):
+        return "Authorization", f"Bearer {token}"
+    return "X-Service-Token", token
+
+
 def build_registry_payload(
     definition: WorkflowNodeManifest,
     *,
@@ -414,8 +427,10 @@ def register_node(
             gateway as ``"http"``).
         api_key: Optional API key for registry authentication
             (sent as ``X-API-Key`` header).
-        service_token: Optional service token for CI/CD authentication
-            (sent as ``X-Service-Token`` header). Takes precedence over
+        service_token: Optional service token for CI/CD authentication.
+            Wire form follows the credential (#133): a ``ctk_`` key rides
+            ``Authorization: Bearer`` (engine DA-1949); anything else rides
+            ``X-Service-Token`` (legacy bridge). Takes precedence over
             ``api_key`` when both are provided.
         tags: Optional searchable tags for the registry.
         invoke_config: Optional extra invocation parameters.
@@ -498,7 +513,8 @@ def register_node(
         "Accept": "application/json",
     }
     if service_token:
-        headers["X-Service-Token"] = service_token
+        auth_name, auth_value = _registry_auth_header(service_token)
+        headers[auth_name] = auth_value
     elif api_key:
         headers["X-API-Key"] = api_key
 
