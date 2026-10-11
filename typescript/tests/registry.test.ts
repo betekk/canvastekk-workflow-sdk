@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildRegistryPayload,
   extractNodeData,
   registerNodeResultGet,
   registerNodeResultHas,
+  registryAuthHeader,
+  registerNode,
 } from "../src/registry.js";
 import { RegistrationError } from "../src/exceptions.js";
 import { VERSION } from "../src/version.js";
@@ -332,5 +334,66 @@ describe("stamped provenance — dual-write dead (#123)", () => {
     // the stamp is ALWAYS the installed VERSION (python parity) — a manifest
     // claiming 0.40.0 cannot masquerade as the registering SDK
     expect(constraints.sdk_version).toBe(VERSION);
+  });
+});
+
+const CTK_KEY = "ctk_" + "a".repeat(43);
+
+describe("registryAuthHeader wire form (#135)", () => {
+  it("ctk_ credentials ride Authorization: Bearer", () => {
+    expect(registryAuthHeader(CTK_KEY)).toEqual(["Authorization", `Bearer ${CTK_KEY}`]);
+  });
+
+  it("legacy service tokens keep X-Service-Token byte-identically", () => {
+    expect(registryAuthHeader("svs_legacy")).toEqual(["X-Service-Token", "svs_legacy"]);
+  });
+});
+
+describe("registerNode credential wire form (#135)", () => {
+  const captureHeaders = (): { headers: Record<string, string> } => {
+    const state = { headers: {} as Record<string, string> };
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (_input: unknown, init?: RequestInit) => {
+      state.headers = (init?.headers ?? {}) as Record<string, string>;
+      return new Response(JSON.stringify({ id: "123", name: "echo" }), { status: 200 });
+    }) as unknown as typeof fetch;
+    return {
+      get headers() {
+        return state.headers;
+      },
+      restore() {
+        globalThis.fetch = realFetch;
+      },
+    };
+  };
+
+  it("sends Authorization: Bearer for ctk_ keys — no X-Service-Token", async () => {
+    const cap = captureHeaders();
+    try {
+      await registerNode(
+        { definition: testDef },
+        "https://engine.example.com/api/workflows/nodes/",
+        { serviceToken: CTK_KEY },
+      ).catch(() => undefined); // header capture is the assertion; post-response parsing may reject on a stub body
+    } finally {
+      cap.restore();
+    }
+    expect(cap.headers["Authorization"]).toBe(`Bearer ${CTK_KEY}`);
+    expect(cap.headers["X-Service-Token"]).toBeUndefined();
+  });
+
+  it("legacy service tokens are unchanged", async () => {
+    const cap = captureHeaders();
+    try {
+      await registerNode(
+        { definition: testDef },
+        "https://engine.example.com/api/workflows/nodes/",
+        { serviceToken: "svs_legacy" },
+      ).catch(() => undefined);
+    } finally {
+      cap.restore();
+    }
+    expect(cap.headers["X-Service-Token"]).toBe("svs_legacy");
+    expect(cap.headers["Authorization"]).toBeUndefined();
   });
 });
