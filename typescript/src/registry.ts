@@ -89,6 +89,15 @@ export function buildRegistryPayload(
   }
   resolvedConstraints.sdk_version = VERSION;
 
+  // D8/#110: the DECLARED serving contract rides constraints — the engine's
+  // RegisterWorkflowNodeRequest is extra="forbid" and has no top-level
+  // contract field yet, but `constraints` is a declared free-form dict.
+  // The engine's registration gate reads it from here (engine #658) and may
+  // promote it to a top-level field engine-side. Caller-supplied wins.
+  if (definition.contract !== null && !("contract" in resolvedConstraints)) {
+    resolvedConstraints.contract = definition.contract;
+  }
+
   // DA-1955: engine RegisterWorkflowNodeRequest is extra="forbid" without
   // node_role/retry/node_status — those keys are NOT emitted here.
   // (`deprecation` is accepted by the engine since DA-2305/#319 and is

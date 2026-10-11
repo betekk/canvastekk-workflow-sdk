@@ -169,6 +169,93 @@ class DeprecationInfo(BaseModel):
         return self
 
 
+# ---------------------------------------------------------------------------
+# Serving contract (D8, #110): the manifest declares HOW a node serves.
+# ---------------------------------------------------------------------------
+
+#: Closed route vocabulary — exactly the routes the SDK adapters mount.
+CONTRACT_ROUTE_VOCABULARY: frozenset[str] = frozenset(
+    {"/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"}
+)
+
+#: Minimum route set every conforming node must serve (D8).
+MINIMUM_CONTRACT_ROUTES: frozenset[str] = frozenset({"/execute", "/health", "/manifest"})
+
+#: What the SDK-served adapters actually mount (ordered for stable output).
+SDK_SERVED_CONTRACT_ROUTES: tuple[str, ...] = (
+    "/execute",
+    "/health",
+    "/manifest",
+    "/hook",
+    "/metrics",
+    "/live",
+    "/ready",
+)
+
+
+class ContractCapabilities(BaseModel):
+    """Optional execution capabilities a node declares (D10 declares, #111 implements)."""
+
+    dry_run: bool = Field(
+        default=False,
+        description="The node accepts dry_run=true on /execute: full input "
+        "validation, zero side effects, token_cost 0, ids namespaced dryrun-*. "
+        "Semantics land in #111; this flag is the declaration the engine "
+        "pre-flight (#662) and verifier (#112) key off.",
+    )
+
+
+class NodeContract(BaseModel):
+    """How a node serves: transport, routes, capabilities, document dialect.
+
+    The declared contract is ADVISORY until the engine's registration gate
+    (#658) probes the live node — declaration never substitutes for
+    verification. SDK-served nodes get the effective default stamped by the
+    adapters (``effective_contract``); self-hosted authors declare what they
+    actually serve.
+    """
+
+    transport: Literal["http"] = Field(
+        default="http",
+        description="Serving transport. Only HTTP today (D8); the vocabulary widens when a second transport earns it.",
+    )
+    routes: list[str] = Field(
+        description="Route paths the node serves. Closed vocabulary: "
+        f"{sorted(CONTRACT_ROUTE_VOCABULARY)}. Must include the minimum set "
+        f"{sorted(MINIMUM_CONTRACT_ROUTES)}.",
+    )
+    capabilities: ContractCapabilities = Field(
+        default_factory=ContractCapabilities,
+        description="Declared execution capabilities (dry_run).",
+    )
+    openapi: Literal["3.2"] = Field(
+        default="3.2",
+        description="OpenAPI dialect the node's interface documents target "
+        "(emission lands in #113; this is the manifest's dialect stamp).",
+    )
+
+    @model_validator(mode="after")
+    def _validate_routes(self) -> NodeContract:
+        """Closed vocabulary, minimum set, no duplicates — named errors (AC2)."""
+        seen: set[str] = set()
+        for route in self.routes:
+            if route not in CONTRACT_ROUTE_VOCABULARY:
+                raise ValueError(
+                    f"NodeContract.routes: '{route}' is outside the closed vocabulary "
+                    f"{sorted(CONTRACT_ROUTE_VOCABULARY)}"
+                )
+            if route in seen:
+                raise ValueError(f"NodeContract.routes: duplicate route '{route}'")
+            seen.add(route)
+        missing = MINIMUM_CONTRACT_ROUTES - seen
+        if missing:
+            raise ValueError(
+                f"NodeContract.routes: missing required route(s) {sorted(missing)} "
+                "(every conforming node serves /execute, /health, /manifest)"
+            )
+        return self
+
+
 class WorkflowNodeManifest(BaseModel):
     """
     Standard definition that every node must provide.
@@ -302,6 +389,21 @@ class WorkflowNodeManifest(BaseModel):
         #3498."""
         return min(self.timeout_seconds, self.hard_max_runtime_seconds)
 
+    @property
+    def effective_contract(self) -> NodeContract:
+        """The contract this node serves: declared, or the SDK-served default.
+
+        D8/#110: a plain derived property (not a computed field — derived
+        bounds never serialize as authored data, per the
+        effective_runtime_seconds precedent). The SDK adapters mount exactly
+        ``SDK_SERVED_CONTRACT_ROUTES``, so when the author declares nothing
+        the adapter-served truth IS that default. A declared subset wins:
+        the author said what they serve.
+        """
+        if self.contract is not None:
+            return self.contract
+        return NodeContract(routes=list(SDK_SERVED_CONTRACT_ROUTES))
+
     # Documentation links (optional — DA-1937 preview surface)
     docs_url: str | None = Field(
         default=None,
@@ -310,6 +412,17 @@ class WorkflowNodeManifest(BaseModel):
     changelog_url: str | None = Field(
         default=None,
         description="HTTP(S) URL to this node's changelog.",
+    )
+
+    # Serving contract (optional — D8, #110). Self-hosted authors declare what
+    # they serve; SDK-served nodes serialize the adapter-stamped default via
+    # effective_contract (the ADAPTERS mount the routes — see app.py).
+    contract: NodeContract | None = Field(
+        default=None,
+        description="Serving contract: transport, routes (closed vocabulary, "
+        "minimum /execute + /health + /manifest), capabilities, openapi "
+        "dialect. Advisory until the engine gate probes the live node. "
+        "Omitted entirely when unset (legacy-identical serialization).",
     )
 
     @model_serializer(mode="wrap")
@@ -331,6 +444,7 @@ class WorkflowNodeManifest(BaseModel):
             "maximum_sdk_version",
             "docs_url",
             "changelog_url",
+            "contract",
         ):
             if data.get(optional_key) is None:
                 data.pop(optional_key, None)

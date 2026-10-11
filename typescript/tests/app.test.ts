@@ -131,6 +131,16 @@ describe("Express endpoints", () => {
       expect(resp.body.mode).toBeDefined();
     });
 
+    it("stamps the effective serving contract (D8 #110)", async () => {
+      const resp = await request(app).get("/manifest");
+      expect(resp.body.contract.transport).toBe("http");
+      expect(resp.body.contract.routes).toEqual([
+        "/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready",
+      ]);
+      expect(resp.body.contract.capabilities).toEqual({ dry_run: false });
+      expect(resp.body.contract.openapi).toBe("3.2");
+    });
+
     it("retains hard_max_runtime_seconds through parse and serve (DA-3609)", async () => {
       // Part of the /manifest shape (mirrors python's registry_dict re-add);
       // the default must survive the zod round-trip intact.

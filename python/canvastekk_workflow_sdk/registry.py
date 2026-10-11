@@ -294,6 +294,13 @@ def build_registry_payload(
     ):
         if value is not None and key not in resolved_constraints:
             resolved_constraints[key] = value
+    # D8/#110: the DECLARED serving contract rides constraints — the engine's
+    # RegisterWorkflowNodeRequest is extra="forbid" and has no top-level
+    # contract field yet, but ``constraints`` is a declared free-form dict.
+    # The engine's registration gate reads it from here (engine #658) and may
+    # promote it to a top-level field engine-side. Caller-supplied wins.
+    if definition.contract is not None and "contract" not in resolved_constraints:
+        resolved_constraints["contract"] = definition.contract.model_dump(mode="json")
     # DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
     # Explicit caller constraints always win over the merge.
     resolved_constraints.setdefault("sdk_version", definition.sdk_version)

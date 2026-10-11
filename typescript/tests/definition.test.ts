@@ -3,6 +3,7 @@ import {
   WorkflowNodeManifestSchema,
   WorkflowNodeRoleSchema,
   DeprecationInfoSchema,
+  NodeContractSchema,
   getNodeId,
   getFileInputFields,
   getFileOutputFields,
@@ -510,5 +511,58 @@ describe("WorkflowNodeManifestSchema host runtime ceiling (DA-3609)", () => {
     expect(
       effectiveRuntimeSeconds({ timeout_seconds: 7200, hard_max_runtime_seconds: 7200 }),
     ).toBe(7200);
+  });
+});
+
+describe("NodeContractSchema (D8 #110 — mirrors python accept/reject matrix)", () => {
+  it("accepts the valid minimum subset with defaults", () => {
+    const parsed = NodeContractSchema.parse({ routes: ["/execute", "/health", "/manifest"] });
+    expect(parsed.transport).toBe("http");
+    expect(parsed.openapi).toBe("3.2");
+    expect(parsed.capabilities.dry_run).toBe(false);
+  });
+
+  it("accepts the full vocabulary", () => {
+    const routes = ["/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"];
+    expect(NodeContractSchema.parse({ routes }).routes).toEqual(routes);
+  });
+
+  it("rejects an unknown route with a named error", () => {
+    const r = NodeContractSchema.safeParse({ routes: ["/execute", "/health", "/manifest", "/nope"] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const msg = r.error.issues.map((i) => i.message).join("; ");
+      expect(msg).toMatch(/routes.*outside the closed vocabulary/);
+    }
+  });
+
+  it("rejects a missing minimum route with a named error", () => {
+    const r = NodeContractSchema.safeParse({ routes: ["/health", "/manifest"] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const msg = r.error.issues.map((i) => i.message).join("; ");
+      expect(msg).toMatch(/routes.*missing required route/);
+    }
+  });
+
+  it("rejects a duplicate route with a named error", () => {
+    const r = NodeContractSchema.safeParse({ routes: ["/execute", "/health", "/manifest", "/health"] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const msg = r.error.issues.map((i) => i.message).join("; ");
+      expect(msg).toMatch(/routes.*duplicate/);
+    }
+  });
+
+  it("manifest field is nullable-default and round-trips", () => {
+    const base = { ...validDefinition };
+    const without = WorkflowNodeManifestSchema.parse(base);
+    expect(without.contract).toBeNull();
+    const withContract = WorkflowNodeManifestSchema.parse({
+      ...base,
+      contract: { routes: ["/execute", "/health", "/manifest"], capabilities: { dry_run: true } },
+    });
+    expect(withContract.contract?.routes).toEqual(["/execute", "/health", "/manifest"]);
+    expect(withContract.contract?.capabilities.dry_run).toBe(true);
   });
 });

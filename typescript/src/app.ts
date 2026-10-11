@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { VERSION } from "./version.js";
-import { getNodeId, getFileOutputFields, effectiveRuntimeSeconds } from "./definition.js";
+import { getNodeId, getFileOutputFields, effectiveRuntimeSeconds, effectiveContract } from "./definition.js";
 import { NodeTimeoutError, NodeExecutionError, getHttpStatusForError } from "./exceptions.js";
 import { configureLogging } from "./logging.js";
 import { enforceSupportHorizon } from "./support-horizon.js";
@@ -242,11 +242,16 @@ export function createNodeApp(
         "maximum_sdk_version",
         "docs_url",
         "changelog_url",
+        "contract",
       ] as const) {
         if (content[key] === null) {
           delete content[key];
         }
       }
+
+      // D8/#110: the adapter stamps the effective contract — declared subset
+      // wins, else the SDK-served default (exactly what this app mounts).
+      content.contract = effectiveContract(def);
 
       const rawEnv = (process.env.CANVASTEKK_NODE_ENV ?? "dev").toLowerCase();
       let mode: string;

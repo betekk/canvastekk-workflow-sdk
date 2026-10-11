@@ -53,7 +53,9 @@ from canvastekk_workflow_sdk.contracts import (
 )
 from canvastekk_workflow_sdk.definition import (
     ColorPreset,
+    ContractCapabilities,
     DeprecationInfo,
+    NodeContract,
     RetryConfig,
     WorkflowNodeManifest,
     WorkflowNodeRole,
@@ -110,6 +112,7 @@ __all__ = [
     "BaseNode",
     "BoundingBox3D",
     "ColorPreset",
+    "ContractCapabilities",
     "DeprecationInfo",
     "EdgeType",
     "ExecutionContext",
@@ -126,6 +129,7 @@ __all__ = [
     "MetricsCollector",
     "NodeAuth",
     "NodeConfigurationError",
+    "NodeContract",
     "NodeExecutionError",
     "NodeExecutionRequest",
     "NodeExecutionResponse",

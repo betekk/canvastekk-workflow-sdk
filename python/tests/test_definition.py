@@ -8,7 +8,9 @@ import pytest
 from pydantic import ValidationError
 
 from canvastekk_workflow_sdk import (
+    ContractCapabilities,
     DeprecationInfo,
+    NodeContract,
     RetryConfig,
     WorkflowNodeManifest,
     WorkflowNodeRole,
@@ -1375,3 +1377,79 @@ class TestHardMaxRuntimeSeconds:
         reloaded = WorkflowNodeManifest.model_validate({**data, "slug": "echo"})
         assert reloaded.hard_max_runtime_seconds == 14400
         assert reloaded.effective_runtime_seconds == 9000
+
+
+class TestNodeContract:
+    """Serving contract (D8, #110): closed vocabulary, minimum set, omit-when-None."""
+
+    def _manifest(self, **overrides):
+        defaults = dict(
+            name="t",
+            version="1.0.0",
+            title="T",
+            description="d",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+        )
+        defaults.update(overrides)
+        return WorkflowNodeManifest(**defaults)
+
+    def test_valid_minimum_subset_accepted(self) -> None:
+        contract = NodeContract(routes=["/execute", "/health", "/manifest"])
+        assert contract.transport == "http"
+        assert contract.openapi == "3.2"
+        assert contract.capabilities.dry_run is False
+
+    def test_full_vocabulary_accepted(self) -> None:
+        routes = ["/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"]
+        assert NodeContract(routes=routes).routes == routes
+
+    def test_unknown_route_rejected_with_named_error(self) -> None:
+        with pytest.raises(ValidationError, match=r"routes.*vocabulary"):
+            NodeContract(routes=["/execute", "/health", "/manifest", "/nope"])
+
+    def test_missing_minimum_route_rejected_with_named_error(self) -> None:
+        with pytest.raises(ValidationError, match=r"routes.*missing required route"):
+            NodeContract(routes=["/health", "/manifest"])
+
+    def test_duplicate_route_rejected_with_named_error(self) -> None:
+        with pytest.raises(ValidationError, match=r"routes.*duplicate"):
+            NodeContract(routes=["/execute", "/health", "/manifest", "/health"])
+
+    def test_contract_omitted_when_unset(self) -> None:
+        """Legacy nodes serialize byte-identically (no contract key)."""
+        assert "contract" not in self._manifest().to_dict()
+
+    def test_contract_serialized_when_set(self) -> None:
+        manifest = self._manifest(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        data = manifest.to_dict()
+        assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
+        assert data["contract"]["capabilities"] == {"dry_run": False}
+        assert data["contract"]["openapi"] == "3.2"
+
+    def test_round_trip(self) -> None:
+        manifest = self._manifest(
+            contract=NodeContract(
+                routes=["/execute", "/health", "/manifest"],
+                capabilities=ContractCapabilities(dry_run=True),
+            )
+        )
+        rebuilt = WorkflowNodeManifest.model_validate(manifest.to_dict())
+        assert rebuilt.contract is not None
+        assert rebuilt.contract.capabilities.dry_run is True
+
+    def test_effective_contract_defaults_to_sdk_served_routes(self) -> None:
+        manifest = self._manifest()
+        assert manifest.effective_contract.routes == [
+            "/execute",
+            "/health",
+            "/manifest",
+            "/hook",
+            "/metrics",
+            "/live",
+            "/ready",
+        ]
+
+    def test_effective_contract_declared_wins(self) -> None:
+        manifest = self._manifest(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        assert manifest.effective_contract.routes == ["/execute", "/health", "/manifest"]
