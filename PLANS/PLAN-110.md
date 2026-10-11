@@ -52,17 +52,17 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
     — **Consumers affected:** none (tests).
 
 ### Phase 3: Adapters stamp the contract
-- [ ] **3.1** fastapi `create_node_app`: if `node.definition.contract is None`, stamp `NodeContract(routes=[the 7 mounted routes])` (constant beside the router mounts); `/manifest` then serves it via to_dict automatically.
+- [ ] **3.1** fastapi `create_node_app`: serve the contract on `/manifest` via a derived property — `WorkflowNodeManifest.effective_contract` (returns the declared `contract` when set, else the SDK-served default: transport http, the 7 mounted routes, dry_run False, openapi 3.2). The adapter MUTATES nothing; the property is the stamp (arch fold: single-writer discipline, matches `effective_runtime_seconds` precedent at definition.py:299).
     — **Why:** AC3 — SDK-served authors get the contract with zero input; the stamped list must equal what the adapter ACTUALLY mounts (it is the source of truth D8 names).
-    — **Done when:** app test — create_node_app on a bare node → GET /manifest shows contract.routes == the 7 mounted paths.
+    — **Done when:** app test — create_node_app on a bare node → GET /manifest shows contract.routes == the 7 mounted paths; a node with a DECLARED subset keeps its declaration.
     — **Consumers affected:** /manifest consumers (registry cross-check, future gate).
-- [ ] **3.2** express `createNodeApp`: same stamp-if-null with the same 7 paths (TS constant).
+- [ ] **3.2** express `createNodeApp`: same derived-property stamp on the TS side (`effectiveContract` getter on the manifest type via the schema's exported helper, or the adapter's manifest response composes it) with the same 7 paths (TS constant).
     — **Why:** AC3 parity of adapters.
-    — **Done when:** ts app test — /manifest body carries contract with the 7 routes.
+    — **Done when:** ts app test — /manifest body carries contract with the 7 routes; declared subset wins.
     — **Consumers affected:** same, TS side.
 
 ### Phase 4: Registry payload carries the contract
-- [ ] **4.1** `build_registry_payload`: when `definition.contract is not None`, set `resolved_constraints["contract"] = definition.contract.model_dump(mode="json")` (caller-supplied constraints win, per the existing merge rule); docstring notes the wire decision (constraints placement vs extra=forbid engine).
+- [ ] **4.1** `build_registry_payload`: when `definition.contract is not None` (the DECLARED contract — not the effective default; self-hosted registrations reflect the author's declaration), set `resolved_constraints["contract"] = definition.contract.model_dump(mode="json")` (caller-supplied constraints win, per the existing merge rule); docstring notes the wire decision (constraints placement vs extra=forbid engine).
     — **Why:** AC4 — the engine registration path must receive the contract; constraints placement keeps TODAY's engine accepting the payload (engine #658 reads + promotes it).
     — **Done when:** TestBuildRegistryPayload: definition with contract → payload["constraints"]["contract"] present and shape-pinned; definition without → key absent.
     — **Consumers affected:** register_node, export_definition, TS mirror.
@@ -88,6 +88,7 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
 - openapi: "3.2" is the declared document dialect stamp; emission is #113.
 - Serializer: `"contract"` joins the omit-when-None tuple (model_serializer at definition.py) so legacy nodes serialize byte-identically.
 - py fields live after changelog_url; ts field after changelog_url (mirror order).
+- Trust rule (arch fold 2): the declared contract is ADVISORY until the engine gate (#658) probes the live node — declaration never substitutes for verification; the SDK stamps what it actually mounts, authors declare what they actually serve, the gate cross-checks.
 
 ## Dependencies
 None (root of the SDK slice). Blocks: SDK #111/#112/#113 (consume contract shape), engine#658 (gate reads constraints["contract"] + /manifest.contract).
