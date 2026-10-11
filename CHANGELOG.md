@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.44.0] - 2026-10-11
+
+### Features
+
+- **manifest**: Manifest declares its serving contract (ContractSpec) (#110) (#116)
+
+
 ## [0.43.1] - 2026-10-11
 
 ### Miscellaneous Tasks
 
 - **config**: Allow civiltekk-pr-workflow-skill in project config
+- **release**: Prepare v0.43.1
 
 
 ## [0.43.0] - 2026-10-10
