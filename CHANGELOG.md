@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.50.0] - 2026-10-11
+
+### Features
+
+- **contract**: Reject invoke_type lambda — not a platform surface (#131) (#132)
+
+
 ## [0.49.0] - 2026-10-11
 
 ### Features
 
 - **ci**: Fold quality lanes onto betekk-gha reusables (#101) (#127)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.49.0
 
 
 ## [0.48.1] - 2026-10-11
