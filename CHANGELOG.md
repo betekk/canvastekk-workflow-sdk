@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.47.1] - 2026-10-11
+
+### Documentation
+
+- **readme**: Deployment ladder — three rungs, who-calls-invoke_url, sequence diagram (#122)
+
+
 ## [0.47.0] - 2026-10-11
 
 ### Features
 
 - **sdk**: To_openapi() 3.2.0 emission + 2020-12 schema-dialect lint + /openapi vocabulary (#121)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.47.0
 
 
 ## [0.46.0] - 2026-10-11
