@@ -264,7 +264,7 @@ register_node(
 
 ### Rung 2 — Self-hosted (Flask, Django, anything)
 
-You serve the contract yourself; the SDK still validates, verifies, and registers. Declare what you mount, implement the routes (including `dry_run` if you declare it — see [`docs/dry-run-contract.md`](./docs/dry-run-contract.md)), and let the verifier judge the deployment:
+You serve the contract yourself; the SDK still validates, verifies, and registers. The full public specification — routes, payloads, status semantics, dry-run rules — lives in the engine repo: **[The Node HTTP Contract](https://github.com/betekk/canvastekk-workflow-engine/blob/dev/fastapi_app/docs/node-http-contract.md)** (every route with examples + the conformance bar the engine's registration gate enforces). Declare what you mount, implement the routes (including `dry_run` if you declare it — see [`docs/dry-run-contract.md`](./docs/dry-run-contract.md)), and let the verifier judge the deployment:
 
 ```python
 from flask import Flask, jsonify, request
