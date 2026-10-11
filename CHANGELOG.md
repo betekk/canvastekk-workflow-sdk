@@ -2,11 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.48.0] - 2026-10-11
+
+### Features
+
+- **manifest**: Remove sdk version range fields + kill dual-write (#123) (#125)
+
+
 ## [0.47.2] - 2026-10-11
 
 ### Miscellaneous Tasks
 
 - **learnings**: Pipeline run order rebuilt from stale summary after restart
+- **release**: Prepare v0.47.2
 
 
 ## [0.47.1] - 2026-10-11
