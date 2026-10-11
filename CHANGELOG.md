@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.0] - 2026-10-11
+
+### Features
+
+- **ts-sdk**: Ctk_ credentials ride Authorization Bearer (#135) (#136)
+
+
 ## [0.51.0] - 2026-10-11
 
 ### Features
 
 - **registry**: Ctk_ credentials ride Authorization Bearer — dispatch on prefix (#133) (#134)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.51.0
 
 
 ## [0.50.0] - 2026-10-11
