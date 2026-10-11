@@ -5,10 +5,10 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] probe list = declared routes (no hardcoded route list remains in the verifier)
-- [ ] positive probe fires iff `--dry-run` passed AND `capabilities.dry_run` declared (grilled 2026-10-11: registration-time verify stays passive); otherwise skipped, not failed
-- [ ] `verify --dry-run` prints per-route PASS/FAIL and exits non-zero on any FAIL
-- [ ] a deliberately broken route fails the check at the right route name
+- [x] probe list = declared routes (no hardcoded route list remains in the verifier)
+- [x] positive probe fires iff `--dry-run` passed AND `capabilities.dry_run` declared (grilled 2026-10-11: registration-time verify stays passive); otherwise skipped, not failed
+- [x] `verify --dry-run` prints per-route PASS/FAIL and exits non-zero on any FAIL
+- [x] a deliberately broken route fails the check at the right route name
 
 ## Dependency & Consumer Map
 
