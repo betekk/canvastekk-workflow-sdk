@@ -489,14 +489,16 @@ register_node(
     api_key="your-api-key",
 )
 
-# Lambda invocation
+# Lambda-hosted node — still HTTP-contract: expose the function via its
+# Function URL (or the shared gateway) and register like any HTTP node.
+# invoke_type="lambda" (direct AWS invoke) is NOT a platform surface and
+# raises ValueError (#131).
 register_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
-    invoke_type="lambda",
-    invoke_url="arn:aws:lambda:ap-southeast-1:123456789:function:my-node",
-    invoke_config={"region": "ap-southeast-1"},
-    service_token="svs_your-token-here",
+    invoke_type="http",
+    invoke_url="https://my-node.lambda-url.ap-southeast-1.on.aws/",
+    api_key="your-api-key",
 )
 ```
 
@@ -507,7 +509,7 @@ register_node(
 | `node` | `BaseNode` | Yes | The node instance to register |
 | `registry_url` | `str` | Yes | Engine registry endpoint (e.g., `/api/workflows/nodes/`) |
 | `invoke_url` | `str \| None` | No | URL where the node is reachable |
-| `invoke_type` | `"http" \| "lambda" \| "sagemaker" \| "in-process"` | No | Invocation type (default: `"http"`) |
+| `invoke_type` | `"http" \| "sagemaker" \| "in-process"` | No | Invocation type (default: `"http"`). `"lambda"` is rejected — not a platform surface (Function URL/gateway + `"http"` instead, [#131](https://github.com/betekk/canvastekk-workflow-sdk/issues/131)) |
 | `api_key` | `str \| None` | Yes* | API key for auth (`X-API-Key` header) |
 | `service_token` | `str \| None` | Yes* | Service token for CI/CD (`X-Service-Token` header, takes precedence) |
 | `tags` | `list[str] \| None` | No | Searchable tags for the registry |

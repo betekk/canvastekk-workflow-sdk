@@ -242,7 +242,7 @@ class TestRegisterNode:
         """Test that custom invoke_type is included in manifest."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
-        invoke_type = "lambda"
+        invoke_type = "sagemaker"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -695,8 +695,64 @@ class TestRegisterNodeNewFeatures:
                 api_key="key",
             )
 
+    def test_rejects_lambda_invoke_type_with_policy_error(self) -> None:
+        """#131: direct AWS invoke is not a platform surface — every node is
+        HTTP-contract. The rejection names the HTTP path, fires in
+        build_registry_payload (the choke every entry point routes through),
+        and happens BEFORE any HTTP call."""
+        node = DummyNode()
+        with patch("canvastekk_workflow_sdk.registry.httpx.post") as mock_post:
+            with pytest.raises(ValueError, match="not a\\s+supported platform surface.*invoke_type='http'"):
+                register_node(
+                    node,
+                    "https://registry.example.com/api/nodes",
+                    invoke_type="lambda",
+                    invoke_url="arn:aws:lambda:ap-southeast-1:123456789:function:x",
+                    api_key="key",
+                )
+        mock_post.assert_not_called()
+
+    def test_build_registry_payload_rejects_lambda(self) -> None:
+        """The export_definition path hits the same choke guard (no HTTP
+        involved at all)."""
+        from canvastekk_workflow_sdk.registry import build_registry_payload
+
+        manifest = WorkflowNodeManifest(
+            slug="lambda-node",
+            version="1.0.0",
+            name="Lambda Node",
+            description="test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+        )
+        with pytest.raises(ValueError, match="Function URL"):
+            build_registry_payload(manifest, invoke_type="lambda")
+
+    def test_http_payload_unchanged_by_lambda_rejection(self) -> None:
+        """#131 AC: no behavior change for HTTP nodes — byte-level pin."""
+        from canvastekk_workflow_sdk.registry import build_registry_payload
+
+        manifest = WorkflowNodeManifest(
+            slug="http-node",
+            version="1.0.0",
+            name="HTTP Node",
+            description="test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+        )
+        payload = build_registry_payload(
+            manifest,
+            invoke_type="http",
+            invoke_url="https://my-node.example.com",
+        )
+        assert payload["invoke_type"] == "http"
+        assert payload["invoke_url"] == "https://my-node.example.com"
+        assert "node_status" not in payload
+
     def test_accepts_valid_invoke_types(self) -> None:
-        for invoke_type in ("http", "lambda", "sagemaker", "in-process"):
+        # "lambda" deliberately absent: rejected platform surface (#131) —
+        # its rejection is pinned below.
+        for invoke_type in ("http", "sagemaker", "in-process"):
             node = DummyNode()
             mock_response = MagicMock()
             mock_response.status_code = 200

@@ -290,19 +290,28 @@ def execute():
 
 Same registration call as Rung 1 — `verify=True` probes whatever your manifest declares, so a route you declared but didn't mount fails loudly at registration, not in production.
 
-### Rung 3 — No HTTP (lambda, in-process)
+### Rung 3 — No HTTP (in-process only)
 
-No server, no `invoke_url`, no HTTP probes. Register with a non-HTTP `invoke_type`; `verify=True` is unavailable by definition (nothing to probe):
+No server, no `invoke_url`, no HTTP probes. Register with
+`invoke_type="in-process"` (an engine-side admin-gated surface — first-party
+seeds and terminal nodes only); `verify=True` is unavailable by definition
+(nothing to probe):
 
 ```python
 register_node(
     MyNode(),
     registry_url="https://engine.example.com/api/workflows/nodes/",
-    invoke_type="lambda",
-    service_token="svs_xxx",
-    tags=["serverless"],
+    invoke_type="in-process",
 )
 ```
+
+> **`invoke_type="lambda"` is not a platform surface** (removed 2026-10,
+> [#131](https://github.com/betekk/canvastekk-workflow-sdk/issues/131)):
+> the engine never invokes AWS Lambda functions directly — every node is an
+> HTTP-contract node. A Lambda-hosted node is reached via its **Function
+> URL** (or the shared gateway) and registers exactly like Rung 1/2 with
+> `invoke_type="http"`. Passing `"lambda"` raises a `ValueError` at
+> registration.
 
 ### Who calls `invoke_url`?
 
