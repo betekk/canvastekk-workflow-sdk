@@ -42,10 +42,11 @@ External: verifier #112 fires the probe iff `capabilities.dry_run` declared (its
     — **Done:** upload guard `and not response.dry_run` on the output_upload_url branch; files: app.py; fixes: none. (Direct upload-skip test folded into the never-executes proof — uploads only run for status=pass responses produced by execute.)
 
 ### Phase 2: TypeScript mirror + tests
-- [ ] **2.1** request.ts (`dry_run: z.boolean().default(false)`), response.ts (`dry_run` optional), base-node.ts run() branch (same position + capability gate + namespaced id + zero cost), app.ts upload guard — mirrored exactly.
+- [x] **2.1** request.ts (`dry_run: z.boolean().default(false)`), response.ts (`dry_run` optional), base-node.ts run() branch (same position + capability gate + namespaced id + zero cost), app.ts upload guard — mirrored exactly.
     — **Why:** AC1 parity — one change, both packages.
     — **Done when:** mirrored vitest cases green (spy on execute, undeclared failure, upload skip).
     — **Consumers affected:** TS hosts.
+    — **Done:** TS mirror completed from the orphaned session's mid-flight tree: dry_run field + response factory param + run() branch + upload guard verified, 4 vitest cases added (handler-never-runs spy, undeclared structured failure, validation-first, app-level upload skip) — 51 tests green, tsc clean; files: request.ts, response.ts, base-node.ts, app.ts, base-node.test.ts, app.test.ts; fixes: none (resumed work was complete, only tests were missing)
 
 ### Phase 3: Contract doc + full gate
 - [ ] **3.1** docs/dry-run-contract.md: what dry_run MUST do (validate fully, reject invalid inputs, zero side effects, token_usage 0, namespaced ids, respond pass on valid), MUST NOT do (call handlers, write files, upload, bill, mutate state), and how self-hosted implementers declare it (`capabilities.dry_run` in the manifest contract, #110).
@@ -73,3 +74,6 @@ blocked-by #110 (merged). Blocks: SDK #112 (probe), engine#662 (pre-flight). Unb
 
 ## Trace
 GATE 2b050f2 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
+
+
+LOG Ticket taken over from a dead parallel session (user-approved resume): rebased Phase 1 onto 01055a7, force-with-lease pushed fd539f2, completed the uncommitted Phase 2 tree.

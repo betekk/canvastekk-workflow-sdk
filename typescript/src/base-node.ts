@@ -8,7 +8,7 @@ import AjvModule from "ajv";
 const Ajv = AjvModule.default ?? AjvModule;
 import type { ValidateFunction } from "ajv";
 import type { WorkflowNodeManifest } from "./definition.js";
-import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds } from "./definition.js";
+import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds, effectiveContract } from "./definition.js";
 import {
   DEFAULT_MAX_DOWNLOAD_BYTES,
   MAX_REDIRECT_HOPS,
@@ -586,6 +586,32 @@ export abstract class BaseNode {
       this.checkDeprecationLifecycle();
 
       this.validateInputs(request.inputs);
+
+      // D10 (#111): validation-only execution. Branch position IS the
+      // zero-side-effect guarantee — after full input validation, before
+      // context/file-download/middleware/execute/upload. Do not move it.
+      if (request.dry_run) {
+        const dryDurationMs = Math.round(performance.now() - startTime);
+        if (!effectiveContract(def).capabilities.dry_run) {
+          logger.info(`dry-run refused (capability not declared) slug=${def.slug}`);
+          return NodeExecutionResponseFactory.failure(
+            executionId,
+            "dry_run requested but the node does not declare contract.capabilities.dry_run",
+            "NodeConfigurationError",
+            dryDurationMs,
+            "DRY_RUN_NOT_SUPPORTED",
+            true,
+          );
+        }
+        logger.info(`execution slug=${def.slug} status=pass duration_ms=${dryDurationMs} dry_run=true`);
+        return NodeExecutionResponseFactory.success(
+          `dryrun-${executionId}`,
+          {},
+          dryDurationMs,
+          0.0,
+          true,
+        );
+      }
 
       const context = new ExecutionContext({
         request,

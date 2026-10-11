@@ -162,7 +162,8 @@ export function createNodeApp(
         response = await node.run(execRequest);
       }
 
-      if (execRequest.output_upload_url && response.status === "pass") {
+      // D10 (#111): a dry-run pass carries no outputs — never upload.
+      if (execRequest.output_upload_url && response.status === "pass" && !response.dry_run) {
         const fileOutputFields = getFileOutputFields(def);
         if (fileOutputFields.length > 0) {
           try {

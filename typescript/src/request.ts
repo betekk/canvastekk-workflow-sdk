@@ -34,6 +34,11 @@ export const NodeExecutionRequestSchema = z.object({
     .union([z.record(z.string(), z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
     .optional()
     .default(null),
+  // D10 (#111): request a validation-only execution — full input validation,
+  // then a synthetic pass: no handler, no file I/O, token_usage 0, execution_id
+  // namespaced 'dryrun-'. Honored only when the node declares
+  // contract.capabilities.dry_run (docs/dry-run-contract.md).
+  dry_run: z.boolean().default(false),
 });
 
 /**

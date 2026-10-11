@@ -564,3 +564,61 @@ describe("BaseNode execution_id propagation (#3498)", () => {
     expect(a.execution_id).toHaveLength(36);
   });
 });
+
+describe("run() dry-run (D10 #111)", () => {
+  class DryEchoNode extends EchoNode {
+    definition: WorkflowNodeManifest = {
+      ...new EchoNode().definition,
+      contract: {
+        transport: "http",
+        routes: ["/execute", "/health", "/manifest"],
+        capabilities: { dry_run: true },
+        openapi: "3.2",
+      },
+    };
+  }
+
+  it("declaring node: validation-only pass — zero cost, dryrun- id, handler never runs", async () => {
+    const node = new DryEchoNode();
+    const spy = vi.spyOn(node, "execute");
+    const resp = await node.run({
+      run_id: "run-dry-1",
+      node_id: "n1",
+      inputs: { message: "hi" },
+      dry_run: true,
+    });
+    expect(resp.status).toBe("pass");
+    expect(resp.dry_run).toBe(true);
+    expect(resp.token_usage).toBe(0);
+    expect(resp.outputs).toEqual({});
+    expect(resp.execution_id.startsWith("dryrun-")).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("undeclared capability: structured DRY_RUN_NOT_SUPPORTED failure", async () => {
+    const node = new EchoNode();
+    const spy = vi.spyOn(node, "execute");
+    const resp = await node.run({
+      run_id: "run-dry-2",
+      node_id: "n1",
+      inputs: { message: "hi" },
+      dry_run: true,
+    });
+    expect(resp.status).toBe("fail");
+    expect(resp.dry_run).toBe(true);
+    expect(resp.error_code).toBe("DRY_RUN_NOT_SUPPORTED");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("validates inputs BEFORE the dry-run branch (full validation)", async () => {
+    const node = new DryEchoNode();
+    const resp = await node.run({
+      run_id: "run-dry-3",
+      node_id: "n1",
+      inputs: { message: 12345 }, // wrong type
+      dry_run: true,
+    });
+    expect(resp.status).toBe("fail");
+    expect(resp.error_code).toBe("VALIDATION_ERROR");
+  });
+});

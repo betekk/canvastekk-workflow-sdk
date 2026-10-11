@@ -9,6 +9,10 @@ export const NodeExecutionResponseSchema = z.object({
   error: z.string().nullable().default(null),
   error_type: z.string().nullable().default(null),
   error_code: z.string().nullable().default(null),
+  // D10 (#111): true when this response is a validation-only dry run —
+  // nothing executed, token_usage 0, execution_id carries the 'dryrun-'
+  // namespace.
+  dry_run: z.boolean().default(false),
 });
 
 /**
@@ -41,6 +45,7 @@ function createSuccessResponse(
   outputs: Record<string, unknown>,
   durationMs = 0,
   tokenUsage = 0.0,
+  dryRun = false,
 ): NodeExecutionResponse {
   return {
     execution_id: executionId,
@@ -51,6 +56,7 @@ function createSuccessResponse(
     error: null,
     error_type: null,
     error_code: null,
+    dry_run: dryRun,
   };
 }
 
@@ -70,6 +76,7 @@ function createFailureResponse(
   errorType: string | null = null,
   durationMs = 0,
   errorCode: string | null = null,
+  dryRun = false,
 ): NodeExecutionResponse {
   return {
     execution_id: executionId,
@@ -79,6 +86,7 @@ function createFailureResponse(
     error_type: errorType,
     duration_ms: durationMs,
     error_code: errorCode,
+    dry_run: dryRun,
     token_usage: 0.0,
   };
 }
