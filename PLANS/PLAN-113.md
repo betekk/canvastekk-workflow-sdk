@@ -7,7 +7,7 @@
 > Note: the previous PLAN under this name (verifier scope) was #112's work — merged via #118 and renamed `PLANS/PLAN-112.md` in the branch's first commit (f1d3978).
 
 ## Acceptance Criteria
-- [ ] `to_openapi()` output declares openapi 3.2.0 and validates against a 3.2 parser
+- [x] `to_openapi()` output declares openapi 3.2.0 and validates against a 3.2 parser
 - [x] dialect lint flags non-2020-12 schema constructs with field paths
 - [x] reconciliation rule vs fastapi served doc documented (manifest doc canonical)
 - [x] golden-file test pins the emitted document shape
