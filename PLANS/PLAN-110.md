@@ -57,14 +57,16 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
     — **Done:** 6 mirrored cases (vocab/min/dup/accept + nullable round-trip) — 53 passed; files: typescript/tests/definition.test.ts; fixes: none.
 
 ### Phase 3: Adapters stamp the contract
-- [ ] **3.1** fastapi `create_node_app`: serve the contract on `/manifest` via a derived property — `WorkflowNodeManifest.effective_contract` (returns the declared `contract` when set, else the SDK-served default: transport http, the 7 mounted routes, dry_run False, openapi 3.2). The adapter MUTATES nothing; the property is the stamp (arch fold: single-writer discipline, matches `effective_runtime_seconds` precedent at definition.py:299).
+- [x] **3.1** fastapi `create_node_app`: serve the contract on `/manifest` via a derived property — `WorkflowNodeManifest.effective_contract` (returns the declared `contract` when set, else the SDK-served default: transport http, the 7 mounted routes, dry_run False, openapi 3.2). The adapter MUTATES nothing; the property is the stamp (arch fold: single-writer discipline, matches `effective_runtime_seconds` precedent at definition.py:299).
     — **Why:** AC3 — SDK-served authors get the contract with zero input; the stamped list must equal what the adapter ACTUALLY mounts (it is the source of truth D8 names).
     — **Done when:** app test — create_node_app on a bare node → GET /manifest shows contract.routes == the 7 mounted paths; a node with a DECLARED subset keeps its declaration.
     — **Consumers affected:** /manifest consumers (registry cross-check, future gate).
-- [ ] **3.2** express `createNodeApp`: same derived-property stamp on the TS side (`effectiveContract` getter on the manifest type via the schema's exported helper, or the adapter's manifest response composes it) with the same 7 paths (TS constant).
+    — **Done:** effective_contract property consumed at the /manifest composition (zero mutation); sdk-served 7-route default + declared-subset-wins tests green (76 passed); files: app.py, tests/test_app.py; fixes: test fixture echo_node absent → construct EchoNode directly.
+- [x] **3.2** express `createNodeApp`: same derived-property stamp on the TS side (`effectiveContract` getter on the manifest type via the schema's exported helper, or the adapter's manifest response composes it) with the same 7 paths (TS constant).
     — **Why:** AC3 parity of adapters.
     — **Done when:** ts app test — /manifest body carries contract with the 7 routes; declared subset wins.
     — **Consumers affected:** same, TS side.
+    — **Done:** effectiveContract() helper + SDK_SERVED_CONTRACT_ROUTES in definition.ts; /manifest stamps it after null-drop; 24 app tests + eslint + tsc green; files: definition.ts, app.ts, tests/app.test.ts; fixes: none.
 
 ### Phase 4: Registry payload carries the contract
 - [ ] **4.1** `build_registry_payload`: when `definition.contract is not None` (the DECLARED contract — not the effective default; self-hosted registrations reflect the author's declaration), set `resolved_constraints["contract"] = definition.contract.model_dump(mode="json")` (caller-supplied constraints win, per the existing merge rule); docstring notes the wire decision (constraints placement vs extra=forbid engine).
@@ -107,3 +109,4 @@ None (root of the SDK slice). Blocks: SDK #111/#112/#113 (consume contract shape
 ## Trace
 GATE 2a5d587 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
 GATE cfb731b tier=light lint=t typecheck=t build=- unit=t e2e=n.a
+GATE b043fef tier=light lint=t typecheck=t build=- unit=t e2e=n.a

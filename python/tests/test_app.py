@@ -1334,3 +1334,27 @@ class TestInlineTimeoutDetails:
             json={"run_id": "r-hang", "node_id": "n-hang", "inputs": {}, "execution_id": "ecs-99"},
         )
         assert resp.json()["execution_id"] == "ecs-99"
+
+
+class TestManifestContract:
+    """D8/#110: the adapter stamps the effective serving contract on /manifest."""
+
+    def test_manifest_carries_sdk_served_contract(self, echo_client: TestClient) -> None:
+        """Bare node (no declared contract) → the SDK-served 7-route default."""
+        data = echo_client.get("/manifest").json()
+        assert data["contract"]["transport"] == "http"
+        assert data["contract"]["routes"] == [
+            "/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready",
+        ]
+        assert data["contract"]["capabilities"] == {"dry_run": False}
+        assert data["contract"]["openapi"] == "3.2"
+
+    def test_manifest_declared_contract_wins(self) -> None:
+        """A declared subset is served verbatim — the default never overrides it."""
+        from canvastekk_workflow_sdk.definition import NodeContract
+
+        node = EchoNode()
+        node.definition.contract = NodeContract(routes=["/execute", "/health", "/manifest"])
+        client = TestClient(create_node_app(node))
+        data = client.get("/manifest").json()
+        assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]

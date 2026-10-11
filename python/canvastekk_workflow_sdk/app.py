@@ -566,6 +566,10 @@ def create_node_app(
         else:
             mode = "production"
         content["mode"] = mode
+        # D8/#110: the adapter stamps the effective contract — a declared
+        # subset wins, else the SDK-served default (exactly the routes this
+        # app mounts: SDK_SERVED_CONTRACT_ROUTES).
+        content["contract"] = node.definition.effective_contract.model_dump(mode="json")
         return JSONResponse(content=content)
 
     @router.post(

@@ -198,6 +198,26 @@ export const NodeContractSchema = z
 
 export type NodeContract = z.infer<typeof NodeContractSchema>;
 
+/** What the SDK-served adapters actually mount (ordered; mirrors python SDK_SERVED_CONTRACT_ROUTES). */
+export const SDK_SERVED_CONTRACT_ROUTES: readonly string[] = [
+  "/execute",
+  "/health",
+  "/manifest",
+  "/hook",
+  "/metrics",
+  "/live",
+  "/ready",
+];
+
+/**
+ * The contract a node serves: declared, or the SDK-served default (D8/#110).
+ * Derived helper — the adapter's /manifest stamps this; the author's declared
+ * subset always wins.
+ */
+export function effectiveContract(manifest: Pick<WorkflowNodeManifest, "contract">): NodeContract {
+  return manifest.contract ?? NodeContractSchema.parse({ routes: [...SDK_SERVED_CONTRACT_ROUTES] });
+}
+
 const WorkflowNodeManifestObjectSchema = z
   .object({
     id: z.unknown().optional(),
