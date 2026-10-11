@@ -5,9 +5,9 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] bundled skill and .agents mirror identical; mirror-guard CI green
-- [ ] registration auth section covers all credential paths incl. verify=True
-- [ ] skill triggers updated; description ≤50 words
+- [x] bundled skill and .agents mirror identical; mirror-guard CI green
+- [x] registration auth section covers all credential paths incl. verify=True
+- [x] skill triggers updated; description ≤50 words
 
 ## Dependency & Consumer Map
 
