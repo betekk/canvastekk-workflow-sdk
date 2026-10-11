@@ -69,14 +69,16 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
     — **Done:** effectiveContract() helper + SDK_SERVED_CONTRACT_ROUTES in definition.ts; /manifest stamps it after null-drop; 24 app tests + eslint + tsc green; files: definition.ts, app.ts, tests/app.test.ts; fixes: none.
 
 ### Phase 4: Registry payload carries the contract
-- [ ] **4.1** `build_registry_payload`: when `definition.contract is not None` (the DECLARED contract — not the effective default; self-hosted registrations reflect the author's declaration), set `resolved_constraints["contract"] = definition.contract.model_dump(mode="json")` (caller-supplied constraints win, per the existing merge rule); docstring notes the wire decision (constraints placement vs extra=forbid engine).
+- [x] **4.1** `build_registry_payload`: when `definition.contract is not None` (the DECLARED contract — not the effective default; self-hosted registrations reflect the author's declaration), set `resolved_constraints["contract"] = definition.contract.model_dump(mode="json")` (caller-supplied constraints win, per the existing merge rule); docstring notes the wire decision (constraints placement vs extra=forbid engine).
     — **Why:** AC4 — the engine registration path must receive the contract; constraints placement keeps TODAY's engine accepting the payload (engine #658 reads + promotes it).
     — **Done when:** TestBuildRegistryPayload: definition with contract → payload["constraints"]["contract"] present and shape-pinned; definition without → key absent.
     — **Consumers affected:** register_node, export_definition, TS mirror.
-- [ ] **4.2** TS `buildEngineRequest` mirror: same constraints merge behavior; cli.test.ts case for both presence and absence.
+    — **Done:** declared-only carry via setdefault-style merge (caller wins); 3 TestBuildRegistryPayload cases (rides/absent/caller-wins) green; files: registry.py, tests/test_registry.py; fixes: appended tests landed under the wrong class (TestStampedDualWrite) — relocated into TestBuildRegistryPayload, indent repaired.
+- [x] **4.2** TS `buildEngineRequest` mirror: same constraints merge behavior; cli.test.ts case for both presence and absence.
     — **Why:** AC4 parity — the CLI's offline engine-request mirror must not drift from the py payload builder.
     — **Done when:** cli.test.ts green with mirrored cases.
     — **Consumers affected:** probeManifest (mirror probe), CLI register.
+    — **Done:** buildRegistryPayload (TS single source; buildEngineRequest delegates) mirrors the same constraints merge — 2 cli.test.ts cases; full suites green (py 848, ts 387).
 
 ### Phase 5: Full gate + LEARNINGS
 - [ ] **5.1** Full gate: python (ruff + pytest) and typescript (eslint + tsc --noEmit + tsc tests + vitest) — all green on the same tree.
@@ -110,3 +112,4 @@ None (root of the SDK slice). Blocks: SDK #111/#112/#113 (consume contract shape
 GATE 2a5d587 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
 GATE cfb731b tier=light lint=t typecheck=t build=- unit=t e2e=n.a
 GATE b043fef tier=light lint=t typecheck=t build=- unit=t e2e=n.a
+GATE 133a7aa tier=light lint=t typecheck=t build=- unit=t e2e=n.a

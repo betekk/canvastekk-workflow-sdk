@@ -61,6 +61,26 @@ describe("buildEngineRequest (DA-2603)", () => {
     expect(payload["invoke_url"]).toBe("https://nodes.example.com/echo/execute");
   });
 
+  it("carries the declared contract inside constraints (D8 #110)", () => {
+    const withContract = parseManifest({
+      ...canonicalManifest,
+      contract: { routes: ["/execute", "/health", "/manifest"] },
+    });
+    const payload = buildEngineRequest(withContract);
+    const constraints = payload["constraints"] as Record<string, unknown>;
+    const contract = constraints["contract"] as Record<string, unknown>;
+    expect(contract["routes"]).toEqual(["/execute", "/health", "/manifest"]);
+    expect(contract["transport"]).toBe("http");
+    expect(contract["openapi"]).toBe("3.2");
+    expect(payload["contract"]).toBeUndefined(); // never top-level on the wire
+  });
+
+  it("omits contract when undeclared (D8 #110)", () => {
+    const payload = buildEngineRequest(parseManifest(canonicalManifest));
+    const constraints = payload["constraints"] as Record<string, unknown>;
+    expect(constraints["contract"]).toBeUndefined();
+  });
+
   it("maps sdk constraints and stays within the engine whitelist", () => {
     const payload = buildEngineRequest(
       parseManifest({ ...canonicalManifest, minimum_sdk_version: "0.27.0", docs_url: "https://docs.example.com" }),

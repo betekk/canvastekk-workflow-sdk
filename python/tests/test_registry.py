@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from canvastekk_workflow_sdk import DeprecationInfo, WorkflowNodeManifest
+from canvastekk_workflow_sdk import DeprecationInfo, NodeContract, WorkflowNodeManifest
 from canvastekk_workflow_sdk.base import BaseNode
 from canvastekk_workflow_sdk.context import ExecutionContext
 from canvastekk_workflow_sdk.registry import (
@@ -417,6 +417,34 @@ class TestBuildRegistryPayload:
         )
         defaults.update(overrides)
         return WorkflowNodeManifest(**defaults)
+
+    def test_contract_rides_constraints_when_declared(self) -> None:
+        """D8/#110: declared contract lands in constraints (engine extra=forbid wire-compat)."""
+        definition = self._make_definition(
+            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
+        )
+        payload = build_registry_payload(definition)
+        assert payload["constraints"]["contract"] == {
+            "transport": "http",
+            "routes": ["/execute", "/health", "/manifest"],
+            "capabilities": {"dry_run": False},
+            "openapi": "3.2",
+        }
+        assert "contract" not in payload  # never top-level on the wire
+
+    def test_contract_absent_when_undeclared(self) -> None:
+        definition = self._make_definition()
+        payload = build_registry_payload(definition)
+        assert "contract" not in payload.get("constraints", {})
+
+    def test_caller_contract_wins(self) -> None:
+        definition = self._make_definition(
+            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
+        )
+        payload = build_registry_payload(
+            definition, constraints={"contract": {"caller": True}}
+        )
+        assert payload["constraints"]["contract"] == {"caller": True}
 
     def test_maps_title_to_label(self) -> None:
         definition = self._make_definition(title="My Node")
