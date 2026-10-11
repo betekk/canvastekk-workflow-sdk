@@ -272,11 +272,10 @@ def build_registry_payload(
         invoke_url: URL/ARN for invoking the node.
         invoke_config: Extra invocation parameters.
         tags: Searchable tags for the registry.
-        constraints: Resource/compatibility constraints. Manifest compat
-            fields (``minimum_sdk_version`` / ``maximum_sdk_version``) and
-            docs fields are merged in; caller-supplied keys win on collision.
+        constraints: Resource/compatibility constraints. Manifest docs
+        fields are merged in; caller-supplied keys win on collision.
         node_status: Ignored — kept for backward compatibility. The engine
-            request schema has no ``node_status`` field.
+        request schema has no ``node_status`` field.
 
     Returns:
         A dict matching the engine's RegisterWorkflowNodeRequest schema.
@@ -287,8 +286,6 @@ def build_registry_payload(
 
     resolved_constraints = dict(constraints) if constraints else {}
     for key, value in (
-        ("minimum_sdk_version", definition.minimum_sdk_version),
-        ("maximum_sdk_version", definition.maximum_sdk_version),
         ("docs_url", definition.docs_url),
         ("changelog_url", definition.changelog_url),
     ):
@@ -301,10 +298,12 @@ def build_registry_payload(
     # promote it to a top-level field engine-side. Caller-supplied wins.
     if definition.contract is not None and "contract" not in resolved_constraints:
         resolved_constraints["contract"] = definition.contract.model_dump(mode="json")
-    # DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
+    # DA-3359 stamped provenance — the ONLY version key on the wire. The
+    # legacy minimum_sdk_version dual-write was removed in #123 (D16:
+    # versions are provenance, never admission gates; the engine's gate is
+    # advisory since engine#671 and behavioral in #658).
     # Explicit caller constraints always win over the merge.
     resolved_constraints.setdefault("sdk_version", definition.sdk_version)
-    resolved_constraints.setdefault("minimum_sdk_version", definition.sdk_version)
 
     payload: dict[str, Any] = {
         "name": definition.slug,

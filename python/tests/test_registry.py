@@ -534,26 +534,25 @@ class TestBuildRegistryPayload:
         assert payload["constraints"].get("sdk_version") == definition.sdk_version
 
     def test_constraints_always_carry_stamp(self) -> None:
-        """DA-3359: provenance is always present — sdk_version + legacy dual-write."""
+        """DA-3359/#123: provenance is always present — sdk_version is the sole version key."""
         definition = self._make_definition()
         payload = build_registry_payload(definition)
         constraints = payload.get("constraints", {})
         assert constraints.get("sdk_version") == definition.sdk_version
-        assert constraints.get("minimum_sdk_version") == definition.sdk_version
+        assert "minimum_sdk_version" not in constraints
 
-    def test_constraints_merges_manifest_compat_fields(self) -> None:
-        """DA-1955: manifest compat + docs fields land in constraints."""
+    def test_constraints_merges_manifest_docs_fields(self) -> None:
+        """DA-1955/#123: docs fields land in constraints; legacy version keys never do."""
         definition = self._make_definition(
-            minimum_sdk_version="0.22.0",
-            maximum_sdk_version="1.0.0",
+            minimum_sdk_version="0.22.0",  # legacy manifest key — ignored at construction
             docs_url="https://example.com/docs",
             changelog_url="https://example.com/changelog",
         )
         payload = build_registry_payload(definition)
-        assert payload["constraints"]["minimum_sdk_version"] == "0.22.0"
-        assert payload["constraints"]["maximum_sdk_version"] == "1.0.0"
         assert payload["constraints"]["docs_url"] == "https://example.com/docs"
         assert payload["constraints"]["changelog_url"] == "https://example.com/changelog"
+        assert "minimum_sdk_version" not in payload["constraints"]
+        assert "maximum_sdk_version" not in payload["constraints"]
 
     def test_constraints_caller_wins_on_key_collision(self) -> None:
         """DA-1955: caller-supplied constraints override manifest compat fields."""
@@ -982,12 +981,13 @@ class TestStampedDualWrite:
         defaults.update(overrides)
         return WorkflowNodeManifest(**defaults)
 
-    def test_payload_carries_both_keys(self) -> None:
+    def test_payload_carries_stamp_only(self) -> None:
+        """#123: the dual-write is dead — sdk_version only."""
         definition = self._definition()
         payload = build_registry_payload(definition)
         constraints = payload.get("constraints", {})
         assert constraints.get("sdk_version") == definition.sdk_version
-        assert constraints.get("minimum_sdk_version") == definition.sdk_version
+        assert "minimum_sdk_version" not in constraints
 
     def test_explicit_caller_constraints_win(self) -> None:
         definition = self._definition()

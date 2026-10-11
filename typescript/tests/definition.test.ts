@@ -344,15 +344,13 @@ describe("WorkflowNodeManifestSchema deprecation field (DA-1582)", () => {
 });
 
 describe("WorkflowNodeManifestSchema compat and docs fields (DA-1955)", () => {
-  it("defaults all four fields to null", () => {
+  it("defaults docs fields to null; version range fields gone (#123)", () => {
     const def = WorkflowNodeManifestSchema.parse(validDefinition);
-    expect(def.minimum_sdk_version).toBeNull();
-    expect(def.maximum_sdk_version).toBeNull();
     expect(def.docs_url).toBeNull();
     expect(def.changelog_url).toBeNull();
   });
 
-  it("parses valid compat and docs values", () => {
+  it("old manifests declaring the removed version keys parse cleanly, keys stripped (#123)", () => {
     const def = WorkflowNodeManifestSchema.parse({
       ...validDefinition,
       minimum_sdk_version: "0.22.0",
@@ -360,19 +358,18 @@ describe("WorkflowNodeManifestSchema compat and docs fields (DA-1955)", () => {
       docs_url: "https://example.com/docs",
       changelog_url: "https://example.com/changelog",
     });
-    expect(def.minimum_sdk_version).toBe("0.22.0");
-    expect(def.maximum_sdk_version).toBe("1.0.0");
+    expect(def).not.toHaveProperty("minimum_sdk_version");
+    expect(def).not.toHaveProperty("maximum_sdk_version");
     expect(def.docs_url).toBe("https://example.com/docs");
     expect(def.changelog_url).toBe("https://example.com/changelog");
   });
 
-  it("rejects non-semver sdk versions", () => {
-    expect(() =>
-      WorkflowNodeManifestSchema.parse({
-        ...validDefinition,
-        minimum_sdk_version: "0.22",
-      }),
-    ).toThrow();
+  it("strips even invalid legacy version values instead of rejecting (#123/D16)", () => {
+    const def = WorkflowNodeManifestSchema.parse({
+      ...validDefinition,
+      minimum_sdk_version: "0.22",
+    });
+    expect(def).not.toHaveProperty("minimum_sdk_version");
   });
 
   it("rejects non-http docs_url", () => {

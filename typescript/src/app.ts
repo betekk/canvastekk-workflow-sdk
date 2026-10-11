@@ -239,8 +239,6 @@ export function createNodeApp(
       // optional keys instead of leaking them as explicit nulls.
       for (const key of [
         "deprecation",
-        "minimum_sdk_version",
-        "maximum_sdk_version",
         "docs_url",
         "changelog_url",
         "contract",

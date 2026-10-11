@@ -98,9 +98,11 @@ describe("buildRegistryPayload", () => {
     });
   });
 
-  it("merges manifest compat fields into constraints (DA-1955)", () => {
+  it("merges manifest docs fields into constraints; version keys never emitted (#123)", () => {
     const def = {
       ...testDef,
+      // #123/D16: the removed range fields still parse (zod strips unknown)
+      // but never reach the payload constraints.
       minimum_sdk_version: "0.22.0",
       maximum_sdk_version: "1.0.0",
       docs_url: "https://example.com/docs",
@@ -108,15 +110,15 @@ describe("buildRegistryPayload", () => {
     };
     const payload = buildRegistryPayload(def);
     expect(payload.constraints).toMatchObject({
-      minimum_sdk_version: "0.22.0",
-      maximum_sdk_version: "1.0.0",
       docs_url: "https://example.com/docs",
       changelog_url: "https://example.com/changelog",
     });
+    expect(payload.constraints).not.toHaveProperty("minimum_sdk_version");
+    expect(payload.constraints).not.toHaveProperty("maximum_sdk_version");
   });
 
   it("caller constraints win on key collision (DA-1955)", () => {
-    const def = { ...testDef, minimum_sdk_version: "0.22.0" };
+    const def = { ...testDef, docs_url: "https://example.com/docs" };
     const payload = buildRegistryPayload(def, {
       constraints: { minimum_sdk_version: "0.21.0", gpu_required: true },
     });
@@ -127,11 +129,11 @@ describe("buildRegistryPayload", () => {
     expect(constraints.sdk_version).toBe(VERSION);
   });
 
-  it("always carries the stamped provenance (DA-3359 supersedes the DA-1955 omission)", () => {
+  it("always carries the stamped provenance — the sole version key (#123)", () => {
     const payload = buildRegistryPayload({ ...testDef });
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.sdk_version).toBeTruthy();
-    expect(constraints.minimum_sdk_version).toBeTruthy();
+    expect(constraints.minimum_sdk_version).toBeUndefined();
   });
 
   it("payload keys are a subset of engine request fields (DA-1955)", () => {
@@ -310,15 +312,17 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
   });
 });
 
-describe("stamped dual-write (DA-3359)", () => {
-  it("payload carries sdk_version + legacy minimum_sdk_version", () => {
+describe("stamped provenance — dual-write dead (#123)", () => {
+  it("payload carries sdk_version ONLY; no legacy minimum_sdk_version", () => {
     const payload = buildRegistryPayload({ ...testDef });
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.sdk_version).toBe(VERSION);
-    expect(constraints.minimum_sdk_version).toBe(VERSION);
+    expect(constraints).not.toHaveProperty("minimum_sdk_version");
   });
 
-  it("explicit caller constraints win over the legacy merge; stamp is forced", () => {
+  it("caller constraints are caller data (passthrough); the stamp is forced", () => {
+    // #123: the SDK never WRITES minimum_sdk_version from manifest/stamp paths;
+    // an explicit caller constraint is arbitrary metadata and passes through.
     const payload = buildRegistryPayload(
       { ...testDef, sdk_version: "0.40.0" },
       { constraints: { minimum_sdk_version: "0.23.1" } },

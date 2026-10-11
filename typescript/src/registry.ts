@@ -70,8 +70,6 @@ export function buildRegistryPayload(
   // DA-1955: manifest compat + docs fields merge into constraints; caller wins.
   const resolvedConstraints: Record<string, unknown> = { ...(constraints ?? {}) };
   const manifestConstraintFields: [string, string | null][] = [
-    ["minimum_sdk_version", definition.minimum_sdk_version ?? null],
-    ["maximum_sdk_version", definition.maximum_sdk_version ?? null],
     ["docs_url", definition.docs_url ?? null],
     ["changelog_url", definition.changelog_url ?? null],
   ];
@@ -80,13 +78,12 @@ export function buildRegistryPayload(
       resolvedConstraints[key] = value;
     }
   }
-  // DA-3359: stamped provenance + legacy dual-write (dropped in 0.38).
-  // The sdk_version stamp is ALWAYS the installed VERSION (python parity —
-  // a manifest parsed from disk carries its authoring stamp; provenance is
-  // the SDK doing the registering). The legacy key stays caller-wins.
-  if (!("minimum_sdk_version" in resolvedConstraints)) {
-    resolvedConstraints.minimum_sdk_version = definition.sdk_version ?? VERSION;
-  }
+  // DA-3359 stamped provenance — the ONLY version key on the wire (the
+  // legacy minimum_sdk_version dual-write was removed in #123/D16:
+  // versions are provenance, never admission gates; the engine gate is
+  // advisory since engine#671 and behavioral in #658). The stamp is ALWAYS
+  // the installed VERSION (python parity — a manifest parsed from disk
+  // carries its authoring stamp; provenance is the SDK doing the registering).
   resolvedConstraints.sdk_version = VERSION;
 
   // D8/#110: the DECLARED serving contract rides constraints — the engine's
