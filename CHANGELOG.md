@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.48.1] - 2026-10-11
+
+### Documentation
+
+- **readme**: Link the public Node HTTP Contract spec (engine #666) (#126)
+
+
 ## [0.48.0] - 2026-10-11
 
 ### Features
 
 - **manifest**: Remove sdk version range fields + kill dual-write (#123) (#125)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.48.0
 
 
 ## [0.47.2] - 2026-10-11
