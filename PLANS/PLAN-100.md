@@ -29,10 +29,11 @@
     — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; files: .github/workflows/ci-python.yml; fixes: none
 
 ### Phase 2: Pin runner image in ci-typescript.yml
-- [ ] **2.1** Same replacement in `.github/workflows/ci-typescript.yml` — probe job `runs-on` (line 26), fallback literals (lines 70, 73), comment prose (line 22)
+- [x] **2.1** Same replacement in `.github/workflows/ci-typescript.yml` — probe job `runs-on` (line 26), fallback literals (lines 70, 73), comment prose (line 22)
     — **Why:** identical 26.04 deadline exposure in the TS lane; same pin semantics keep both CI lanes on one image
     — **Done when:** `grep -c 'ubuntu-latest' .github/workflows/ci-typescript.yml` returns 0 and the file parses via `yaml.safe_load`
     — **Consumers affected:** every typescript-lane PR and main push
+    — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; files: .github/workflows/ci-typescript.yml; fixes: none
 
 ### Phase 3: Pin runner image in release.yml
 - [ ] **3.1** Same replacement in `.github/workflows/release.yml` — probe job `runs-on` (line 23), fallback literals (lines 67, 70), comment prose (line 19); no other release-lane behavior changes (the `sdk-released` dispatch contract is out of scope per #101)
@@ -66,3 +67,6 @@ None (no `blocked-by`). Time constraint: Oct 19, 2026 migration date.
 - Release-lane regression → Phase 3 changes only the image strings; dispatch payload contract untouched per #101.
 
 ## Trace
+
+
+GATE 78f0f43 tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
