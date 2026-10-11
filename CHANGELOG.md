@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.51.0] - 2026-10-11
+
+### Features
+
+- **registry**: Ctk_ credentials ride Authorization Bearer — dispatch on prefix (#133) (#134)
+
+
 ## [0.50.0] - 2026-10-11
 
 ### Features
 
 - **contract**: Reject invoke_type lambda — not a platform surface (#131) (#132)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.50.0
 
 
 ## [0.49.0] - 2026-10-11
