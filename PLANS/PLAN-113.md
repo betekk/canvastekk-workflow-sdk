@@ -31,10 +31,11 @@
     — **Done:** to_openapi() emitted (3.2.0, per-family operations, schemas on /execute); golden file pinned + effective-default + schema-carry tests (3 pass), ruff clean; files: definition.py, tests/test_openapi.py, tests/golden/openapi-3.2-echo.json; fixes: 1 (dead /execute condition in the family elif — simplified before commit)
 
 ### Phase 2: 2020-12 schema-dialect lint
-- [ ] **2.1** New `schema_dialect.py`: `lint_schema_dialect(schema: dict) -> list[tuple[str, str]]` returning `(json_path, message)` for non-2020-12 constructs — draft-07 `$schema` URIs, `definitions` (→ `$defs`), object-of-arrays `dependencies` (→ `dependentRequired`/`dependentSchemas`), boolean `exclusiveMinimum/Maximum` (draft-04), `recursiveAnchor` (2019-09) — recursing through `properties`/`items`/`$defs`/`additionalProperties` with accurate `$`-paths
+- [x] **2.1** New `schema_dialect.py`: `lint_schema_dialect(schema: dict) -> list[tuple[str, str]]` returning `(json_path, message)` for non-2020-12 constructs — draft-07 `$schema` URIs, `definitions` (→ `$defs`), object-of-arrays `dependencies` (→ `dependentRequired`/`dependentSchemas`), boolean `exclusiveMinimum/Maximum` (draft-04), `recursiveAnchor` (2019-09) — recursing through `properties`/`items`/`$defs`/`additionalProperties` with accurate `$`-paths
     — **Why:** AC2 — the manifest's schema dialect is unchecked today; authors get named, pathed violations instead of silent dialect drift
     — **Done when:** `tests/test_schema_dialect.py` covers each flagged construct + a clean 2020-12 schema returns `[]`; paths verified for nested cases; ruff clean
     — **Consumers affected:** none in-repo (new surface); CLI/verifier wiring deliberately deferred (noted in PLAN Risks)
+    — **Done:** lint_schema_dialect shipped: pre-2020-12 $schema URIs, definitions, recursiveAnchor, boolean exclusiveMin/Max, dependencies split by shape, array-form items (recursed); 7 tests incl. nested paths; files: schema_dialect.py, tests/test_schema_dialect.py; fixes: none
 
 ### Phase 3: `/openapi` vocabulary entry (both stacks) + reconciliation doc
 - [ ] **3.1** Add `/openapi` to `CONTRACT_ROUTE_VOCABULARY` in `definition.py` AND `typescript/src/definition.ts` in the SAME change with parity accept/reject tests both sides (repo rule: validator loops must cover new fields); minimum set unchanged; `SDK_SERVED_CONTRACT_ROUTES` unchanged (adapters do not mount it)
