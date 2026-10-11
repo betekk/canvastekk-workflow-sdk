@@ -1,0 +1,21 @@
+name: Reusable load probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/ci-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-python.yml@v1.3.28
+    with:
+      runner-labels: '["ubuntu-latest"]'
+      python-version: '3.12'
+      working-directory: python
+      poetry-install-args: '-E fastapi'
+      run-mypy: false
+      pytest-args: 'tests/test_app.py -q'
