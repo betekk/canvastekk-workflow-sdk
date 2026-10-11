@@ -35,10 +35,11 @@ Docs-only change — no code paths. The bundled copy is canonical; the mirror MU
     — **Done:** mirror copied byte-identical (cmp exit 0); files: .agents mirror SKILL.md; fixes: none
 
 ### Phase 3: Full gate
-- [ ] **3.1** Full gate on the final tree: mirror `cmp` clean; description word count ≤50; markdown renders (no broken fences — fenced-block balance check); diff scope = the two SKILL.md files + PLAN only. Python/TS test legs n.a. (docs-only change — justified deviation in Trace; CI mirror-guard is the authoritative check)
+- [x] **3.1** Full gate on the final tree: mirror `cmp` clean; description word count ≤50; markdown renders (no broken fences — fenced-block balance check); diff scope = the two SKILL.md files + PLAN only. Python/TS test legs n.a. (docs-only change — justified deviation in Trace; CI mirror-guard is the authoritative check)
     — **Why:** ticket exit gate — the last verification before PR
     — **Done when:** all local checks green; `GATE <sha> tier=full` memo appended
     — **Consumers affected:** none beyond the above
+    — **Done:** full gate: cmp identical, description 43<=50 words, fences balanced, three-dot diff scope = 2 SKILL.md + PLAN only (14 credential-path references present); python/TS legs n.a. (docs-only — CI mirror-guard is authoritative); files: none (verification); fixes: 1 (first scope check used two-dot diff and showed main-side noise — redone three-dot)
 
 ## Technical Notes
 - Canonical copy = the bundled one (ships in the wheel); `.agents/` is the mirror. Never edit the mirror alone.
@@ -53,3 +54,7 @@ blocked-by: `#` (malformed, removed 2026-10-11) — no blockers. Content referen
 - Word-count creep in description → counted at Phase 1 gate.
 
 ## Trace
+
+
+GATE c7ae86f tier=full lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
+LOG Exit gate (ticket): full — cmp + description count + fence balance + three-dot scope on c7ae86f; test legs n.a. (docs-only), mirror-guard CI = authoritative re-run.
