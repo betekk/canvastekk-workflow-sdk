@@ -36,10 +36,11 @@
     — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; files: .github/workflows/ci-typescript.yml; fixes: none
 
 ### Phase 3: Pin runner image in release.yml
-- [ ] **3.1** Same replacement in `.github/workflows/release.yml` — probe job `runs-on` (line 23), fallback literals (lines 67, 70), comment prose (line 19); no other release-lane behavior changes (the `sdk-released` dispatch contract is out of scope per #101)
+- [x] **3.1** Same replacement in `.github/workflows/release.yml` — probe job `runs-on` (line 23), fallback literals (lines 67, 70), comment prose (line 19); no other release-lane behavior changes (the `sdk-released` dispatch contract is out of scope per #101)
     — **Why:** the release lane is the artifact publisher — an unverified 26.04 jump there risks every consumer pin; pin first per the ticket's sequencing
     — **Done when:** `grep -c 'ubuntu-latest' .github/workflows/release.yml` returns 0 and the file parses via `yaml.safe_load`
     — **Consumers affected:** release cuts (wheel + npm + nodes-repo dispatch)
+    — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; release-lane dispatch contract untouched; files: .github/workflows/release.yml; fixes: none
 
 ### Phase 4: Bump create-github-app-token to v3
 - [ ] **4.1** Bump `actions/create-github-app-token@v2` → `@v3` at the three `pick-runner` sites (ci-python.yml:37, ci-typescript.yml:35, release.yml:32) and `@v1` → `@v3` at the release.yml nodes-token (line 417); inputs (`app-id`, `private-key`, `owner`, `repositories`) and the `token` output are unchanged in v3 — no other edits
@@ -70,3 +71,5 @@ None (no `blocked-by`). Time constraint: Oct 19, 2026 migration date.
 
 
 GATE 78f0f43 tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
+
+GATE 7d07b2d tier=light lint=t typecheck=n.a build=n.a unit=n.a e2e=n.a
