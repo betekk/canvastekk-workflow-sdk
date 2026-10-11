@@ -37,10 +37,11 @@ TS side: no verifier exists (`typescript/src` has no verify command) — parity 
     — **Done:** dry_run flag AND capability gate added; positive probe seeds inputs from input_schema; skip recorded as ok RouteCheck; 4 new tests; files: conformance.py, test_conformance.py; fixes: none
 
 ### Phase 3: CLI `--dry-run` flag
-- [ ] **3.1** Extend the `verify` command parser in `__main__.py` with `--dry-run`, thread it to `verify_node(dry_run=...)`, keep the per-route PASS/FAIL print and the non-zero exit on any FAIL (existing `sys.exit(0 if report.ok else 1)`), and update the help line.
+- [x] **3.1** Extend the `verify` command parser in `__main__.py` with `--dry-run`, thread it to `verify_node(dry_run=...)`, keep the per-route PASS/FAIL print and the non-zero exit on any FAIL (existing `sys.exit(0 if report.ok else 1)`), and update the help line.
     — **Why:** AC3 — authors need the positive probe reachable from the CLI
     — **Done when:** `python -m canvastekk_workflow_sdk verify <url> --dry-run` parses (arg-level test or MockTransport CLI-level test), help text lists `--dry-run`, exit codes unchanged
     — **Consumers affected:** node-author workflows; no other CLI commands touched
+    — **Done:** --dry-run parsed and threaded to verify_node; help text updated; CLI threading test added (16 pass); files: __main__.py, test_conformance.py; fixes: 2 (help-string literal split across lines broke syntax — repaired with concatenated literals)
 
 ### Phase 4: Full gate
 - [ ] **4.1** Full gate on the final tree: python legs (ruff check + pytest) green; TS legs n/a (no TS files touched — justified deviation noted in Trace); `git diff origin/main --stat` scope check (conformance.py, `__main__.py`, test_conformance.py, PLAN only)

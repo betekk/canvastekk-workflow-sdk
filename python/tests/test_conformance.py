@@ -323,3 +323,33 @@ def test_dry_run_positive_probe_skipped_without_capability(monkeypatch) -> None:
     probe = next(c for c in report.checks if c.route == "POST /execute (dry-run)")
     assert probe.ok
     assert "skipped" in probe.detail
+
+
+def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
+    """--dry-run reaches verify_node as dry_run=True (#113 AC3)."""
+    captured: dict = {}
+
+    def fake_verify(url, **kw):
+        captured.update(kw)
+
+        class _R:
+            ok = True
+
+            def summary(self):
+                return "CONFORMING"
+
+        return _R()
+
+    _patch_client(monkeypatch)(_dry_run_handler)
+    import canvastekk_workflow_sdk.conformance as conf
+
+    monkeypatch.setattr(conf, "verify_node", fake_verify)
+    from canvastekk_workflow_sdk.__main__ import main
+
+    monkeypatch.setattr(
+        "sys.argv", ["canvastekk_workflow_sdk", "verify", "http://node.test", "--dry-run"]
+    )
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 0
+    assert captured.get("dry_run") is True
