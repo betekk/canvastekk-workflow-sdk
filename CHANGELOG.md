@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.46.0] - 2026-10-11
+
+### Features
+
+- **sdk**: Dry_run execution semantics — validation-only pass, both stacks + contract doc (#120)
+
+
 ## [0.45.1] - 2026-10-11
 
 ### Documentation
 
 - **skill**: Node-builder registration auth + verify section (#119)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.45.1
 
 
 ## [0.45.0] - 2026-10-11
