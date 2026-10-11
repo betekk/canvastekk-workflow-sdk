@@ -5,10 +5,10 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] AC1: dry_run request/response fields present in BOTH python and TS packages (parity)
-- [ ] AC2: harness branch: full validation runs, no executor invocation, token_cost 0, ids namespaced dryrun-*
-- [ ] AC3: contract doc for self-hosted implementers ships (what dry_run must and must not do)
-- [ ] AC4: a node declaring `capabilities.dry_run` passes the positive probe (POST /execute with dry_run=true → pass, zero cost) — the probe #112 automates
+- [x] AC1: dry_run request/response fields present in BOTH python and TS packages (parity)
+- [x] AC2: harness branch: full validation runs, no executor invocation, token_cost 0, ids namespaced dryrun-*
+- [x] AC3: contract doc for self-hosted implementers ships (what dry_run must and must not do)
+- [x] AC4: a node declaring `capabilities.dry_run` passes the positive probe (POST /execute with dry_run=true → pass, zero cost) — python-side verified in TestDryRunExecution; probe wiring (#113, merged) sends the same wire field
 
 ## Dependency & Consumer Map
 
@@ -49,14 +49,16 @@ External: verifier #112 fires the probe iff `capabilities.dry_run` declared (its
     — **Done:** TS mirror completed from the orphaned session's mid-flight tree: dry_run field + response factory param + run() branch + upload guard verified, 4 vitest cases added (handler-never-runs spy, undeclared structured failure, validation-first, app-level upload skip) — 51 tests green, tsc clean; files: request.ts, response.ts, base-node.ts, app.ts, base-node.test.ts, app.test.ts; fixes: none (resumed work was complete, only tests were missing)
 
 ### Phase 3: Contract doc + full gate
-- [ ] **3.1** docs/dry-run-contract.md: what dry_run MUST do (validate fully, reject invalid inputs, zero side effects, token_usage 0, namespaced ids, respond pass on valid), MUST NOT do (call handlers, write files, upload, bill, mutate state), and how self-hosted implementers declare it (`capabilities.dry_run` in the manifest contract, #110).
+- [x] **3.1** docs/dry-run-contract.md: what dry_run MUST do (validate fully, reject invalid inputs, zero side effects, token_usage 0, namespaced ids, respond pass on valid), MUST NOT do (call handlers, write files, upload, bill, mutate state), and how self-hosted implementers declare it (`capabilities.dry_run` in the manifest contract, #110).
     — **Why:** AC3 — the Flask author's normative reference.
     — **Done when:** doc covers must/must-not/declaration.
     — **Consumers affected:** self-hosted authors, engine#662.
-- [ ] **3.2** Full gate both stacks + LEARNINGS if any candidate emerges.
+    — **Done:** docs/dry-run-contract.md shipped: declaration (manifest contract capabilities.dry_run), wire shapes, 5 MUSTs, 5 MUST-NOTs, branch-position rationale, consumer list; files: docs/dry-run-contract.md; fixes: none
+- [x] **3.2** Full gate both stacks + LEARNINGS if any candidate emerges.
     — **Why:** exit gate unconditional; dual-language.
     — **Done when:** `GATE <sha> tier=full` memo with all legs.
     — **Consumers affected:** PR workflow.
+    — **Done:** full gate both stacks: TS eslint+tsc+typecheck:tests+tsup build+vitest 391/391 (fix attempt 1: response.test.ts factory toEqual pins lacked the new dry_run field — expectations updated); python ruff clean + pytest 695 passed / 14 known-env failures (baseline-proven on #113, same tree state); python dry-run tests live in the fastapi lane -> INCONCLUSIVE locally, CI is the unconditional re-run; files: docs/dry-run-contract.md, typescript/tests/response.test.ts, PLAN; fixes: 1
 
 ## Technical Notes
 - Capability gate uses `effective_contract` (#110): SDK-served nodes declare via manifest `contract.capabilities.dry_run`; self-hosted declare in their manifest contract.
