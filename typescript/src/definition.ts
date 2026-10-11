@@ -146,6 +146,7 @@ export const CONTRACT_ROUTE_VOCABULARY = [
   "/metrics",
   "/live",
   "/ready",
+  "/openapi",
 ] as const;
 
 export type ContractRoute = (typeof CONTRACT_ROUTE_VOCABULARY)[number];

@@ -1404,6 +1404,17 @@ class TestNodeContract:
         routes = ["/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"]
         assert NodeContract(routes=routes).routes == routes
 
+    def test_optional_openapi_route_accepted(self) -> None:
+        """#113: /openapi joins the vocabulary as an OPTIONAL (non-minimum) route."""
+        contract = NodeContract(routes=["/execute", "/health", "/manifest", "/openapi"])
+        assert "/openapi" in contract.routes
+        # optional: the minimum set does not include it
+        assert NodeContract(routes=["/execute", "/health", "/manifest"]).routes == [
+            "/execute",
+            "/health",
+            "/manifest",
+        ]
+
     def test_unknown_route_rejected_with_named_error(self) -> None:
         with pytest.raises(ValidationError, match=r"routes.*vocabulary"):
             NodeContract(routes=["/execute", "/health", "/manifest", "/nope"])

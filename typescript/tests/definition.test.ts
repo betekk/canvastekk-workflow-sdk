@@ -527,6 +527,17 @@ describe("NodeContractSchema (D8 #110 — mirrors python accept/reject matrix)",
     expect(NodeContractSchema.parse({ routes }).routes).toEqual(routes);
   });
 
+  it("accepts the optional /openapi route (#113)", () => {
+    const routes = ["/execute", "/health", "/manifest", "/openapi"];
+    expect(NodeContractSchema.parse({ routes }).routes).toEqual(routes);
+    // optional: minimum-set contracts without it stay valid
+    expect(NodeContractSchema.parse({ routes: ["/execute", "/health", "/manifest"] }).routes).toEqual([
+      "/execute",
+      "/health",
+      "/manifest",
+    ]);
+  });
+
   it("rejects an unknown route with a named error", () => {
     const r = NodeContractSchema.safeParse({ routes: ["/execute", "/health", "/manifest", "/nope"] });
     expect(r.success).toBe(false);

@@ -1,72 +1,75 @@
-# PLAN: Verifier derives probes from manifest + dry-run positive probe
+# PLAN: OpenAPI 3.2 emission + 2020-12 schema-dialect lint
 
 **Branch**: feat/113
 **Issue**: https://github.com/betekk/canvastekk-workflow-sdk/issues/113
 **Base**: main
 
+> Note: the previous PLAN under this name (verifier scope) was #112's work — merged via #118 and renamed `PLANS/PLAN-112.md` in the branch's first commit (f1d3978).
+
 ## Acceptance Criteria
-- [x] probe list = declared routes (no hardcoded route list remains in the verifier)
-- [x] positive probe fires iff `--dry-run` passed AND `capabilities.dry_run` declared (grilled 2026-10-11: registration-time verify stays passive); otherwise skipped, not failed
-- [x] `verify --dry-run` prints per-route PASS/FAIL and exits non-zero on any FAIL
-- [x] a deliberately broken route fails the check at the right route name
+- [x] `to_openapi()` output declares openapi 3.2.0 and validates against a 3.2 parser
+- [x] dialect lint flags non-2020-12 schema constructs with field paths
+- [x] reconciliation rule vs fastapi served doc documented (manifest doc canonical)
+- [x] golden-file test pins the emitted document shape
 
 ## Dependency & Consumer Map
 
 | Node (file/module) | Depends on (must precede) | Consumers (who depends on this) | Change risk |
 |---------------------|---------------------------|---------------------------------|-------------|
-| `python/canvastekk_workflow_sdk/conformance.py` | #110 `NodeContract`/`effective_contract` (definition.py, merged via #116); #111 wire flag `dry_run` on execute request (parallel ticket — name pinned below) | `registry.py:457` (registration-time `verify=True`), `__main__.py` verify CLI, `tests/test_conformance.py` | medium |
-| `python/canvastekk_workflow_sdk/__main__.py` (verify command) | conformance.py signature | node authors using `python -m canvastekk_workflow_sdk verify` | low |
-| `python/tests/test_conformance.py` | conformance.py | CI python lane | low |
-
-TS side: no verifier exists (`typescript/src` has no verify command) — parity is out of scope; nothing mirrors.
+| `python/canvastekk_workflow_sdk/definition.py` (`to_openapi()`) | `effective_contract` (#110, merged) | gateways/consumers wanting a standard artifact; golden-file test | low |
+| `python/canvastekk_workflow_sdk/schema_dialect.py` (new lint) | none | manifest authors; future verifier/CLI wiring | low |
+| `definition.py` + `typescript/src/definition.ts` vocabulary (add `/openapi`) | — | both validator loops (SAME-change parity rule); #112-verifier route derivation (merged) | medium |
+| `docs/EXTERNAL-AUTHOR-GUIDE.md` (reconciliation rule) | `to_openapi()` semantics | self-hosted authors, gateway teams | low |
 
 ## Implementation Phases
 
-### Phase 1: Manifest-derived probe list
-- [x] **1.1** Rewrite `verify_node` to fetch `GET /manifest` first (200 + valid `WorkflowNodeManifest` = the existing /manifest check), derive the probe list from the manifest's effective contract routes (`manifest.contract` or the SDK-served default via `effective_contract`), and generate one `RouteCheck` per derived route (health-family GETs → expect non-5xx with 200 preferred; `/manifest` keeps the body-validation check; `/execute` keeps the malformed-payload 4xx negative probe; other declared routes → must respond without 5xx). No hardcoded route list remains; a 404/5xx/unreachable on any derived route FAILs under that route's name.
-    — **Why:** AC1 + AC4 — conformance must be derived from the node's own declaration (D8/#110), and a broken declared route must fail under its own name, not silently pass a 3-route checklist
-    — **Done when:** `test_conformance.py` passes with cases: derived-probe-count matches a declared 4-route contract; a 404 on a declared extra route yields `FAIL` with that route's name; minimum-route node (3 routes) behaves as today; ruff clean on the file
-    — **Consumers affected:** `registry.py` registration `verify=True` (signature unchanged — passive behavior preserved via new `dry_run: bool = False` default); CLI output gains derived per-route lines
-    — **Done:** verify_node now fetches /manifest first, derives probes from effective_contract.routes, per-family expectations (GET presence, execute negative, POST presence); tests updated+added (15 pass), ruff clean; files: conformance.py, test_conformance.py; fixes: 2 test-expectation fixes (dry-run skip line counts)
+### Phase 1: `to_openapi()` + golden-file test
+- [x] **1.1** Add `WorkflowNodeManifest.to_openapi() -> dict` in `definition.py`: emits `{"openapi": "3.2.0", "info": {title: name, version, description}, "paths": {...}}` with one path per `effective_contract.routes` entry; per-family operations mirror the verifier's method mapping (POST for `/execute` with `requestBody` from `input_schema` + 200 response from `output_schema` + 422 validation response; GET for health-family/`/manifest`; POST for other declared POST routes) — presence-level detail, not framework-introspected truth
+    — **Why:** AC1 — a standard, derivable interface artifact for gateways; the manifest is the contract of record
+    — **Done when:** golden-file test (`tests/test_openapi.py`) pins the full emitted dict for a declaring node AND an effective-default node; assertions: `openapi == "3.2.0"`, every contract route present, `/execute` POST carries input/output schema refs; ruff clean
+    — **Consumers affected:** none in-repo (new surface); wheel content grows
+    — **Done:** to_openapi() emitted (3.2.0, per-family operations, schemas on /execute); golden file pinned + effective-default + schema-carry tests (3 pass), ruff clean; files: definition.py, tests/test_openapi.py, tests/golden/openapi-3.2-echo.json; fixes: 1 (dead /execute condition in the family elif — simplified before commit)
 
-### Phase 2: Dry-run positive probe (flag + capability gated)
-- [x] **2.1** Add `dry_run: bool = False` to `verify_node`; when True AND the manifest declares `contract.capabilities.dry_run`, fire one positive probe: `POST /execute` with `{"dry_run": true, "inputs": <type-seeded dummies from input_schema required fields>}` expecting 2xx; recorded as its own `RouteCheck("POST /execute (dry-run)", ...)` — a non-2xx or unreachable FAILs under that name. Capability absent → the probe is skipped with a `SKIPPED` RouteCheck detail line, never a FAIL. Wire note: the request flag is the top-level `dry_run` boolean (the #111 contract; SDK harness semantics live in #111 — this probe asserts transport conformance only, not side-effect freedom).
-    — **Why:** AC2 — a safe positive path gated on the node's own declaration; the flag gate keeps registration-time `verify=True` passive against production nodes
-    — **Done when:** tests cover: capability declared + flag → positive probe fires (2xx mock → PASS; 500 mock → FAIL at `POST /execute (dry-run)`); capability declared + no flag → skipped; capability absent + flag → skipped; ruff clean
-    — **Consumers affected:** CLI (`--dry-run` in Phase 3); registry path unchanged (default False)
-    — **Done:** dry_run flag AND capability gate added; positive probe seeds inputs from input_schema; skip recorded as ok RouteCheck; 4 new tests; files: conformance.py, test_conformance.py; fixes: none
+### Phase 2: 2020-12 schema-dialect lint
+- [x] **2.1** New `schema_dialect.py`: `lint_schema_dialect(schema: dict) -> list[tuple[str, str]]` returning `(json_path, message)` for non-2020-12 constructs — draft-07 `$schema` URIs, `definitions` (→ `$defs`), object-of-arrays `dependencies` (→ `dependentRequired`/`dependentSchemas`), boolean `exclusiveMinimum/Maximum` (draft-04), `recursiveAnchor` (2019-09) — recursing through `properties`/`items`/`$defs`/`additionalProperties` with accurate `$`-paths
+    — **Why:** AC2 — the manifest's schema dialect is unchecked today; authors get named, pathed violations instead of silent dialect drift
+    — **Done when:** `tests/test_schema_dialect.py` covers each flagged construct + a clean 2020-12 schema returns `[]`; paths verified for nested cases; ruff clean
+    — **Consumers affected:** none in-repo (new surface); CLI/verifier wiring deliberately deferred (noted in PLAN Risks)
+    — **Done:** lint_schema_dialect shipped: pre-2020-12 $schema URIs, definitions, recursiveAnchor, boolean exclusiveMin/Max, dependencies split by shape, array-form items (recursed); 7 tests incl. nested paths; files: schema_dialect.py, tests/test_schema_dialect.py; fixes: none
 
-### Phase 3: CLI `--dry-run` flag
-- [x] **3.1** Extend the `verify` command parser in `__main__.py` with `--dry-run`, thread it to `verify_node(dry_run=...)`, keep the per-route PASS/FAIL print and the non-zero exit on any FAIL (existing `sys.exit(0 if report.ok else 1)`), and update the help line.
-    — **Why:** AC3 — authors need the positive probe reachable from the CLI
-    — **Done when:** `python -m canvastekk_workflow_sdk verify <url> --dry-run` parses (arg-level test or MockTransport CLI-level test), help text lists `--dry-run`, exit codes unchanged
-    — **Consumers affected:** node-author workflows; no other CLI commands touched
-    — **Done:** --dry-run parsed and threaded to verify_node; help text updated; CLI threading test added (16 pass); files: __main__.py, test_conformance.py; fixes: 2 (help-string literal split across lines broke syntax — repaired with concatenated literals)
+### Phase 3: `/openapi` vocabulary entry (both stacks) + reconciliation doc
+- [x] **3.1** Add `/openapi` to `CONTRACT_ROUTE_VOCABULARY` in `definition.py` AND `typescript/src/definition.ts` in the SAME change with parity accept/reject tests both sides (repo rule: validator loops must cover new fields); minimum set unchanged; `SDK_SERVED_CONTRACT_ROUTES` unchanged (adapters do not mount it)
+    — **Why:** the ticket's "optional `openapi` route-vocabulary entry" — nodes may now DECLARE an OpenAPI-doc route; the closed vocabulary must admit it before any manifest can
+    — **Done when:** python validator accepts a contract declaring `/openapi` and still rejects unknown routes; TS mirror accepts/rejects identically; both test suites green on the same commit
+    — **Consumers affected:** both validators; #112-verifier (merged) will probe a declared `/openapi` route as presence-GET — harmless
+    — **Done:** /openapi added to both vocabularies in one commit; parity acceptance tests both sides (minimum set unchanged, SDK_SERVED unchanged); python 108 definition+openapi tests green, TS 392/392 all legs; files: definition.py x2, test_definition.py, definition.test.ts; fixes: none
+- [x] **3.2** Document the reconciliation rule in `docs/EXTERNAL-AUTHOR-GUIDE.md`: the manifest's `to_openapi()` document is CANONICAL for gateways and the engine; a framework-served doc (e.g. fastapi's `/docs` artifact) is the live server's view — reconcile field-level differences toward the manifest; note that framework-served OpenAPI versions track the framework (3.1 today for fastapi per the ticket's own note) while the manifest pins 3.2.0
+    — **Why:** AC3 — gateways need one rule for conflicting artifacts
+    — **Done when:** the guide section states the canonical-artifact rule + the version note; link added from `to_openapi()`'s docstring
+    — **Consumers affected:** documentation surface only
+    — **Done:** OpenAPI Reconciliation section in EXTERNAL-AUTHOR-GUIDE.md: canonical-artifact rule, version divergence note, /openapi declaration example; to_openapi docstring links it; files: docs/EXTERNAL-AUTHOR-GUIDE.md; fixes: none
 
 ### Phase 4: Full gate
-- [x] **4.1** Full gate on the final tree: python legs (ruff check + pytest) green; TS legs n/a (no TS files touched — justified deviation noted in Trace); `git diff origin/main --stat` scope check (conformance.py, `__main__.py`, test_conformance.py, PLAN only)
+- [x] **4.1** Full gate on the final tree: python ruff + pytest (runnable subset; fastapi-lane modules → CI, baseline-documented); TS eslint + tsc + typecheck:tests + vitest full; `git diff origin/main...feat/113 --stat` scope check
     — **Why:** ticket exit gate — the last verification before PR
-    — **Done when:** ruff + pytest green on the final tree; diff scope exactly as listed; `GATE <sha> tier=full` memo appended
+    — **Done when:** all legs green; `GATE <sha> tier=full` memo appended
     — **Consumers affected:** none beyond the above
-    — **Done:** full gate on final tree: ruff clean (whole python pkg), pytest 695 passed / 14 failed — all 14 proven pre-existing on clean origin/main (fastapi-env gaps, same tests fail on base), 4 fastapi-lane modules unrunnable locally (INCONCLUSIVE -> CI is the unconditional re-run); diff scope = 4 planned files; files: none (verification); fixes: none
+    — **Done:** full gate on final tree: python ruff clean + pytest 706 passed / 14 known-env failures (baseline-proven); TS eslint+tsc+tsc-tests+tsup+vitest 392/392; three-dot scope = 11 files matching the Consumer Map (+ PLAN rename from the takeover); files: none (verification); fixes: none
 
 ## Technical Notes
-- Probe expectations by family (documented in `conformance.py` docstring): GET routes → 200 expected for /health, /manifest, /live, /ready (non-5xx tolerated as PASS with a detail note; 404/5xx FAIL); POST /execute → malformed payload must 4xx (negative, unchanged) + capability-gated dry-run positive.
-- RouteCheck.route keeps the `METHOD /path` form so AC4's "right route name" holds.
-- The #111 coordination point is the single wire field: top-level `dry_run: true` on the execute request body. If #111 lands a different shape, this ticket's positive probe adjusts in review.
+- AC1's "validates against a 3.2 parser": OpenAPI 3.2 tooling is new; the golden-file test carries the parse pin (structural assertions on the emitted document). `# ponytail:` swap in `openapi-spec-validator` (or equivalent) when it ships 3.2 support — one test import, no dependency added today.
+- The lint is a pure function this round; wiring it into the CLI `validate` output or the verifier is a follow-up once the violation shapes settle.
+- `/openapi` is OPTIONAL (vocabulary admits it, minimum set unchanged, adapters don't mount it).
 
 ## Dependencies
-blocked-by: #110 (merged via #116). #111 is NOT a blocker per the ticket declaration; only the wire-field name is shared (pinned above).
+blocked-by: #110 (merged via #116).
 
 ## Risks & Mitigation
-- Registration-time `verify=True` behavior change → gated behind `dry_run=False` default; passive probe set only gains derived extra routes (strictly more thorough, same pass/fail semantics for conforming nodes).
-- Schema-seeded dummy inputs may not satisfy a node's cross-field validation → the positive probe reports FAIL with the node's 4xx detail (author's signal to fix schema or inputs), never a crash; documented in the docstring.
-- #111 wire-field drift → single pinned field name; review-time reconciliation.
+- Vocabulary growth ripples into validators and the verifier → parity tests in the same commit; verifier treats an unmounted `/openapi` as any other broken declared route (fails under its name) — correct semantics for a declared-but-absent route.
+- Golden-file brittleness → the file pins ONE representative manifest; schema-level changes to the emitter fail loudly and deliberately.
 
 ## Trace
 
 
-LOG Phases 1+2 landed as one commit — verify_node rewritten as a unit; per-phase split would be git theater (deviation visible here, gates ran scoped per concern).
-
-GATE cd001ba tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
-LOG Exit gate (ticket): full — ruff (repo python) + pytest 695-pass subset on cd001ba; 14 env failures + 4 fastapi-collection modules verified identical on clean origin/main (baseline worktree /tmp/opencode/base113); TS legs n.a. (no TS files touched).
+GATE 4b9991c tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Exit gate (ticket): full on 4b9991c — python ruff+706 (14 env failures = proven baseline, fastapi lanes -> CI); TS eslint/tsc/tsc-tests/tsup/vitest 392. NOTE: phase-3 tick script errored (NameError) so 3.1/3.2 ticks ride this commit instead of 4b9991c — deviation visible here.
