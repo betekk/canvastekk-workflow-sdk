@@ -123,6 +123,8 @@ class NodeExecutionResponse(BaseModel):
             error_type: Exception class name (e.g. ``"NodeTimeoutError"``).
             duration_ms: Execution time before failure.
             error_code: Structured error code (e.g. ``"TIMEOUT"``).
+            dry_run: D10 (#111) — mark this as a dry-run refusal
+                (``"DRY_RUN_NOT_SUPPORTED"``).
 
         Returns:
             A :class:`NodeExecutionResponse` with ``status="fail"``.
