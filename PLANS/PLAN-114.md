@@ -39,7 +39,7 @@ Docs-only change. Facts sourced from merged code: `registry.py` (register_node, 
     — **Why:** AC4 (samples must match the shipped SDK) + ticket exit gate
     — **Done when:** all import checks pass; scope exact; `GATE <sha> tier=full` memo appended
     — **Consumers affected:** none beyond the above
-    — **Done:** done3
+    — **Done:** full gate on final tree: sdk-symbol import checks pass (create_node_app extra-gated, documented), 52 fences balanced, mermaid present, three-dot scope = README + PLAN only; files: none (verification); fixes: none
 
 ## Technical Notes
 - Rung naming matches the ticket: SDK-served / self-hosted / no-HTTP.
