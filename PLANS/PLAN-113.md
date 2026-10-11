@@ -8,9 +8,9 @@
 
 ## Acceptance Criteria
 - [ ] `to_openapi()` output declares openapi 3.2.0 and validates against a 3.2 parser
-- [ ] dialect lint flags non-2020-12 schema constructs with field paths
-- [ ] reconciliation rule vs fastapi served doc documented (manifest doc canonical)
-- [ ] golden-file test pins the emitted document shape
+- [x] dialect lint flags non-2020-12 schema constructs with field paths
+- [x] reconciliation rule vs fastapi served doc documented (manifest doc canonical)
+- [x] golden-file test pins the emitted document shape
 
 ## Dependency & Consumer Map
 
@@ -38,20 +38,23 @@
     — **Done:** lint_schema_dialect shipped: pre-2020-12 $schema URIs, definitions, recursiveAnchor, boolean exclusiveMin/Max, dependencies split by shape, array-form items (recursed); 7 tests incl. nested paths; files: schema_dialect.py, tests/test_schema_dialect.py; fixes: none
 
 ### Phase 3: `/openapi` vocabulary entry (both stacks) + reconciliation doc
-- [ ] **3.1** Add `/openapi` to `CONTRACT_ROUTE_VOCABULARY` in `definition.py` AND `typescript/src/definition.ts` in the SAME change with parity accept/reject tests both sides (repo rule: validator loops must cover new fields); minimum set unchanged; `SDK_SERVED_CONTRACT_ROUTES` unchanged (adapters do not mount it)
+- [x] **3.1** Add `/openapi` to `CONTRACT_ROUTE_VOCABULARY` in `definition.py` AND `typescript/src/definition.ts` in the SAME change with parity accept/reject tests both sides (repo rule: validator loops must cover new fields); minimum set unchanged; `SDK_SERVED_CONTRACT_ROUTES` unchanged (adapters do not mount it)
     — **Why:** the ticket's "optional `openapi` route-vocabulary entry" — nodes may now DECLARE an OpenAPI-doc route; the closed vocabulary must admit it before any manifest can
     — **Done when:** python validator accepts a contract declaring `/openapi` and still rejects unknown routes; TS mirror accepts/rejects identically; both test suites green on the same commit
     — **Consumers affected:** both validators; #112-verifier (merged) will probe a declared `/openapi` route as presence-GET — harmless
-- [ ] **3.2** Document the reconciliation rule in `docs/EXTERNAL-AUTHOR-GUIDE.md`: the manifest's `to_openapi()` document is CANONICAL for gateways and the engine; a framework-served doc (e.g. fastapi's `/docs` artifact) is the live server's view — reconcile field-level differences toward the manifest; note that framework-served OpenAPI versions track the framework (3.1 today for fastapi per the ticket's own note) while the manifest pins 3.2.0
+    — **Done:** /openapi added to both vocabularies in one commit; parity acceptance tests both sides (minimum set unchanged, SDK_SERVED unchanged); python 108 definition+openapi tests green, TS 392/392 all legs; files: definition.py x2, test_definition.py, definition.test.ts; fixes: none
+- [x] **3.2** Document the reconciliation rule in `docs/EXTERNAL-AUTHOR-GUIDE.md`: the manifest's `to_openapi()` document is CANONICAL for gateways and the engine; a framework-served doc (e.g. fastapi's `/docs` artifact) is the live server's view — reconcile field-level differences toward the manifest; note that framework-served OpenAPI versions track the framework (3.1 today for fastapi per the ticket's own note) while the manifest pins 3.2.0
     — **Why:** AC3 — gateways need one rule for conflicting artifacts
     — **Done when:** the guide section states the canonical-artifact rule + the version note; link added from `to_openapi()`'s docstring
     — **Consumers affected:** documentation surface only
+    — **Done:** OpenAPI Reconciliation section in EXTERNAL-AUTHOR-GUIDE.md: canonical-artifact rule, version divergence note, /openapi declaration example; to_openapi docstring links it; files: docs/EXTERNAL-AUTHOR-GUIDE.md; fixes: none
 
 ### Phase 4: Full gate
-- [ ] **4.1** Full gate on the final tree: python ruff + pytest (runnable subset; fastapi-lane modules → CI, baseline-documented); TS eslint + tsc + typecheck:tests + vitest full; `git diff origin/main...feat/113 --stat` scope check
+- [x] **4.1** Full gate on the final tree: python ruff + pytest (runnable subset; fastapi-lane modules → CI, baseline-documented); TS eslint + tsc + typecheck:tests + vitest full; `git diff origin/main...feat/113 --stat` scope check
     — **Why:** ticket exit gate — the last verification before PR
     — **Done when:** all legs green; `GATE <sha> tier=full` memo appended
     — **Consumers affected:** none beyond the above
+    — **Done:** full gate on final tree: python ruff clean + pytest 706 passed / 14 known-env failures (baseline-proven); TS eslint+tsc+tsc-tests+tsup+vitest 392/392; three-dot scope = 11 files matching the Consumer Map (+ PLAN rename from the takeover); files: none (verification); fixes: none
 
 ## Technical Notes
 - AC1's "validates against a 3.2 parser": OpenAPI 3.2 tooling is new; the golden-file test carries the parse pin (structural assertions on the emitted document). `# ponytail:` swap in `openapi-spec-validator` (or equivalent) when it ships 3.2 support — one test import, no dependency added today.
@@ -66,3 +69,7 @@ blocked-by: #110 (merged via #116).
 - Golden-file brittleness → the file pins ONE representative manifest; schema-level changes to the emitter fail loudly and deliberately.
 
 ## Trace
+
+
+GATE 4b9991c tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Exit gate (ticket): full on 4b9991c — python ruff+706 (14 env failures = proven baseline, fastapi lanes -> CI); TS eslint/tsc/tsc-tests/tsup/vitest 392. NOTE: phase-3 tick script errored (NameError) so 3.1/3.2 ticks ride this commit instead of 4b9991c — deviation visible here.
