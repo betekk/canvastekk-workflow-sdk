@@ -897,3 +897,21 @@ assert result.output_dir is None  # cleaned up
 - [SDK Python README](../python/README.md) — full API reference
 - [Echo Node Example](../examples/echo_node/) — minimal reference implementation
 - [Root README](../README.md) — SDK overview and architecture
+
+---
+
+## OpenAPI Reconciliation
+
+Your manifest can emit a standard interface document — `WorkflowNodeManifest.to_openapi()` produces an **OpenAPI 3.2.0** description of your node's declared routes and schemas.
+
+**The rule: the manifest document is canonical.** When a framework-served artifact (e.g. FastAPI's `/docs` schema) and your manifest disagree, the manifest wins — it is what the engine's registration gate, the SDK verifier, and gateways consume. The framework-served doc is the live server's view; reconcile field-level differences toward the manifest.
+
+Versions differ by design: framework-served OpenAPI tracks the framework (FastAPI serves 3.1 today), while the manifest document pins `3.2.0`. The manifest leads; the served doc catches up.
+
+To expose the document itself over HTTP, declare an `/openapi` route in your contract (optional, non-minimum — the SDK adapters do not mount it):
+
+```python
+contract = NodeContract(
+    routes=["/execute", "/health", "/manifest", "/openapi"],
+)
+```

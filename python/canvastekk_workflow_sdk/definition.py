@@ -175,7 +175,7 @@ class DeprecationInfo(BaseModel):
 
 #: Closed route vocabulary — exactly the routes the SDK adapters mount.
 CONTRACT_ROUTE_VOCABULARY: frozenset[str] = frozenset(
-    {"/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"}
+    {"/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready", "/openapi"}
 )
 
 #: Minimum route set every conforming node must serve (D8).
