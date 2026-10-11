@@ -83,44 +83,36 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
 
-  lint-and-test:
+  # C11 (#101): the quality lane folds onto betekk-gha reusable-ci-python.
+  # Reusable-calling jobs can't carry strategy.matrix — the dual-python
+  # support (3.12 + 3.13) becomes two explicit calls. poetry-install-args
+  # rides v1.3.28 (-E fastapi: PEP 621 optional dep the test suite
+  # imports). run-mypy: false preserves the pre-fold gate set (no mypy
+  # config today); the coverage artifact upload is dropped — zero
+  # consumers (grep-verified), the xml report still generates in-run.
+  quality-312:
+    name: Quality (py3.12)
     needs: [pick-runner]
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.12', '3.13']
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-python.yml@v1.3.28
+    with:
+      runner-labels: ${{ needs.pick-runner.outputs.labels }}
+      python-version: '3.12'
+      working-directory: python
+      poetry-install-args: '-E fastapi'
+      run-mypy: false
+      pytest-args: '-v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml'
 
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Poetry
-        run: pip install "poetry>=2.2"
-
-      - name: Install dependencies
-        run: python -m poetry install --no-interaction -E fastapi
-
-      - name: Lint with Ruff
-        run: python -m poetry run ruff check canvastekk_workflow_sdk/ tests/
-
-      - name: Run tests with coverage
-        run: python -m poetry run pytest -v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml
-
-      - name: Upload coverage to GitHub Actions
-        if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v5
-        with:
-          name: python-coverage
-          path: python/coverage.xml
-
-  # ─── Phase 10.1 [DA-1546]: Manifest Schema Stability ───────────────
-  # Detects breaking Pydantic model schema changes on PRs that modify
-  # the SDK's public models. Breaking changes require the 'major' label.
+  quality-313:
+    name: Quality (py3.13)
+    needs: [pick-runner]
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-python.yml@v1.3.28
+    with:
+      runner-labels: ${{ needs.pick-runner.outputs.labels }}
+      python-version: '3.13'
+      working-directory: python
+      poetry-install-args: '-E fastapi'
+      run-mypy: false
+      pytest-args: '-v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml'
 
   schema-stability:
     name: Manifest schema stability

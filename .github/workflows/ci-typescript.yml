@@ -81,39 +81,19 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
 
+  # C11 (#101): folds onto betekk-gha reusable-ci-node. The old lane's
+  # --legacy-peer-deps is vestigial (bare npm ci verified green against the
+  # current lockfile); coverage artifact dropped — zero consumers
+  # (grep-verified), the report still generates in-run via --coverage.
   typecheck-test-build:
+    name: Typecheck / Lint / Test / Build
     needs: [pick-runner]
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: ['24']
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v5
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test with coverage
-        run: npx vitest run --coverage
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload coverage to GitHub Actions
-        uses: actions/upload-artifact@v5
-        with:
-          name: typescript-coverage
-          path: typescript/coverage/
+    uses: betekk/betekk-gha/.github/workflows/reusable-ci-node.yml@v1.3.28
+    with:
+      runner-labels: ${{ needs.pick-runner.outputs.labels }}
+      node-version: '24'
+      working-directory: typescript
+      typecheck-command: npx tsc --noEmit
+      lint-command: npm run lint
+      test-command: npx vitest run --coverage
+      build-command: npm run build
