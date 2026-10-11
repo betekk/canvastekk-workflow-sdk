@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.1] - 2026-10-11
+
+### Bug Fixes
+
+- **ci**: Sha-pin floating third-party action tags (#137)
+
+
 ## [0.52.0] - 2026-10-11
 
 ### Features
 
 - **ts-sdk**: Ctk_ credentials ride Authorization Bearer (#135) (#136)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.52.0
 
 
 ## [0.51.0] - 2026-10-11
