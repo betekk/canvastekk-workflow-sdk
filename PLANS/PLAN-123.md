@@ -65,3 +65,7 @@ LOG Exit gate (ticket): ruff check rc=0 (verified solo); tsc rc=0 (verified
 solo); pytest 870 passed; vitest 392 passed. README swept in-change (standing
 rule). Caller-supplied legacy constraint keys remain caller data (passthrough
 pinned both stacks).
+LOG Standing rule added (user directive): new SDK features ship to both
+python/ and typescript/ in the same change — README one-liner + LEARNINGS
+pattern + noted on #124. Schema-stability gate classified the removals
+BREAKING; major label applied to acknowledge (recorded on #123).
