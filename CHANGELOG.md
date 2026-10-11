@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.49.0] - 2026-10-11
+
+### Features
+
+- **ci**: Fold quality lanes onto betekk-gha reusables (#101) (#127)
+
+
 ## [0.48.1] - 2026-10-11
 
 ### Documentation
 
 - **readme**: Link the public Node HTTP Contract spec (engine #666) (#126)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.48.1
 
 
 ## [0.48.0] - 2026-10-11
