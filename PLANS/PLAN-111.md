@@ -80,3 +80,5 @@ GATE 2b050f2 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
 
 LOG Ticket taken over from a dead parallel session (user-approved resume): rebased Phase 1 onto 01055a7, force-with-lease pushed fd539f2, completed the uncommitted Phase 2 tree.GATE 3ba1b2a tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG Exit gate (ticket): full both stacks on 3ba1b2a — TS eslint/tsc/tsc-tests/tsup/vitest 391; python ruff + pytest 695 (14 env failures = proven baseline); python fastapi-lane tests incl. TestDryRunExecution -> CI.
+LOG Review fix (NOTE): failure() docstring gains the dry_run arg; re-gate tier=full green on 718f3e1 (ruff+695 py subset, TS eslint/tsc/vitest 391).
+GATE 718f3e1 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
