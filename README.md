@@ -231,6 +231,111 @@ Both SDKs use **snake_case** for wire-format field names — matching the Canvas
 
 See [`typescript/README.md`](./typescript/) for the full migration guide with old → new field name tables.
 
+## Deployment Ladder
+
+Three ways to put a node on the engine's map. Pick the rung that matches where your code lives — climb only as far as you need.
+
+### Rung 1 — SDK-served (recommended)
+
+The SDK mounts your HTTP contract for you: `create_node_app` serves `/execute`, `/health`, `/manifest` (plus the optional routes), stamps the manifest's effective contract, and implements `dry_run` for free.
+
+```python
+from canvastekk_workflow_sdk import create_node_app
+from my_node.handler import MyNode
+
+app = create_node_app(MyNode())  # contract stamped from the manifest (D8)
+```
+
+Deploy the container, then register (see the node-builder skill's *Engine Registration* section for credential paths):
+
+```python
+from canvastekk_workflow_sdk.registry import register_node
+
+register_node(
+    MyNode(),
+    registry_url="https://engine.example.com/api/workflows/nodes/",
+    invoke_url="https://my-node.example.com",
+    service_token="svs_xxx",
+    verify=True,  # probes the served contract before registering
+)
+```
+
+### Rung 2 — Self-hosted (Flask, Django, anything)
+
+You serve the contract yourself; the SDK still validates, verifies, and registers. Declare what you mount, implement the routes (including `dry_run` if you declare it — see [`docs/dry-run-contract.md`](./docs/dry-run-contract.md)), and let the verifier judge the deployment:
+
+```python
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+@app.get("/health")
+def health():
+    return jsonify(status="healthy")
+
+@app.get("/manifest")
+def manifest():
+    return jsonify(MY_MANIFEST)  # WorkflowNodeManifest.to_dict() — declares your routes
+
+@app.post("/execute")
+def execute():
+    payload = request.get_json(force=True)
+    if payload.get("dry_run"):
+        return jsonify(status="pass", execution_id=f"dryrun-{payload['run_id']}",
+                       outputs={}, token_usage=0.0, dry_run=True)
+    return jsonify(run(payload["inputs"]))
+```
+
+Same registration call as Rung 1 — `verify=True` probes whatever your manifest declares, so a route you declared but didn't mount fails loudly at registration, not in production.
+
+### Rung 3 — No HTTP (lambda, in-process)
+
+No server, no `invoke_url`, no HTTP probes. Register with a non-HTTP `invoke_type`; `verify=True` is unavailable by definition (nothing to probe):
+
+```python
+register_node(
+    MyNode(),
+    registry_url="https://engine.example.com/api/workflows/nodes/",
+    invoke_type="lambda",
+    service_token="svs_xxx",
+    tags=["serverless"],
+)
+```
+
+### Who calls `invoke_url`?
+
+| Caller | When | Credential | Where the credential comes from |
+|--------|------|------------|--------------------------------|
+| SDK verifier (registration-time probes) | `register_node(..., verify=True)` | `X-API-Key` | the `api_key` parameter you pass to `register_node` — never serialized into the registry payload |
+| Engine (execution time) | every workflow run that reaches your node | your node's auth posture (e.g. `X-API-Key`) | engine-side invocation config — delivered out-of-band (`invoke_config` at registration, or engine configuration); the registration `api_key` is NOT reused here |
+| Gateway / workflow consumers | when a workflow step targets your node | same as engine execution time | same channel |
+
+The registration `service_token` authenticates **the engine registry only** — it never travels to your node.
+
+### Serve → verify → register → probes
+
+```mermaid
+sequenceDiagram
+    participant A as Author / CI
+    participant N as Node (invoke_url)
+    participant SDK as SDK verifier
+    participant E as Engine registry
+
+    A->>N: deploy (serve the declared contract)
+    A->>SDK: register_node(verify=True)
+    SDK->>N: GET /manifest (derives the probe set)
+    N-->>SDK: manifest (contract routes)
+    SDK->>N: probe each declared route (+ dry-run positive if declared)
+    N-->>SDK: per-route PASS/FAIL
+    alt all routes conform
+        SDK->>E: POST manifest (service_token)
+        E-->>SDK: created / updated
+        E->>N: execution-time invokes at run time
+    else any route fails
+        SDK-->>A: RegistrationError (per-route report; nothing registered)
+    end
+```
+
 ## Architecture
 
 The SDK provides registry-level node definition tools and a local workflow builder. In the engine's terminology:
