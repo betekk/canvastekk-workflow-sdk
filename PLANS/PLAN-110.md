@@ -28,18 +28,21 @@ External consumers: engine#658 (registration gate — reads `constraints["contra
 ## Implementation Phases
 
 ### Phase 1: Python ContractSpec + tests
-- [ ] **1.1** Add `ContractCapabilities` (dry_run: bool = False) and `NodeContract` (transport: Literal["http"] = "http"; routes: list[str]; capabilities: ContractCapabilities = default; openapi: Literal["3.2"] = "3.2") models in definition.py, plus `contract: NodeContract | None = Field(default=None)` on WorkflowNodeManifest; add `"contract"` to `_drop_optional_when_none`'s optional-key tuple.
+- [x] **1.1** Add `ContractCapabilities` (dry_run: bool = False) and `NodeContract` (transport: Literal["http"] = "http"; routes: list[str]; capabilities: ContractCapabilities = default; openapi: Literal["3.2"] = "3.2") models in definition.py, plus `contract: NodeContract | None = Field(default=None)` on WorkflowNodeManifest; add `"contract"` to `_drop_optional_when_none`'s optional-key tuple.
     — **Why:** D8 — the manifest must declare HOW a node serves; None-default + omit-when-None keeps legacy serialization byte-identical (protects the /manifest comparers called out in the model_serializer docstring).
     — **Done when:** manifest without contract serializes identically to pre-change (regression test proves it); with contract, it round-trips.
     — **Consumers affected:** to_dict, /manifest body, build_registry_payload (later phases).
-- [ ] **1.2** Validators on NodeContract: routes must be a subset of the closed vocabulary {"/execute","/health","/manifest","/hook","/metrics","/live","/ready"}; must contain the minimum {"/execute","/health","/manifest"}; no duplicates; error messages name the offending field and value.
+    — **Done:** models + field + serializer tuple entry landed; legacy-omit and round-trip tests green (104 passed); exports added to package __init__; files: definition.py, __init__.py; fixes: ruff UP037 quote annotation auto-fixed.
+- [x] **1.2** Validators on NodeContract: routes must be a subset of the closed vocabulary {"/execute","/health","/manifest","/hook","/metrics","/live","/ready"}; must contain the minimum {"/execute","/health","/manifest"}; no duplicates; error messages name the offending field and value.
     — **Why:** AC2 — the vocabulary is the contract the engine gate (#658) and verifier (#112) derive probes from; a lying or partial declaration must fail at validation, not at run time.
     — **Done when:** accept/reject tests cover: valid subset, unknown route rejected (named), missing each minimum rejected (named), duplicate rejected (named).
     — **Consumers affected:** all manifest validators (py side).
-- [ ] **1.3** Python unit tests (test_definition.py): the accept/reject matrix above + serialization omission + round-trip + the pre-change byte-identity regression.
+    — **Done:** model_validator with named errors (vocabulary/missing/duplicate) — live-verified then pinned in tests; files: definition.py; fixes: none.
+- [x] **1.3** Python unit tests (test_definition.py): the accept/reject matrix above + serialization omission + round-trip + the pre-change byte-identity regression.
     — **Why:** AC1's pydantic half + the repo learning that validator loops must cover new fields IN THE SAME CHANGE.
     — **Done when:** `pytest python/tests/test_definition.py` green with the new cases present.
     — **Consumers affected:** none (tests).
+    — **Done:** TestNodeContract class — 10 cases covering the full matrix + effective_contract default/declared; files: tests/test_definition.py; fixes: none.
 
 ### Phase 2: TypeScript ContractSpec + tests (SAME change — parity rule)
 - [ ] **2.1** Mirror in typescript/src/definition.ts: `ContractCapabilitiesSchema`, `NodeContractSchema` (zod) with the SAME closed vocabulary, minimum-set, duplicate, and literal constraints; `contract: NodeContractSchema.nullable().default(null)` on WorkflowNodeManifestObjectSchema.
@@ -98,3 +101,6 @@ None (root of the SDK slice). Blocks: SDK #111/#112/#113 (consume contract shape
 - **Engine 422 on registration** — contract rides `constraints` (declared dict both sides; TS whitelist already allows it); top-level promotion happens engine-side (#658).
 - **Serialization churn for existing nodes** — omit-when-None + a byte-identity regression test.
 - **Stamped routes lying about what's mounted** — the stamp constant sits beside the mounts and a test pins the 7 paths; #112's probe-derivation then has a truthful source.
+
+## Trace
+GATE 2a5d587 tier=light lint=t typecheck=- build=- unit=t e2e=n.a
