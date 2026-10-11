@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.45.1] - 2026-10-11
+
+### Documentation
+
+- **skill**: Node-builder registration auth + verify section (#119)
+
+
 ## [0.45.0] - 2026-10-11
 
 ### Features
 
 - **sdk**: Verifier derives probes from manifest + capability-gated dry-run positive probe (#118)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.45.0
 
 
 ## [0.44.1] - 2026-10-11
