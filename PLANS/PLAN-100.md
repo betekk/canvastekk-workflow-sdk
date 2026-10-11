@@ -22,10 +22,11 @@
 ## Implementation Phases
 
 ### Phase 1: Pin runner image in ci-python.yml
-- [ ] **1.1** Replace every `ubuntu-latest` occurrence in `.github/workflows/ci-python.yml` with `ubuntu-24.04` — the probe job's `runs-on` (line 28), both fallback literals `labels=["ubuntu-latest"]` (lines 72, 75), and the block comment prose (line 24) so the comment stays truthful
+- [x] **1.1** Replace every `ubuntu-latest` occurrence in `.github/workflows/ci-python.yml` with `ubuntu-24.04` — the probe job's `runs-on` (line 28), both fallback literals `labels=["ubuntu-latest"]` (lines 72, 75), and the block comment prose (line 24) so the comment stays truthful
     — **Why:** GitHub migrates the `ubuntu-latest` image to 26.04 on Oct 19; the ticket's stated safest sequencing is an explicit pin before that date, relax only after a verified green 26.04 run
     — **Done when:** `grep -c 'ubuntu-latest' .github/workflows/ci-python.yml` returns 0 and `python3 -c "import yaml;yaml.safe_load(open('.github/workflows/ci-python.yml'))"` parses clean
     — **Consumers affected:** every python-lane PR and main push (they run on the pinned image)
+    — **Done:** pinned runner image: probe runs-on, both fallback labels, comment/warning prose to ubuntu-24.04; files: .github/workflows/ci-python.yml; fixes: none
 
 ### Phase 2: Pin runner image in ci-typescript.yml
 - [ ] **2.1** Same replacement in `.github/workflows/ci-typescript.yml` — probe job `runs-on` (line 26), fallback literals (lines 70, 73), comment prose (line 22)
