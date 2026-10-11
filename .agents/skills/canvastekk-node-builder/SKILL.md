@@ -660,7 +660,7 @@ result = register_node(
     node,                                   # your BaseNode instance
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",  # where the engine reaches this node
-    invoke_type="http",                     # default; also: "lambda", "graphql"
+    invoke_type="http",                     # "http", "lambda", "sagemaker", or "in-process"
     service_token="svs_xxx",                # OR api_key — see credential paths
     verify=True,                            # probe the node's HTTP contract first
 )
@@ -672,10 +672,10 @@ print(result.revision_id)  # e.g. "rev-abc123"
 
 | Parameter | Header sent | Authenticates against | Use when |
 |-----------|-------------|----------------------|----------|
-| `service_token` | `X-Service-Token` | the **engine registry** | standard CI/CD registration (engine-issued service token) |
-| `api_key` | `X-API-Key` | the **engine registry**, and the node's own routes during `verify` probes | the node is API-key-guarded; the same key verifies it |
+| `service_token` | `X-Service-Token` | the **engine registry** | standard CI/CD registration (engine-issued service token); **takes precedence over `api_key` for the registry request when both are set** |
+| `api_key` | `X-API-Key` | the **engine registry** (when no service token), and **always the node's own routes** during `verify` probes | the node is API-key-guarded — the verify probes need it |
 
-When both are provided, `api_key` takes precedence for the verify probes; the registry request still authenticates with the engine's expected credential. Read both from CI secrets/env vars — never hardcode:
+Exactly one is required; neither raises `ValueError`. The verify probes authenticate with `api_key` alone — an api-key-guarded node must pass it even when a `service_token` handles registry auth. Read both from CI secrets/env vars — never hardcode:
 
 ```bash
 CANVASTEKK_REGISTRY_URL="https://engine.example.com/api/workflows/nodes/"
