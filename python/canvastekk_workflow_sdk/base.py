@@ -509,6 +509,38 @@ class BaseNode(ABC):
 
             self._validate_inputs(request.inputs)
 
+            if request.dry_run:
+                # D10 (#111): validation-only execution. The branch position
+                # IS the zero-side-effect guarantee — after full input
+                # validation, before context/file-download/middleware/
+                # execute/output-upload. Do not move it.
+                duration_ms = int((time.perf_counter() - start_time) * 1000)
+                if not self.definition.effective_contract.capabilities.dry_run:
+                    logger.info(
+                        "dry-run refused (capability not declared) slug=%s",
+                        self.definition.slug,
+                    )
+                    return NodeExecutionResponse.failure(
+                        execution_id=execution_id,
+                        error="dry_run requested but the node does not declare contract.capabilities.dry_run",
+                        error_type="NodeConfigurationError",
+                        duration_ms=duration_ms,
+                        error_code="DRY_RUN_NOT_SUPPORTED",
+                        dry_run=True,
+                    )
+                logger.info(
+                    "execution slug=%s status=pass duration_ms=%d dry_run=true",
+                    self.definition.slug,
+                    duration_ms,
+                )
+                return NodeExecutionResponse.success(
+                    execution_id=f"dryrun-{execution_id}",
+                    outputs={},
+                    duration_ms=duration_ms,
+                    token_usage=0.0,
+                    dry_run=True,
+                )
+
             context = ExecutionContext(
                 request,
                 cancel_event=getattr(self, "_cancel_event", None),

@@ -413,3 +413,69 @@ describe("manifest code_digest (DA-2603)", () => {
     expect(digest).toBe(createHash("sha256").update(readFileSync(testFile)).digest("hex"));
   });
 });
+
+describe("dry-run upload guard (D10 #111)", () => {
+  it("never uploads on a dry-run pass even with output_upload_url", async () => {
+    class DryFileNode extends BaseNode {
+      definition: WorkflowNodeManifest = {
+        slug: "dry-file-node",
+        version: "1.0.0",
+        name: "Dry File Node",
+        description: "Declares dry_run; writes a file output when really executed",
+        input_schema: { type: "object" },
+        output_schema: {
+          type: "object",
+          properties: { out_file: { type: "string", format: "file" } },
+          required: ["out_file"],
+        },
+        contract: {
+          transport: "http",
+          routes: ["/execute", "/health", "/manifest"],
+          capabilities: { dry_run: true },
+          openapi: "3.2",
+        },
+      };
+
+      execute(_inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+        const p = context.outputPath("out.txt");
+        writeFileSync(p, "data");
+        return { out_file: p };
+      }
+    }
+
+    const app = createNodeApp(new DryFileNode());
+    const server = app.listen(0);
+    const port = (server.address() as { port: number }).port;
+
+    const originalFetch = globalThis.fetch;
+    let putCalls = 0;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        putCalls += 1;
+        return new Response("ok", { status: 200 });
+      }
+      return originalFetch(input as RequestInfo, init);
+    }) as typeof fetch;
+
+    try {
+      const resp = await fetch(`http://127.0.0.1:${port}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          run_id: "r-dry",
+          node_id: "n1",
+          inputs: {},
+          dry_run: true,
+          output_upload_url: { out_file: "https://s3.example.com/put" },
+        }),
+      });
+      const data = (await resp.json()) as { status: string; dry_run?: boolean };
+      expect(data.status).toBe("pass");
+      expect(data.dry_run).toBe(true);
+      expect(putCalls).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+      server.close();
+    }
+  });
+});

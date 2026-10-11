@@ -18,6 +18,7 @@ describe("NodeExecutionResponseFactory", () => {
         error: null,
         error_type: null,
         error_code: null,
+        dry_run: false,
       });
     });
 
@@ -46,6 +47,7 @@ describe("NodeExecutionResponseFactory", () => {
         duration_ms: 30000,
         error_code: "TIMEOUT",
         token_usage: 0.0,
+        dry_run: false,
       });
     });
 

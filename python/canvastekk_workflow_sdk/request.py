@@ -92,6 +92,17 @@ class NodeExecutionRequest(BaseModel):
             "NodeIOError instead of an opaque 422"
         ),
     )
+    dry_run: bool = Field(
+        default=False,
+        description=(
+            "D10 (#111): request a validation-only execution. When true the "
+            "harness runs FULL input validation and then returns a "
+            "synthetic pass — no handler invocation, no file downloads or "
+            "uploads, token_usage 0, execution_id namespaced 'dryrun-'. "
+            "Honored only when the node declares "
+            "contract.capabilities.dry_run (see docs/dry-run-contract.md)"
+        ),
+    )
 
     model_config = ConfigDict(
         # Tolerate unknown body keys both directions (old engine ↔ new SDK).
