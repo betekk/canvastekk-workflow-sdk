@@ -2,12 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.3] - 2026-10-12
+
+### Bug Fixes
+
+- **app**: Manifest stamps default contract without unanswerable /hook (#139)
+
+
 ## [0.52.2] - 2026-10-12
 
 ### Miscellaneous Tasks
 
 - **learnings**: Red-verdict discipline, toolcache triage, env-drift false reds, wheel-pin triple
 - **learnings**: Blanket version-replace corrupts pinned artifact URLs
+- **release**: Prepare v0.52.2
 
 
 ## [0.52.1] - 2026-10-11
