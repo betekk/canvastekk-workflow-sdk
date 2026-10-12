@@ -23,7 +23,7 @@ Cross-module consumers exist (two downstream repos) → architecture review note
 ## Implementation Phases
 
 ### Phase 1: Instance-aware contract stamping
-- [ ] **1.1** In `app.py`'s `/manifest` handler, compute the served contract: default-minus-`/hook` when `definition.contract is None and type(node).hook is BaseNode.hook`; declared and hook-overriding nodes unchanged. Bump version to 0.52.3. Add three tests (default-omits, override-keeps, declared-untouched).
+- [x] **1.1** In `app.py`'s `/manifest` handler, compute the served contract: default-minus-`/hook` when `definition.contract is None and type(node).hook is BaseNode.hook`; declared and hook-overriding nodes unchanged. Bump version to 0.52.3. Add three tests (default-omits, override-keeps, declared-untouched).
     — **Why:** The SDK stamps `/hook` into every default contract while its own stub returns 501 for it, and the engine's presence bar rejects ≥500 — so every default-contract node fails registration by construction (49 CWN + 15 CPCA handlers, zero hook implementers).
     — **Done when:** the three tests pass locally (or CI if no local venv) and Python CI is green on the PR.
     — **Consumers affected:** workflow-nodes, point-cloud-app (adoption tickets follow); all other SDK consumers see a narrowed default only.
