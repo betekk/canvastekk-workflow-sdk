@@ -1348,11 +1348,16 @@ class TestManifestContract:
     """D8/#110: the adapter stamps the effective serving contract on /manifest."""
 
     def test_manifest_carries_sdk_served_contract(self, echo_client: TestClient) -> None:
-        """Bare node (no declared contract) → the SDK-served 7-route default."""
+        """Bare node (no declared contract) → the SDK-served default.
+
+        #138: the default omits /hook — the adapter mounts it as a 501 stub
+        unless hook() is overridden, and declaring an unanswerable route
+        fails the engine's #658 presence bar.
+        """
         data = echo_client.get("/manifest").json()
         assert data["contract"]["transport"] == "http"
         assert data["contract"]["routes"] == [
-            "/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready",
+            "/execute", "/health", "/manifest", "/metrics", "/live", "/ready",
         ]
         assert data["contract"]["capabilities"] == {"dry_run": False}
         assert data["contract"]["openapi"] == "3.2"
@@ -1449,3 +1454,49 @@ class TestDryRunExecution:
         assert resp.dry_run is True
         assert resp.execution_id.startswith("dryrun-")
         assert resp.token_usage == 0.0
+
+
+class HookedEchoNode(EchoNode):
+    """EchoNode that overrides hook() — the webhook contract is real."""
+
+    # Independent definition instance — EchoNode.definition is shared
+    # class-level state that sibling tests may stamp; a copy isolates us.
+    definition = EchoNode.definition.model_copy()
+
+    def hook(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return {"received": True}
+
+
+class DeclaredHookNode(EchoNode):
+    """Author-declared contract including /hook, WITHOUT a hook override."""
+
+    definition = EchoNode.definition.model_copy(
+        update={
+            "contract": NodeContract(
+                routes=["/execute", "/health", "/manifest", "/hook"]
+            )
+        }
+    )
+
+
+class TestManifestContractStamping:
+    """#138: the served contract must not declare routes the node cannot answer."""
+
+    def test_default_contract_omits_unimplemented_hook(
+        self, echo_client: TestClient
+    ) -> None:
+        routes = echo_client.get("/manifest").json()["contract"]["routes"]
+        assert "/hook" not in routes
+        assert "/execute" in routes
+        assert "/health" in routes
+        assert "/manifest" in routes
+
+    def test_hook_override_serves_hook_route(self) -> None:
+        client = TestClient(create_node_app(HookedEchoNode()))
+        routes = client.get("/manifest").json()["contract"]["routes"]
+        assert "/hook" in routes
+
+    def test_declared_contract_served_untouched(self) -> None:
+        client = TestClient(create_node_app(DeclaredHookNode()))
+        routes = client.get("/manifest").json()["contract"]["routes"]
+        assert "/hook" in routes

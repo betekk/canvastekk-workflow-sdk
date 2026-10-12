@@ -570,7 +570,21 @@ def create_node_app(
         # D8/#110: the adapter stamps the effective contract — a declared
         # subset wins, else the SDK-served default (exactly the routes this
         # app mounts: SDK_SERVED_CONTRACT_ROUTES).
-        content["contract"] = node.definition.effective_contract.model_dump(mode="json")
+        effective = node.definition.effective_contract
+        # #138 / engine #658: the adapter mounts POST /hook unconditionally
+        # and stubs it 501 when hook() is not overridden, while the engine's
+        # registration presence bar rejects >= 500. Declaring /hook for a
+        # node that cannot answer it fails registration by construction.
+        # Nodes riding the default contract AND the BaseNode.hook default
+        # serve the default WITHOUT /hook; declared contracts and
+        # hook-implementing nodes are untouched.
+        from canvastekk_workflow_sdk.base import BaseNode as _BaseNode
+
+        if node.definition.contract is None and type(node).hook is _BaseNode.hook:
+            effective = effective.model_copy(
+                update={"routes": [r for r in effective.routes if r != "/hook"]}
+            )
+        content["contract"] = effective.model_dump(mode="json")
         return JSONResponse(content=content)
 
     @router.post(
