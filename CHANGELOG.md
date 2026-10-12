@@ -2,11 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.2] - 2026-10-12
+
+### Miscellaneous Tasks
+
+- **learnings**: Red-verdict discipline, toolcache triage, env-drift false reds, wheel-pin triple
+- **learnings**: Blanket version-replace corrupts pinned artifact URLs
+
+
 ## [0.52.1] - 2026-10-11
 
 ### Bug Fixes
 
 - **ci**: Sha-pin floating third-party action tags (#137)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.52.1
 
 
 ## [0.52.0] - 2026-10-11
