@@ -5,9 +5,9 @@
 **Base**: main
 
 ## Acceptance Criteria
-- [ ] Decision recorded on ticket #140: no-change (with evidence) OR release cut (with version + what changed)
-- [ ] Manifest sketch for `remove-humans` (inputs, outputs, storage convention) attached as a comment for A3 (betekk/canvastekk-ml-service#57) to implement against
-- [ ] Temp-output storage convention agreed: the node writes its final artifact to `temp-outputs/{run_id}/…` and temp artifacts are NOT registered as `node_results` protected roots
+- [x] Decision recorded on ticket #140: no-change (with evidence) OR release cut (with version + what changed)
+- [x] Manifest sketch for `remove-humans` (inputs, outputs, storage convention) attached as a comment for A3 (betekk/canvastekk-ml-service#57) to implement against
+- [x] Temp-output storage convention agreed: the node writes its final artifact to `temp-outputs/{run_id}/…` and temp artifacts are NOT registered as `node_results` protected roots
 
 ## Investigation Findings (evidence for the decision)
 
@@ -40,14 +40,16 @@
     — **Done:** exit gate run on docs-only tree (see Trace memo); committed and pushed on feat/140; files: PLANS/PLAN-140.md; fixes: none
 
 ### Phase 2: Ticket comments (the ticket's own ACs)
-- [ ] **2.1** Post the decision comment on betekk/canvastekk-workflow-sdk#140: NO-CHANGE + evidence summary (file:line citations, v0.52.0 pin correction)
+- [x] **2.1** Post the decision comment on betekk/canvastekk-workflow-sdk#140: NO-CHANGE + evidence summary (file:line citations, v0.52.0 pin correction)
     — **Why:** AC1 demands the decision be recorded on the ticket itself, not only in-repo
     — **Done when:** comment posted; permalink captured in this PLAN's trace
     — **Consumers affected:** A3 implementer
-- [ ] **2.2** Post the manifest-sketch comment on #140 for A3: inputs/outputs JSON Schema + storage convention (engine-minted `temp-outputs/{run_id}/` target; never a `node_results` protected root; 7-day lifecycle expiry)
+    — **Done:** decision comment posted; permalink: https://github.com/betekk/canvastekk-workflow-sdk/issues/140#issuecomment-6140673226; files: none (gh comment); fixes: none
+- [x] **2.2** Post the manifest-sketch comment on #140 for A3: inputs/outputs JSON Schema + storage convention (engine-minted `temp-outputs/{run_id}/` target; never a `node_results` protected root; 7-day lifecycle expiry)
     — **Why:** AC2 — A3 implements against this sketch; AC3 — the convention must be stated on the ticket thread
     — **Done when:** comment posted; permalink captured
     — **Consumers affected:** A3 (ml-service#57)
+    — **Done:** manifest-sketch comment posted; permalink: https://github.com/betekk/canvastekk-workflow-sdk/issues/140#issuecomment-6140676415; files: none (gh comment); fixes: none
 
 ## Technical Notes
 - Manifest sketch (for A3):
