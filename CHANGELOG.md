@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.4] - 2026-10-13
+
+### Documentation
+
+- **sdk**: Record temp-lane node-contract decision — no-change (#140) (#141)
+
+
 ## [0.52.3] - 2026-10-12
 
 ### Bug Fixes
 
 - **app**: Manifest stamps default contract without unanswerable /hook (#139)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.52.3
 
 
 ## [0.52.2] - 2026-10-12

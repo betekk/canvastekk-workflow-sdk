@@ -1,7 +1,7 @@
 /**
  * SDK version string following semantic versioning (X.Y.Z).
  */
-export const VERSION = "0.52.3";
+export const VERSION = "0.52.4";
 
 /**
  * Release date (UTC) of this version — the support-horizon sunset is
