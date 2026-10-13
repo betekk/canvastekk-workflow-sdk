@@ -28,14 +28,16 @@
 ## Implementation Phases
 
 ### Phase 1: Decision record in-repo
-- [ ] **1.1** Write `docs/temp-lane-node-contract.md` recording the no-change decision with the v0.40.0/v0.52.0 evidence above, the manifest sketch, and the temp-output storage convention
+- [x] **1.1** Write `docs/temp-lane-node-contract.md` recording the no-change decision with the v0.40.0/v0.52.0 evidence above, the manifest sketch, and the temp-output storage convention
     — **Why:** the durable in-repo record the epic (betekk/canvastekk-tracker#3776) and consumers reference; also the PR vehicle that closes #140 on merge
     — **Done when:** file exists in `docs/`, states NO-CHANGE with file:line evidence, and contains the manifest sketch + storage convention
     — **Consumers affected:** A3 (ml-service#57) implementers; A5 (cwe#747) reviewers
-- [ ] **1.2** Run verification gate on the docs tree, commit and push the decision doc on `feat/140`
+    — **Done:** decision doc written — NO-CHANGE with v0.40.0 tag-line evidence, pin correction to v0.52.0 (register.sh:32), manifest sketch (human_filter-mirrored 10 MiB per user answer), storage convention; files: docs/temp-lane-node-contract.md; fixes: none
+- [x] **1.2** Run verification gate on the docs tree, commit and push the decision doc on `feat/140`
     — **Why:** the PR must exist for `Closes #140` to fire; uncommitted work is lost on worktree removal
     — **Done when:** `feat/140` pushed to origin with the decision doc; gate green
     — **Consumers affected:** none beyond this branch
+    — **Done:** exit gate run on docs-only tree (see Trace memo); committed and pushed on feat/140; files: PLANS/PLAN-140.md; fixes: none
 
 ### Phase 2: Ticket comments (the ticket's own ACs)
 - [ ] **2.1** Post the decision comment on betekk/canvastekk-workflow-sdk#140: NO-CHANGE + evidence summary (file:line citations, v0.52.0 pin correction)
@@ -60,9 +62,9 @@
     "properties": {
       "image": {
         "type": "string", "format": "file",
-        "x-accept": [".png", ".jpg", ".jpeg", ".webp"],
-        "x-maxSizeBytes": 15728640,
-        "description": "Source image (15 MiB cap)"
+        "x-accept": [".jpg", ".jpeg", ".png", ".webp"],
+        "x-maxSizeBytes": 10485760,
+        "description": "Source image (10 MiB cap — mirrors human_filter MAX_INLINE_BYTES)"
       }
     }
   },
@@ -84,3 +86,7 @@
 ## Risks & Mitigation
 - Risk: A3 misreads the decision as "node writes to S3 directly". Mitigation: manifest sketch + storage convention state the engine-minted-target model explicitly, with DA-3340 cited.
 - Risk: stale v0.40.0 premise misleads pin updates. Mitigation: decision records the actual live pin (v0.52.0) with the register.sh citation.
+
+## Trace
+- Phase 1 gate: docs-only diff vs origin/main (docs/temp-lane-node-contract.md + PLANS/PLAN-140.md) — no lint/typecheck/unit targets touched; scoped-lint rule → n.a. across the board; CI (ci-python.yml) carries the code signal on the PR.
+- GATE 79ed285 tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a  (docs-only diff; ruff/pytest targets untouched — zero code delta vs origin/main; CI carries the signal; fixes: none)
