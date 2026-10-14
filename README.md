@@ -480,20 +480,20 @@ Terminal failures fail the execution — they are deterministic.
 
 The SDK bundles portable agent skills (Agent Skills standard) that teach coding agents how to create CanvasTEKK workflow nodes correctly — without reading docs.
 
-**Install from the repo (no Python needed):**
+**Install from the repo (no Python needed) — project scope by default, like `npx skills add`:**
 
 ```bash
 # List the bundled skills
 npx github:betekk/canvastekk-workflow-sdk list
 
-# Install to user scope (~/.agents/skills — all projects)
+# Install into THIS project (./.agents/skills — default scope)
 npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant
 
-# Install into a project (.agents/skills — this project only)
-npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-builder --project .
+# Install to user scope (~/.agents/skills — all projects)
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant -g
 ```
 
-Pinned install / rollback: append `#v0.52.5` to the repo spec. Unreleased tree: `--ref main`. Preview targets without writing: `--dry-run`. Upgrade = re-run `add`. Each installed skill carries a `.skill-source.json` provenance stamp; `npx github:betekk/canvastekk-workflow-sdk list installed` shows what you have vs the latest release.
+Pinned install / rollback: append `#v0.53.0` to the repo spec. Unreleased tree: `--ref main`. Preview targets without writing: `--dry-run`. Upgrade = re-run `add`. Each installed skill carries a `.skill-source.json` provenance stamp; `npx github:betekk/canvastekk-workflow-sdk list installed` shows what the project has vs the latest release (`--global` for user scope).
 
 **Wheel users** (`pip install`-ed SDK) — one command in your node project:
 
@@ -532,10 +532,10 @@ my-node-project/
 **Global setup** (works across all projects):
 
 ```bash
-# User scope installs straight to ~/.agents/skills (OpenCode and pi discover it)
-npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant
-npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-builder
-npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-patterns
+# -g installs straight to ~/.agents/skills (OpenCode and pi discover it)
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant -g
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-builder -g
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-patterns -g
 ```
 
 > **Upgrading from an SDK version that scaffolded `.opencode/skills/`?**
