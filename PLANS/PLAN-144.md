@@ -145,3 +145,5 @@ GATE 41a03a9 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
 
 GATE 5c59daf tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a
 LOG full-tier escalation: ticket exit gate (last gate of the run) — unconditional full per gate contract
+LOG review-fix round 1: 2 Major fixed — AUDIT export command replaced with real export_definition call (verified vs __main__.py), stray artifacts (=0, .opencode file) removed; Minor fixed — installer traversal guard; re-gate full green
+GATE d324f00 tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a

@@ -41,3 +41,6 @@
 - [registry-wheel-pin-triple](conventions/registry-wheel-pin-triple.md) — SDK wheel bumps move script + pyproject + poetry.lock together; CASA's drift test enforces it
 - [blanket-version-string-replace-corrupts-urls](anti-patterns/blanket-version-string-replace-corrupts-urls.md) — s|vX|vY| on pinned wheel URLs leaves the bare filename behind; full-URL replaces only, verify tag/filename agreement
 - [installed-tool-env-contracts-invisible-to-invoker-greps](anti-patterns/installed-tool-env-contracts-invisible-to-invoker-greps.md) — invoker greps prove callers, not the pinned tool; sweep the dependency source before cutting the release that retires a name (ifc run 38508424993/#142)
+- [shipped-docs-must-verify-cli-surface](anti-patterns/shipped-docs-must-verify-cli-surface.md) — grep the dispatch surface before shipping any CLI snippet in skills/docs; export_definition is a function, not a subcommand (#144)
+- [git-add-all-sweeps-worktree-artifacts](anti-patterns/git-add-all-sweeps-worktree-artifacts.md) — stage explicit paths per phase commit; sessions drop .opencode/ and typo files (e.g. a file named =0) that -A commits (#144)
+- [full-pytest-needs-fastapi-extra](conventions/full-pytest-needs-fastapi-extra.md) — fresh venv: poetry install -E fastapi (ci-python.yml:106) before pytest; fastapi collection errors are environmental (#144)
