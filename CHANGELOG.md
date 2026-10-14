@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.1] - 2026-10-14
+
+### Bug Fixes
+
+- **installer**: Project scope is the default, -g opts into user scope (#146)
+
+
 ## [0.53.0] - 2026-10-14
 
 ### Features
 
 - **skills**: SDK assistant skill, npx installer, bundled-skill scrub (#145)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.53.0
 
 
 ## [0.52.5] - 2026-10-14
