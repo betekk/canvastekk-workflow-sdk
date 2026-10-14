@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--token",
         default=None,
-        help="service token; defaults to $REGISTRY_SERVICE_TOKEN",
+        help="service token; defaults to $CANVASTEKK_REGISTRY_TOKEN",
     )
     parser.add_argument(
         "--staged",
@@ -215,9 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or os.environ.get("REGISTRY_SERVICE_TOKEN", "")
+    token = args.token or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
     if not token:
-        print("::error::no service token (pass --token or set REGISTRY_SERVICE_TOKEN)")
+        print("::error::no service token (pass --token or set CANVASTEKK_REGISTRY_TOKEN)")
         return 2
 
     declared_list = load_declared(args.slugs_file)

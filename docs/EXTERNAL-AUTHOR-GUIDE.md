@@ -539,7 +539,7 @@ Secrets are **never stored in code**. Use your CI/CD provider's secrets store.
 
 | Secret | When Required | Description |
 |--------|--------------|-------------|
-| `REGISTRY_SERVICE_TOKEN` | CI/CD registration | Service token for automated registration (`X-Service-Token` header). Provided by the platform team. |
+| `CANVASTEKK_REGISTRY_TOKEN` | CI/CD registration | Service token for automated registration (`X-Service-Token` header). Provided by the platform team. |
 | `REGISTRY_API_KEY` | Manual registration | API key for the registry (`X-API-Key` header). Provided by the platform team. |
 | `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. |
 | `CANVASTEKK_KEYCLOAK_SERVER_URL` | Node auth (Keycloak mode) | Keycloak base URL. Only needed if using Keycloak auth. |
@@ -594,7 +594,7 @@ jobs:
 
       - name: Register node with engine
         env:
-          REGISTRY_SERVICE_TOKEN: ${{ secrets.REGISTRY_SERVICE_TOKEN }}
+          CANVASTEKK_REGISTRY_TOKEN: ${{ secrets.CANVASTEKK_REGISTRY_TOKEN }}
         run: |
           python -c "
           import os
@@ -605,7 +605,7 @@ jobs:
               MyNode(),
               registry_url='${{ env.ENGINE_URL }}',
               invoke_url='https://my-node.example.com',
-              service_token=os.environ['REGISTRY_SERVICE_TOKEN'],
+              service_token=os.environ['CANVASTEKK_REGISTRY_TOKEN'],
               tags=['ci-cd', 'auto-registered'],
           )
           print('Registration successful')
@@ -614,7 +614,7 @@ jobs:
       - name: Validate registration
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-Service-Token: ${{ secrets.REGISTRY_SERVICE_TOKEN }}" \
+            -H "X-Service-Token: ${{ secrets.CANVASTEKK_REGISTRY_TOKEN }}" \
             "${{ env.ENGINE_URL }}/my-node-v1.0.0")
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "Registration verification failed (HTTP $HTTP_STATUS)"
@@ -629,7 +629,7 @@ Configure these in **Settings > Secrets and variables > Actions**:
 
 | Secret | Description |
 |--------|-------------|
-| `REGISTRY_SERVICE_TOKEN` | Service token for engine registration |
+| `CANVASTEKK_REGISTRY_TOKEN` | Service token for engine registration |
 | `REGISTRY_USERNAME` | Container registry username |
 | `REGISTRY_PASSWORD` | Container registry password |
 
