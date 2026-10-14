@@ -82,22 +82,26 @@
 
 ### Phase 4: Routing, docs, config
 
-- [ ] **4.1** Update `python/canvastekk_workflow_sdk/data/templates/AGENTS.md`: creation routes assistant-first (contract gate) then builder/patterns; "Review my node"/validate row → assistant; new SDK Q&A row → assistant
+- [x] **4.1** Update `python/canvastekk_workflow_sdk/data/templates/AGENTS.md`: creation routes assistant-first (contract gate) then builder/patterns; "Review my node"/validate row → assistant; new SDK Q&A row → assistant
     — **Why:** `init --agents-md` teaches routing; the assistant is now the entry point
     — **Done when:** table rows reference all three skills; template still renders the conventions section
     — **Consumers affected:** every `init --agents-md` consumer
-- [ ] **4.2** Update root `README.md` "AI Agent Setup": skills table 2→3 rows; add npx install block (list / add user-scope / add --project / pinned `#vX.Y.Z`) before the `init` path; keep `init` documented; one line noting `npx skills add`-ready layout (deferred)
+    — **Done:** routing table rebuilt assistant-first (create/review/Q&A rows); tree shows all three skills; files: data/templates/AGENTS.md; fixes: none
+- [x] **4.2** Update root `README.md` "AI Agent Setup": skills table 2→3 rows; add npx install block (list / add user-scope / add --project / pinned `#vX.Y.Z`) before the `init` path; keep `init` documented; one line noting `npx skills add`-ready layout (deferred)
     — **Why:** AC — README must list the third skill and the npx path
     — **Done when:** section shows three skills + both install paths; commands match installer flags verbatim
     — **Consumers affected:** public readers
-- [ ] **4.3** Add one pointer line to `python/README.md` directing to the root README's "AI Agent Setup" section (user decision, detection-gate round 1: pointer-line-only — python/README has no skills section today; single canonical listing, no drift)
+    — **Done:** AI Agent Setup: npx block first (list/add/pin/dry-run/list installed), init kept as wheel path, 3-skill table, global setup via npx user-scope, ecosystem-layout note; files: README.md; fixes: none
+- [x] **4.3** Add one pointer line to `python/README.md` directing to the root README's "AI Agent Setup" section (user decision, detection-gate round 1: pointer-line-only — python/README has no skills section today; single canonical listing, no drift)
     — **Why:** SDK-change README sweep rule (root + language READMEs) without duplicating the skills table
     — **Done when:** python/README mentions the bundled agent skills exactly once, pointing at the root section
     — **Consumers affected:** python README readers
-- [ ] **4.4** Add `{"action": "skill", "resource": "canvastekk-workflow-sdk-assistant", "effect": "allow"}` to `opencode.json` permissions
+    — **Done:** single pointer line after the intro blockquote -> root README AI Agent Setup (user decision round 1); files: python/README.md; fixes: none
+- [x] **4.4** Add `{"action": "skill", "resource": "canvastekk-workflow-sdk-assistant", "effect": "allow"}` to `opencode.json` permissions
     — **Why:** AC — repo authors get the mirror-discovered skill without a permission prompt
     — **Done when:** JSON valid; entry present alongside the existing shape
     — **Consumers affected:** repo-author OpenCode sessions
+    — **Done:** allow entry added next to the existing permission shape; JSON valid; files: opencode.json; fixes: none
 
 ### Phase 5: Exit gate (full tier) + final sync
 
@@ -134,3 +138,4 @@ None — no blocked-by tickets; base `origin/main` @ b1989ce (v0.52.5).
 _Planning: PLAN authored from ticket #144 + approved local plan `/home/silentx/.opencode/plan/PLAN-sdk-assistant-skill-and-installer.md`._
 GATE 9b20d72 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
 GATE 59c1320 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
+GATE 197097e tier=light lint=n.a typecheck=n.a build=- unit=t e2e=n.a

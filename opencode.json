@@ -10,6 +10,7 @@
     }
   },
   "permissions": [
-    { "action": "skill", "resource": "civiltekk-pr-workflow-skill", "effect": "allow" }
+    { "action": "skill", "resource": "civiltekk-pr-workflow-skill", "effect": "allow" },
+    { "action": "skill", "resource": "canvastekk-workflow-sdk-assistant", "effect": "allow" }
   ]
 }
