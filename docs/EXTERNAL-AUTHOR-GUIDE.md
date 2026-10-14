@@ -333,8 +333,10 @@ python -m canvastekk_workflow_sdk register handler:definition \
 
 The CLI maps the manifest to the engine's request vocabulary automatically
 (`name` = the manifest's `slug`, `label` = the display `name`, plus schemas,
-cost, timeout, constraints, deprecation), authenticates with the
-`X-Service-Token` header, POSTs to `{engine}/api/workflows/nodes/`, and
+cost, timeout, constraints, deprecation), authenticates with the header
+the token shape selects — a `ctk_` credential rides `Authorization: Bearer`,
+a legacy service token rides `X-Service-Token` — POSTs to
+`{engine}/api/workflows/nodes/`, and
 verifies the row via `by-name/{name}`. Exit codes: `0` ok · `2` usage ·
 `3` auth (401/403) · `4` other 4xx · `5` server · `6` network. The token is
 read from the environment and never printed.
@@ -539,7 +541,7 @@ Secrets are **never stored in code**. Use your CI/CD provider's secrets store.
 
 | Secret | When Required | Description |
 |--------|--------------|-------------|
-| `CANVASTEKK_REGISTRY_TOKEN` | CI/CD registration | Service token for automated registration (`X-Service-Token` header). Provided by the platform team. |
+| `CANVASTEKK_REGISTRY_TOKEN` | CI/CD registration | Service credential for automated registration. The header is picked from the token shape: a `ctk_` credential rides `Authorization: Bearer`, a legacy service token rides `X-Service-Token`. Issued by the platform team. |
 | `REGISTRY_API_KEY` | Manual registration | API key for the registry (`X-API-Key` header). Provided by the platform team. |
 | `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. |
 | `CANVASTEKK_KEYCLOAK_SERVER_URL` | Node auth (Keycloak mode) | Keycloak base URL. Only needed if using Keycloak auth. |
