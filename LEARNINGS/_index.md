@@ -40,3 +40,4 @@
 - [local-red-ci-green-means-env-drift](patterns/local-red-ci-green-means-env-drift.md) — CI-green/local-red divergence is env drift until proven otherwise; diff installed pins vs lock before recording baseline failures (engine minimum_sdk_version/#123)
 - [registry-wheel-pin-triple](conventions/registry-wheel-pin-triple.md) — SDK wheel bumps move script + pyproject + poetry.lock together; CASA's drift test enforces it
 - [blanket-version-string-replace-corrupts-urls](anti-patterns/blanket-version-string-replace-corrupts-urls.md) — s|vX|vY| on pinned wheel URLs leaves the bare filename behind; full-URL replaces only, verify tag/filename agreement
+- [installed-tool-env-contracts-invisible-to-invoker-greps](anti-patterns/installed-tool-env-contracts-invisible-to-invoker-greps.md) — invoker greps prove callers, not the pinned tool; sweep the dependency source before cutting the release that retires a name (ifc run 38508424993/#142)
