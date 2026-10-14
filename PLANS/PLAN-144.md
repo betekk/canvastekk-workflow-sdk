@@ -64,18 +64,21 @@
 
 ### Phase 3: npx installer
 
-- [ ] **3.1** Add root `package.json` — `private: true`, `"type": "module"`, `bin: {"canvastekk-workflow-sdk-skills": "./installer/init.mjs"}`, repository field
+- [x] **3.1** Add root `package.json` — `private: true`, `"type": "module"`, `bin: {"canvastekk-workflow-sdk-skills": "./installer/init.mjs"}`, repository field
     — **Why:** `npx github:betekk/canvastekk-workflow-sdk` resolves the bin from the root manifest
     — **Done when:** `npx --no-install` irrelevant; `node installer/init.mjs` runs; JSON valid
     — **Consumers affected:** end users reviewing the repo
-- [ ] **3.2** Write `installer/init.mjs` adapted from betekk-skills: `list` / `list installed` / `add <skill> [--project .] [--ref <tag|main>] [--source .] [--dry-run]`; `SKILLS_SRC = .agents/skills`; user scope `~/.agents/skills`; latest `vX.Y.Z` tag router (`git ls-remote` + shallow clone + re-exec); sidecar `.skill-source.json` with version from `python/pyproject.toml` `[project].version`; `--dry-run` prints resolved source→dest, writes nothing
+    — **Done:** root manifest with bin + repository; node installer/init.mjs runs; files: package.json; fixes: none
+- [x] **3.2** Write `installer/init.mjs` adapted from betekk-skills: `list` / `list installed` / `add <skill> [--project .] [--ref <tag|main>] [--source .] [--dry-run]`; `SKILLS_SRC = .agents/skills`; user scope `~/.agents/skills`; latest `vX.Y.Z` tag router (`git ls-remote` + shallow clone + re-exec); sidecar `.skill-source.json` with version from `python/pyproject.toml` `[project].version`; `--dry-run` prints resolved source→dest, writes nothing
     — **Why:** the one-command install path for repo reviewers without Python
     — **Done when:** smoke test below passes
     — **Consumers affected:** end users; README install section (documents its commands)
-- [ ] **3.3** Smoke test: `node installer/init.mjs list` (3 skills); `add canvastekk-workflow-sdk-assistant --project /tmp/opencode/sdk144-probe --dry-run` (writes nothing); real `add` (SKILL.md + `.skill-source.json` with `version: 0.52.5` present); remove probe dir
+    — **Done:** installer adapted (SKILLS_SRC=.agents/skills, user scope ~/.agents/skills, pyproject version stamping, --dry-run, tag router); files: installer/init.mjs; fixes: none
+- [x] **3.3** Smoke test: `node installer/init.mjs list` (3 skills); `add canvastekk-workflow-sdk-assistant --project /tmp/opencode/sdk144-probe --dry-run` (writes nothing); real `add` (SKILL.md + `.skill-source.json` with `version: 0.52.5` present); remove probe dir
     — **Why:** installer is new machinery — prove the AC's three behaviors before commit
     — **Done when:** all three assertions observed in output; probe dir cleaned
     — **Consumers affected:** none (probe only)
+    — **Done:** list=3 skills; dry-run wrote nothing (probe absent); real add wrote SKILL.md + sidecar version 0.52.5; probe cleaned; files: none (probe only); fixes: none
 
 ### Phase 4: Routing, docs, config
 
@@ -130,3 +133,4 @@ None — no blocked-by tickets; base `origin/main` @ b1989ce (v0.52.5).
 
 _Planning: PLAN authored from ticket #144 + approved local plan `/home/silentx/.opencode/plan/PLAN-sdk-assistant-skill-and-installer.md`._
 GATE 9b20d72 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
+GATE 59c1320 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
