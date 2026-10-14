@@ -51,14 +51,16 @@
 
 ### Phase 2: Leak scrub + dependency restatement (both skills, both copies)
 
-- [ ] **2.1** Strip `DA-\d+` references from builder + patterns (canonical and mirror): 5 lines each (builder 747/753/754, patterns 957) — keep the mechanism, drop the ticket IDs (e.g. "rejected with `NodeIOError`" without `(DA-3340)`)
+- [x] **2.1** Strip `DA-\d+` references from builder + patterns (canonical and mirror): 5 lines each (builder 747/753/754, patterns 957) — keep the mechanism, drop the ticket IDs (e.g. "rejected with `NodeIOError`" without `(DA-3340)`)
     — **Why:** AC gate — internal ticket IDs must not ship in public skill content
     — **Done when:** `grep -rE 'DA-[0-9]+' python/canvastekk_workflow_sdk/data/skills .agents/skills` empty
     — **Consumers affected:** wheel users, mirror guard
-- [ ] **2.2** Restate builder dependency guidance per base-default rule: "Package Installation" section, Step 4 Dockerfile, Step 5 pyproject — base `canvastekk-workflow-sdk` line first, `[fastapi,serve]` as the SDK-served variant with one-line why (base ships without fastapi since 0.43), bump stale `>=0.5.2` floors to `>=0.52`; mirror the file
+    — **Done:** all 5 lines scrubbed in both copies (mechanism kept, IDs dropped); grep = 0 hits; files: builder + patterns SKILL.md ×2 copies; fixes: none
+- [x] **2.2** Restate builder dependency guidance per base-default rule: "Package Installation" section, Step 4 Dockerfile, Step 5 pyproject — base `canvastekk-workflow-sdk` line first, `[fastapi,serve]` as the SDK-served variant with one-line why (base ships without fastapi since 0.43), bump stale `>=0.5.2` floors to `>=0.52`; mirror the file
     — **Why:** AC — templates must match the dependency rule stated in the assistant
     — **Done when:** no `[fastapi,serve]>=0.5.2` remnants; builder guidance agrees with the assistant's decision table; diff -r clean
     — **Consumers affected:** wheel users following templates
+    — **Done:** Package Installation section restated (base-first + pointer to assistant table), Dockerfile + both pyproject variants carry the why-comment, checklist + 3 pins bumped to >=0.52; stale-pin grep = 0; mirror re-synced; files: builder SKILL.md ×2 copies; fixes: none
 
 ### Phase 3: npx installer
 
@@ -127,3 +129,4 @@ None — no blocked-by tickets; base `origin/main` @ b1989ce (v0.52.5).
 ## Trace
 
 _Planning: PLAN authored from ticket #144 + approved local plan `/home/silentx/.opencode/plan/PLAN-sdk-assistant-skill-and-installer.md`._
+GATE 9b20d72 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a

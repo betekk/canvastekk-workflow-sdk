@@ -305,7 +305,7 @@ app = MyNode().create_app(dependencies=[Depends(auth)])
 pip install canvastekk-workflow-sdk --index-url https://USERNAME:TOKEN@pypi.pkg.github.com/betekk/
 ```
 
-Optional extras: `canvastekk-workflow-sdk[jwt]`, `[keycloak]`, `[serve]` (uvicorn), `[fastapi]` (server imports — required since SDK 0.43 for `create_node_app`; the base install ships without fastapi). Node templates use `[fastapi,serve]`.
+The base install covers defining, validating, locally test-running, and registering nodes. Add extras only when the rung needs them — the full decision table lives in the `canvastekk-workflow-sdk-assistant` skill: `[fastapi]` (SDK-served HTTP — the base install ships without fastapi since SDK 0.43), `[serve]` (uvicorn), `[jwt]`, `[keycloak]`.
 
 ---
 
@@ -453,9 +453,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install SDK from GitHub Packages
+# Install SDK from GitHub Packages.
+# [fastapi,serve]: this template serves the HTTP contract via uvicorn — the
+# base install ships without fastapi (since SDK 0.43). Plain
+# canvastekk-workflow-sdk is enough when you self-host the routes.
 COPY pyproject.toml ./
-RUN pip install "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2" \
+RUN pip install "canvastekk-workflow-sdk[fastapi,serve]>=0.52" \
     --index-url https://betekk:${SDK_PAT}@pypi.pkg.github.com/betekk/
 
 # Copy node code
@@ -495,7 +498,9 @@ version = "{{version}}"
 description = "{{description}}"
 requires-python = ">=3.12"
 dependencies = [
-    "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2",
+    # SDK-served rung: drop [fastapi,serve] (keep the base package) when you
+    # self-host the HTTP routes — see canvastekk-workflow-sdk-assistant.
+    "canvastekk-workflow-sdk[fastapi,serve]>=0.52",
     "uvicorn>=0.54",
 ]
 
@@ -508,7 +513,7 @@ build-backend = "poetry.core.masonry.api"
 
 ```toml
 dependencies = [
-    "canvastekk-workflow-sdk[fastapi,serve]>=0.5.2",
+    "canvastekk-workflow-sdk[fastapi,serve]>=0.52",
     "uvicorn>=0.54",
     "numpy>=1.26",
     "open3d>=0.18",
@@ -744,14 +749,14 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 
 1. Write output files to `context.output_path("filename.ext")`
 2. Return the file path as a string in the outputs dict
-3. The SDK uploads the file automatically after successful execution — the engine provides the upload target, which is a multipart `UploadSession` descriptor; since SDK 0.36.0 a legacy presigned PUT URL string is rejected with `NodeIOError` (DA-3340)
+3. The SDK uploads the file automatically after successful execution — the engine provides the upload target, which is a multipart `UploadSession` descriptor; since SDK 0.36.0 a legacy presigned PUT URL string is rejected with `NodeIOError`
 
 **Upload targets: `UploadSession`** (`canvastekk_workflow_sdk.uploads.UploadTarget`)
 
 The engine mints the target; your node never constructs one and must pass it through untouched:
 
-- `UploadSession` (multipart, DA-2885/2886): engine-minted descriptor (`session_token`, `initiate_url`, `complete_url`, `abort_url`, `status_url`, TTL-bound). The SDK redeems it lazily — POSTs size to `initiate_url`, PUTs parts in bounded parallel batches, finalizes via `complete_url`; resume via `status_url` (machinery in `multipart.py`).
-- Legacy presigned-PUT string: removed in SDK 0.36.0 — reaching the SDK it raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine"). There is no warning to silence and no fallback; the fix is upgrading the engine (DA-3338), not node changes.
+- `UploadSession` (multipart): engine-minted descriptor (`session_token`, `initiate_url`, `complete_url`, `abort_url`, `status_url`, TTL-bound). The SDK redeems it lazily — POSTs size to `initiate_url`, PUTs parts in bounded parallel batches, finalizes via `complete_url`; resume via `status_url` (machinery in `multipart.py`).
+- Legacy presigned-PUT string: removed in SDK 0.36.0 — reaching the SDK it raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine"). There is no warning to silence and no fallback; the fix is upgrading the engine, not node changes.
 
 Rules: never assume the target is a string (no slicing, concatenation, or `.startswith("http")` checks); never persist or pre-fetch URLs; return the output path and let the SDK upload.
 
@@ -821,7 +826,7 @@ Before considering a node complete, verify ALL of these:
 - [ ] Exposes port 8001
 
 ### pyproject.toml
-- [ ] Lists `canvastekk-workflow-sdk>=0.5.2` as dependency
+- [ ] Lists `canvastekk-workflow-sdk>=0.52` as dependency
 - [ ] `requires-python = ">=3.12"`
 
 ### Tests
