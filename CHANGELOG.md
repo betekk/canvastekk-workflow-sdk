@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.0] - 2026-10-14
+
+### Features
+
+- **skills**: SDK assistant skill, npx installer, bundled-skill scrub (#145)
+
+
 ## [0.52.5] - 2026-10-14
 
 ### Bug Fixes
 
 - **sdk**: Read CANVASTEKK_REGISTRY_TOKEN in convergence fallback (#142) (#143)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.52.5
 
 
 ## [0.52.4] - 2026-10-13
