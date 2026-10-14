@@ -105,14 +105,16 @@
 
 ### Phase 5: Exit gate (full tier) + final sync
 
-- [ ] **5.1** Run the AC gates as one verification pass: `grep -rE 'DA-[0-9]+'` both skills dirs (empty); `grep -rn 'api/internal\|workflow-definitions.json'` skills dirs (empty); `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` (clean); description word count ≤50; body size ≤~10KB; `node installer/init.mjs list` (3 skills); `cd python/ && poetry run pytest` (green)
+- [x] **5.1** Run the AC gates as one verification pass: `grep -rE 'DA-[0-9]+'` both skills dirs (empty); `grep -rn 'api/internal\|workflow-definitions.json'` skills dirs (empty); `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` (clean); description word count ≤50; body size ≤~10KB; `node installer/init.mjs list` (3 skills); `cd python/ && poetry run pytest` (green)
     — **Why:** the ticket exit gate is full-tier — every AC must be demonstrably green on the final tree
     — **Done when:** all commands observed green; failures fixed and re-run before push
     — **Consumers affected:** PR gate citation
-- [ ] **5.2** Append the `GATE <short-sha> tier=full` memo line to this PLAN's Trace
+    — **Done:** all AC gates observed green: DA=0, internals=0, mirror clean, 44 words, 8168 bytes, installer lists 3, ruff full pass, pytest 879 passed; files: none (verification); fixes: poetry install -E fastapi to match CI line 106 (fresh venv lacked extras; environmental, not code)
+- [x] **5.2** Append the `GATE <short-sha> tier=full` memo line to this PLAN's Trace
     — **Why:** Step 10a PR creation cites this line for the pushed SHA
     — **Done when:** memo names the final implementation SHA
     — **Consumers affected:** PR workflow
+    — **Done:** full-tier memo appended to Trace naming the final implementation SHA; carried by the trailing docs-only commit per pipeline Step 9; files: PLANS/PLAN-144.md; fixes: none
 
 ## Technical Notes
 
@@ -139,3 +141,4 @@ _Planning: PLAN authored from ticket #144 + approved local plan `/home/silentx/.
 GATE 9b20d72 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
 GATE 59c1320 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
 GATE 197097e tier=light lint=n.a typecheck=n.a build=- unit=t e2e=n.a
+GATE 41a03a9 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
