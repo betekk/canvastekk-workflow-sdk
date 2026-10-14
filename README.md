@@ -480,7 +480,22 @@ Terminal failures fail the execution — they are deterministic.
 
 The SDK bundles portable agent skills (Agent Skills standard) that teach coding agents how to create CanvasTEKK workflow nodes correctly — without reading docs.
 
-**One-command setup** in your node project:
+**Install from the repo (no Python needed):**
+
+```bash
+# List the bundled skills
+npx github:betekk/canvastekk-workflow-sdk list
+
+# Install to user scope (~/.agents/skills — all projects)
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant
+
+# Install into a project (.agents/skills — this project only)
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-builder --project .
+```
+
+Pinned install / rollback: append `#v0.52.5` to the repo spec. Unreleased tree: `--ref main`. Preview targets without writing: `--dry-run`. Upgrade = re-run `add`. Each installed skill carries a `.skill-source.json` provenance stamp; `npx github:betekk/canvastekk-workflow-sdk list installed` shows what you have vs the latest release.
+
+**Wheel users** (`pip install`-ed SDK) — one command in your node project:
 
 ```bash
 # Copy skills + create AGENTS.md with routing rules
@@ -498,34 +513,38 @@ This creates:
 ```
 my-node-project/
 ├── .agents/skills/
-│   ├── canvastekk-node-builder/SKILL.md    # Primary creation skill
+│   ├── canvastekk-workflow-sdk-assistant/SKILL.md  # Entry point: contract gate, SDK Q&A, node audit
+│   ├── canvastekk-node-builder/SKILL.md    # Creation workflow + templates
 │   └── canvastekk-node-patterns/SKILL.md   # Domain pattern library
 └── AGENTS.md                               # Skill routing + conventions
 ```
 
-**Two bundled skills:**
+**Three bundled skills:**
 
 | Skill | Purpose |
 |-------|---------|
+| `canvastekk-workflow-sdk-assistant` | Entry point — enforces the node contract on creation, answers SDK questions, audits existing nodes (version, dependencies, change classification) |
 | `canvastekk-node-builder` | Full SDK API reference, 7-step creation workflow, templates, validation checklist |
 | `canvastekk-node-patterns` | 10 complete code examples — segmentation, measurement, plane detection, inference, auth, middleware, webhooks, testing |
 
-**How it works:** After setup, your coding agent automatically discovers the skills. When you say *"create a workflow node that segments point clouds"*, the agent loads the relevant skill and follows the correct SDK patterns — proper schemas, file I/O, Dockerfile, tests — all generated correctly.
+**How it works:** After setup, your coding agent automatically discovers the skills. When you say *"create a workflow node that segments point clouds"*, the assistant skill gates the request on the node contract, then the builder/pattern skills generate the correct SDK patterns — proper schemas, file I/O, Dockerfile, tests.
 
 **Global setup** (works across all projects):
 
 ```bash
-# Run init in any directory, then copy skills to the shared global skills dir
-# (both OpenCode and pi discover ~/.agents/skills)
-python -m canvastekk_workflow_sdk init
-cp -r .agents/skills/canvastekk-node-builder ~/.agents/skills/
-cp -r .agents/skills/canvastekk-node-patterns ~/.agents/skills/
-rm -rf .agents
+# User scope installs straight to ~/.agents/skills (OpenCode and pi discover it)
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-workflow-sdk-assistant
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-builder
+npx github:betekk/canvastekk-workflow-sdk add canvastekk-node-patterns
 ```
 
 > **Upgrading from an SDK version that scaffolded `.opencode/skills/`?**
 > Remove the legacy copy first (`rm -rf .opencode/skills`), otherwise both
 > copies stay discoverable and coding agents see each skill twice.
+
+> The skills live in the Agent Skills standard layout (`.agents/skills/`), so
+> the repo is also installable by ecosystem tooling built on that standard —
+> no extra plumbing required.
 
 ## Examples
 

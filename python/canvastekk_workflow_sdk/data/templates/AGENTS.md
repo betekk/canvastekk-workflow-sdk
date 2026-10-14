@@ -6,11 +6,12 @@ This project uses the CanvasTEKK Workflow SDK. When a user asks to create, scaff
 
 | User Request Pattern | Skill to Load | When |
 |----------------------|---------------|------|
-| "Create a workflow node" / "Build a CanvasTEKK node" / "Scaffold a node" | `canvastekk-node-builder` | Always load first for any node creation task |
+| "Create a workflow node" / "Build a CanvasTEKK node" / "Scaffold a node" / "create a node using FastAPI" | `canvastekk-workflow-sdk-assistant` → `canvastekk-node-builder` | Assistant first — contract gate + dependency decision; then builder for code templates |
+| "Create a point cloud segmentation node" | `canvastekk-workflow-sdk-assistant` + `canvastekk-node-patterns` | Assistant gates the contract; patterns for the domain example |
 | "How do I use InstanceSet/MeasurementSet/PlaneSet?" | `canvastekk-node-patterns` | Load for domain-specific patterns and examples |
-| "Create a point cloud segmentation node" | `canvastekk-node-builder` + `canvastekk-node-patterns` | Load both — builder for workflow, patterns for domain example |
 | "Add auth/middleware/webhooks to my node" | `canvastekk-node-patterns` | Load for advanced integration patterns |
-| "Review my node" / "Validate my handler" | `canvastekk-node-builder` | Load for the validation checklist |
+| "Review my node" / "Audit my dependencies" / "What changed between versions" / "Am I on the latest SDK" | `canvastekk-workflow-sdk-assistant` | Audit mode — version, deps, change classification, conformance (PASS/FAIL report) |
+| Any other "how do I … with the SDK" question | `canvastekk-workflow-sdk-assistant` | Quick reference; loads sibling skills only for depth |
 
 ### Node Creation Conventions
 

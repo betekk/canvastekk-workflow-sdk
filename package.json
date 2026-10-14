@@ -1,0 +1,14 @@
+{
+  "name": "canvastekk-workflow-sdk-skills",
+  "version": "0.52.5",
+  "private": true,
+  "description": "Skill installer for the CanvasTEKK Workflow SDK (npx github:betekk/canvastekk-workflow-sdk) — version shown is cosmetic; the installer stamps the SDK version from python/pyproject.toml",
+  "type": "module",
+  "bin": {
+    "canvastekk-workflow-sdk-skills": "./installer/init.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/betekk/canvastekk-workflow-sdk.git"
+  }
+}

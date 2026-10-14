@@ -4,6 +4,8 @@
 
 Node SDK for CanvasTEKK Workflow Engine. Handles HTTP endpoint boilerplate so node authors can focus on business logic.
 
+> Bundled agent skills (node creation / SDK Q&A / node audit) ship with the wheel and install straight from the repo — see [AI Agent Setup](../README.md#ai-agent-setup) in the root README.
+
 ## Installation
 
 ### From GitHub Packages (requires PAT)

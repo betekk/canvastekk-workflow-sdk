@@ -954,7 +954,7 @@ Read these in `execute()` for audit trails or size-based branching. Manual
 ## Upload target: `UploadSession`
 
 Output upload targets come from the engine and are a multipart `UploadSession`
-descriptor. Since SDK 0.36.0 (DA-3340) a legacy presigned PUT URL string is
+descriptor. Since SDK 0.36.0 a legacy presigned PUT URL string is
 rejected with `NodeIOError` ("engine sent deprecated presigned target —
 upgrade the engine") — the fix is upgrading the engine, not node changes.
 Your node never constructs one:
