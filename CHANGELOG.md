@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.2] - 2026-10-14
+
+### Documentation
+
+- Correct the registry-token dispatch contract in the author guide (#147)
+
+
 ## [0.53.1] - 2026-10-14
 
 ### Bug Fixes
 
 - **installer**: Project scope is the default, -g opts into user scope (#146)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.53.1
 
 
 ## [0.53.0] - 2026-10-14
