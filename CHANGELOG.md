@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.5] - 2026-10-14
+
+### Bug Fixes
+
+- **sdk**: Read CANVASTEKK_REGISTRY_TOKEN in convergence fallback (#142) (#143)
+
+
 ## [0.52.4] - 2026-10-13
 
 ### Documentation
 
 - **sdk**: Record temp-lane node-contract decision — no-change (#140) (#141)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.52.4
 
 
 ## [0.52.3] - 2026-10-12
