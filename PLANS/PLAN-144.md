@@ -33,18 +33,21 @@
 
 ### Phase 1: Assistant skill (canonical + mirror + test pin)
 
-- [ ] **1.1** Write `python/canvastekk_workflow_sdk/data/skills/canvastekk-workflow-sdk-assistant/SKILL.md` — frontmatter (`name` + ≤50-word description with trigger phrases), mode dispatch table, inline contract checklist, CREATE mode (dependency decision table: base default, extras per rung with one-line whys; rung selection; route codegen to builder/patterns), ANSWER mode (standalone quick-reference: imports map, endpoints, env vars, extras, versioning, context API), AUDIT mode (version currency, extras-vs-imports, `validate`/`diff` classification, conformance, PASS/FAIL report)
+- [x] **1.1** Write `python/canvastekk_workflow_sdk/data/skills/canvastekk-workflow-sdk-assistant/SKILL.md` — frontmatter (`name` + ≤50-word description with trigger phrases), mode dispatch table, inline contract checklist, CREATE mode (dependency decision table: base default, extras per rung with one-line whys; rung selection; route codegen to builder/patterns), ANSWER mode (standalone quick-reference: imports map, endpoints, env vars, extras, versioning, context API), AUDIT mode (version currency, extras-vs-imports, `validate`/`diff` classification, conformance, PASS/FAIL report)
     — **Why:** this is the deliverable's core; everything else wraps or serves it
     — **Done when:** file parses as frontmatter + markdown; description ≤50 words; body ≤~10KB; `grep -E 'DA-[0-9]|api/internal'` on it is empty
     — **Consumers affected:** wheel `init`, mirror, installer, routing template (names this dir)
-- [ ] **1.2** Mirror to `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md` (byte-identical copy)
+    — **Done:** three-mode router written (dispatch table, inline contract, dependency decision table, audit checklist, quick reference); 44-word description, 8168 bytes, zero leak hits; files: data/skills/canvastekk-workflow-sdk-assistant/SKILL.md; fixes: none
+- [x] **1.2** Mirror to `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md` (byte-identical copy)
     — **Why:** mirror-guard CI and the installer both read `.agents/skills`; canonical and mirror must move together
     — **Done when:** `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` clean
     — **Consumers affected:** skill-mirror-guard CI, installer source
-- [ ] **1.3** Extend `python/tests/test_cli_init.py` scaffold loop with `canvastekk-workflow-sdk-assistant`
+    — **Done:** byte-identical copy; `diff -r` clean; files: .agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md; fixes: none
+- [x] **1.3** Extend `python/tests/test_cli_init.py` scaffold loop with `canvastekk-workflow-sdk-assistant`
     — **Why:** pins the third skill into the `init` scaffold contract so a future packaging regression fails loudly
     — **Done when:** loop lists three skill ids; `poetry run pytest tests/test_cli_init.py` green
     — **Consumers affected:** python CI suite
+    — **Done:** loop extended to three ids; ruff + pytest green (2 passed); files: python/tests/test_cli_init.py; fixes: poetry install for fresh worktree venv (gate fix, root cause: deps uninstalled)
 
 ### Phase 2: Leak scrub + dependency restatement (both skills, both copies)
 
@@ -82,9 +85,9 @@
     — **Why:** AC — README must list the third skill and the npx path
     — **Done when:** section shows three skills + both install paths; commands match installer flags verbatim
     — **Consumers affected:** public readers
-- [ ] **4.3** Sweep `python/README.md` for bundled-skill mentions; add the third skill + npx path where the two are listed
-    — **Why:** SDK-change README sweep rule (root + language READMEs)
-    — **Done when:** `grep -n 'node-builder' python/README.md` contexts all mention three skills or link the root section
+- [ ] **4.3** Add one pointer line to `python/README.md` directing to the root README's "AI Agent Setup" section (user decision, detection-gate round 1: pointer-line-only — python/README has no skills section today; single canonical listing, no drift)
+    — **Why:** SDK-change README sweep rule (root + language READMEs) without duplicating the skills table
+    — **Done when:** python/README mentions the bundled agent skills exactly once, pointing at the root section
     — **Consumers affected:** python README readers
 - [ ] **4.4** Add `{"action": "skill", "resource": "canvastekk-workflow-sdk-assistant", "effect": "allow"}` to `opencode.json` permissions
     — **Why:** AC — repo authors get the mirror-discovered skill without a permission prompt

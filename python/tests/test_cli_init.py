@@ -38,7 +38,11 @@ def test_init_scaffolds_skills_into_agents_skills(tmp_path):
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
-    for skill_id in ("canvastekk-node-builder", "canvastekk-node-patterns"):
+    for skill_id in (
+        "canvastekk-workflow-sdk-assistant",
+        "canvastekk-node-builder",
+        "canvastekk-node-patterns",
+    ):
         scaffolded = tmp_path / ".agents" / "skills" / skill_id / "SKILL.md"
         assert scaffolded.is_file(), f"missing scaffold: {scaffolded}"
 
