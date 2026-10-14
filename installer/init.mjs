@@ -5,11 +5,12 @@
 // data/skills by the skill-mirror-guard CI job).
 // Usage:
 //   npx github:betekk/canvastekk-workflow-sdk list
-//   npx github:betekk/canvastekk-workflow-sdk list installed      # installed vs latest release
-//   npx github:betekk/canvastekk-workflow-sdk add <skill>         # latest release tag (user scope)
+//   npx github:betekk/canvastekk-workflow-sdk list installed      # project scope; --global for user scope
+//   npx github:betekk/canvastekk-workflow-sdk add <skill>         # project scope (./.agents/skills) — ecosystem default
+//   npx github:betekk/canvastekk-workflow-sdk add <skill> -g      # user scope (~/.agents/skills)
 //   npx github:betekk/canvastekk-workflow-sdk#v0.52.5 add <skill> # pinned — rollback = older tag
 //   npx github:betekk/canvastekk-workflow-sdk add <skill> --ref main        # unreleased tree
-//   npx github:betekk/canvastekk-workflow-sdk add <skill> --project .       # project scope (.agents/skills)
+//   npx github:betekk/canvastekk-workflow-sdk add <skill> --project <dir>   # explicit project dir
 //   npx github:betekk/canvastekk-workflow-sdk add <skill> --dry-run         # print targets, write nothing
 import { cp, readdir, readFile, writeFile, mkdir, rm, mkdtemp } from "node:fs/promises";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -98,12 +99,21 @@ async function listSkills() {
 
 function userSkillsDir() { return join(os.homedir(), ".agents", "skills"); }
 
-async function listInstalled() {
+// Scope resolution (ecosystem convention: project default, -g opts into user
+// scope — mirrors `npx skills add`): explicit --project dir > --global > cwd.
+function resolveTargetDir({ projectDir, globalFlag }) {
+  if (projectDir) return join(projectDir, ".agents", "skills");
+  if (globalFlag) return userSkillsDir();
+  return join(process.cwd(), ".agents", "skills");
+}
+
+async function listInstalled({ globalFlag }) {
   // installed-vs-latest per skill, from the sidecar stamp (one ls-remote).
-  const target = userSkillsDir();
+  const target = resolveTargetDir({ projectDir: null, globalFlag });
+  const scope = globalFlag ? "user" : "project";
   let latest = null;
   try { latest = resolveLatestTag(repoUrl()); } catch (e) { console.error(`note: latest-tag lookup failed (${e.message.split("\n")[0]})`); }
-  if (!existsSync(target)) { console.log("no skills installed (user scope)."); return; }
+  if (!existsSync(target)) { console.log(`no skills installed (${scope} scope).`); return; }
   const rows = [];
   for (const dir of await readdir(target)) {
     const sc = join(target, dir, SIDECAR);
@@ -113,8 +123,8 @@ async function listInstalled() {
     rows.push({ name: m.name || dir, installedRef: m.ref, installedVersion: m.version, latest: latest || null, updateAvailable: !!(latest && norm && latest !== `v${norm}`) });
   }
   rows.sort((a, b) => a.name.localeCompare(b.name));
-  if (!rows.length) { console.log("no stamped skills installed (user scope)."); return; }
-  console.log("installed skills (user scope) vs latest release:\n");
+  if (!rows.length) { console.log(`no stamped skills installed (${scope} scope).`); return; }
+  console.log(`installed skills (${scope} scope) vs latest release:\n`);
   for (const r of rows) {
     const flag = r.updateAvailable ? "  <- update available (re-run add)" : "";
     console.log(`  ${r.name.padEnd(38)} ${String(r.installedRef || "?").padEnd(12)} latest: ${r.latest || "?"}${flag}`);
@@ -134,15 +144,17 @@ async function main() {
   const ref = takeFlag(rest, "--ref");
   const projectFlag = rest.includes("--project");
   const projectDir = projectFlag ? resolve(rest[rest.indexOf("--project") + 1] || ".") : null;
+  const globalFlag = rest.includes("-g") || rest.includes("--global");
   const dryRun = rest.includes("--dry-run");
 
-  if (cmd === "list" && name === "installed") { await listInstalled(); return; }
+  if (cmd === "list" && name === "installed") { await listInstalled({ globalFlag }); return; }
 
   if (cmd === "list" || !cmd) {
     const skills = await listSkills();
     console.log("canvastekk-workflow-sdk bundled skills:\n");
     for (const s of skills) console.log(`  ${s.name.padEnd(38)} ${s.description.slice(0, 90)}`);
-    console.log(`\ninstall: npx github:betekk/canvastekk-workflow-sdk add <name> [--project .]`);
+    console.log(`\ninstall: npx github:betekk/canvastekk-workflow-sdk add <name>   # project scope`);
+    console.log(`user scope: npx github:betekk/canvastekk-workflow-sdk add <name> -g`);
     console.log(`versions: npx github:betekk/canvastekk-workflow-sdk list installed`);
     return;
   }
@@ -176,7 +188,7 @@ async function main() {
       if ((r.status ?? 1) !== 0) process.exit(r.status ?? 1);
       // Stamp the requested skill's dir if the inner left it unstamped
       // (idempotent: new inners already wrote it).
-      const dest = join(projectDir ? join(projectDir, ".agents", "skills") : userSkillsDir(), name);
+      const dest = join(resolveTargetDir({ projectDir, globalFlag }), name);
       if (name && !existsSync(join(dest, SIDECAR))) await writeSkillSidecar(dest);
       process.exit(0);
     }
@@ -186,7 +198,7 @@ async function main() {
   }
 
   if (cmd === "add") {
-    if (!name) { console.error("usage: add <skill-name> [--project .] [--ref <tag|main>] [--source .] [--dry-run]"); process.exit(1); }
+    if (!name) { console.error("usage: add <skill-name> [-g | --project <dir>] [--ref <tag|main>] [--source .] [--dry-run]"); process.exit(1); }
     if (/[\\/]/.test(name) || name.includes("..")) { console.error(`error: invalid skill name: ${name}`); process.exit(1); }
     const src = join(SKILLS_SRC, name);
     if (!existsSync(join(src, "SKILL.md"))) {
@@ -194,9 +206,7 @@ async function main() {
       console.error(`skill not found: ${name}\navailable: ${skills.map((s) => s.name).join(", ")}`);
       process.exit(1);
     }
-    const target = projectDir
-      ? join(projectDir, ".agents", "skills")
-      : userSkillsDir();
+    const target = resolveTargetDir({ projectDir, globalFlag });
     const dest = join(target, name);
     if (dryRun) {
       const meta = await skillSourceMeta();
@@ -212,7 +222,7 @@ async function main() {
     console.log("restart your agent (opencode/claude/pi) to pick it up.");
     return;
   }
-  console.error(`unknown command: ${cmd}\nusage: list | list installed | add <skill> [--project .] [--ref <tag|main>] [--source .] [--dry-run]`);
+  console.error(`unknown command: ${cmd}\nusage: list | list installed [--global] | add <skill> [-g | --project <dir>] [--ref <tag|main>] [--source .] [--dry-run]`);
   process.exit(1);
 }
 
