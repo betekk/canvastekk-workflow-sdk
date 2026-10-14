@@ -187,6 +187,7 @@ async function main() {
 
   if (cmd === "add") {
     if (!name) { console.error("usage: add <skill-name> [--project .] [--ref <tag|main>] [--source .] [--dry-run]"); process.exit(1); }
+    if (/[\\/]/.test(name) || name.includes("..")) { console.error(`error: invalid skill name: ${name}`); process.exit(1); }
     const src = join(SKILLS_SRC, name);
     if (!existsSync(join(src, "SKILL.md"))) {
       const skills = await listSkills();

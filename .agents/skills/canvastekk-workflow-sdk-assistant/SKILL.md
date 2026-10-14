@@ -92,7 +92,7 @@ Run each check; report a PASS/FAIL table with the fix for every FAIL.
    missing extras (import crashes) and unused extras (cost).
 3. **Change review** — classify what changed between versions:
    ```bash
-   python -m canvastekk_workflow_sdk export_definition handler:definition --output new.json
+   python -c "from canvastekk_workflow_sdk import export_definition; from handler import definition; export_definition(definition, 'new.json')"
    python -m canvastekk_workflow_sdk diff old.json new.json
    ```
    Exit 0 clean · 1 breaking/errors · 2 load failure. Breaking (removed

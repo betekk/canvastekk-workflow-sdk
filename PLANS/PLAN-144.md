@@ -6,14 +6,14 @@
 
 ## Acceptance Criteria
 
-- [ ] `canvastekk-workflow-sdk-assistant/SKILL.md` exists in `python/canvastekk_workflow_sdk/data/skills/` with a ≤50-word description and a mode dispatch table (create/answer/audit); the contract checklist lives inline
-- [ ] Dependency rule stated once in the assistant: base `canvastekk-workflow-sdk` default; extras (`[fastapi,serve]`, `[jwt]`, `[keycloak]`) added per rung/auth with one-line reasons; builder templates match
-- [ ] `grep -rE 'DA-[0-9]+' python/canvastekk_workflow_sdk/data/skills .agents/skills` returns nothing; no `/api/internal` or engine config filenames in any skill
-- [ ] `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` is clean
-- [ ] `node installer/init.mjs list` shows three skills; `add <skill> --project <probe> --dry-run` writes nothing; a real add writes `.skill-source.json` carrying the SDK version
-- [ ] AGENTS.md routing template + root README + python/README list the third skill and the npx install path
-- [ ] `opencode.json` carries an allow entry for the assistant skill
-- [ ] `cd python/ && poetry run pytest` is green
+- [x] `canvastekk-workflow-sdk-assistant/SKILL.md` exists in `python/canvastekk_workflow_sdk/data/skills/` with a ≤50-word description and a mode dispatch table (create/answer/audit); the contract checklist lives inline
+- [x] Dependency rule stated once in the assistant: base `canvastekk-workflow-sdk` default; extras (`[fastapi,serve]`, `[jwt]`, `[keycloak]`) added per rung/auth with one-line reasons; builder templates match
+- [x] `grep -rE 'DA-[0-9]+' python/canvastekk_workflow_sdk/data/skills .agents/skills` returns nothing; no `/api/internal` or engine config filenames in any skill
+- [x] `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` is clean
+- [x] `node installer/init.mjs list` shows three skills; `add <skill> --project <probe> --dry-run` writes nothing; a real add writes `.skill-source.json` carrying the SDK version
+- [x] AGENTS.md routing template + root README + python/README list the third skill and the npx install path
+- [x] `opencode.json` carries an allow entry for the assistant skill
+- [x] `cd python/ && poetry run pytest` is green
 
 ## Dependency & Consumer Map
 
@@ -142,3 +142,6 @@ GATE 9b20d72 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
 GATE 59c1320 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
 GATE 197097e tier=light lint=n.a typecheck=n.a build=- unit=t e2e=n.a
 GATE 41a03a9 tier=light lint=n.a typecheck=n.a build=- unit=n.a e2e=n.a
+
+GATE 5c59daf tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a
+LOG full-tier escalation: ticket exit gate (last gate of the run) — unconditional full per gate contract
