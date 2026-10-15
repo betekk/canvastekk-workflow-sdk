@@ -11,3 +11,6 @@ build/
 *.so
 .codegraph/
 .opencode/goals/
+
+# opencode local state (CFN convention)
+.opencode/
