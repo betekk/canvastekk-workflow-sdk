@@ -2,11 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.53.3] - 2026-10-15
+
+### Miscellaneous Tasks
+
+- Ignore local .opencode state
+
+
 ## [0.53.2] - 2026-10-14
 
 ### Documentation
 
 - Correct the registry-token dispatch contract in the author guide (#147)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.53.2
 
 
 ## [0.53.1] - 2026-10-14
