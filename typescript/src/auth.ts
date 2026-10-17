@@ -1,4 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import type { NodeTokenClaims } from "./node-token.js";
 
 /**
  * Checks if dev mode is enabled via CANVASTEKK_DEV_MODE env var.
@@ -114,6 +115,144 @@ export class NodeAuth {
       }
 
       next();
+    });
+  }
+
+  /**
+   * Creates central-validation middleware (engine-issued run tokens).
+   *
+   * Production mode for org nodes (#3825): the `X-API-Key` header carries a
+   * run-scoped token minted by the engine; verdicts come from the engine's
+   * verify endpoint (cached, fail-closed per DA-1949 — transport failures
+   * answer 503 and are never cached). Mirrors the Python `_CentralAuth`.
+   *
+   * @param opts - Central mode options (verify endpoint, cache, legacy leg)
+   * @returns Express middleware function
+   */
+  static central(opts?: {
+    verifyBaseUrlEnvVar?: string;
+    verifyPath?: string;
+    cacheTtlMs?: number;
+    timeoutMs?: number;
+    legacyKeyEnvVar?: string | null;
+  }): AuthMiddleware {
+    const verifyBaseUrlEnvVar = opts?.verifyBaseUrlEnvVar ?? "CWE_API_BASE_URL";
+    const verifyPath = opts?.verifyPath ?? "/api/nodes/verify-token";
+    const cacheTtlMs = opts?.cacheTtlMs ?? 60_000;
+    const timeoutMs = opts?.timeoutMs ?? 5_000;
+    // Explicit null disables the legacy leg (central-only); ?? would
+    // swallow null back to the default — compare against undefined.
+    const legacyKeyEnvVar =
+      opts?.legacyKeyEnvVar !== undefined ? opts.legacyKeyEnvVar : "CANVASTEKK_API_KEY";
+    // sha256(token) -> { valid, claims, expiresAt } (monotonic-ish Date.now)
+    const verdictCache = new Map<string, { valid: boolean; claims?: NodeTokenClaims; expiresAt: number }>();
+
+    /**
+     * Constant-time match against the legacy static key (dual-accept
+     * transition); inert when the env var is unset — retirement happens by
+     * env removal (#3838).
+     */
+    function legacyMatches(provided: string): boolean {
+      if (!legacyKeyEnvVar) return false;
+      const expectedKeys = [
+        process.env[legacyKeyEnvVar] ?? "",
+        process.env[`${legacyKeyEnvVar}_NEXT`] ?? "",
+      ].filter((key) => key.length > 0);
+      const providedBuf = Buffer.from(provided);
+      return expectedKeys.some((key) => {
+        const expected = Buffer.from(key);
+        return expected.length === providedBuf.length && timingSafeEqual(providedBuf, expected);
+      });
+    }
+
+    /**
+     * Calls the engine verify endpoint; resolves to the verdict.
+     * Rejects on any transport or protocol failure — the caller fails
+     * closed (503) and never caches.
+     */
+    async function remoteVerify(token: string, baseUrl: string): Promise<{ valid: boolean; claims?: NodeTokenClaims }> {
+      let resp: globalThis.Response;
+      try {
+        resp = await fetch(`${baseUrl.replace(/\/$/, "")}${verifyPath}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } catch {
+        throw new Error("verify endpoint unreachable");
+      }
+      if (!resp.ok) throw new Error(`verify endpoint answered HTTP ${resp.status}`);
+      let payload: unknown;
+      try {
+        payload = await resp.json();
+      } catch {
+        throw new Error("malformed verify response");
+      }
+      if (typeof payload !== "object" || payload === null || typeof (payload as { valid?: unknown }).valid !== "boolean") {
+        throw new Error("malformed verify response");
+      }
+      const body = payload as { valid: boolean; run_id?: unknown; node_id?: unknown; exp?: unknown };
+      if (!body.valid) return { valid: false };
+      if (typeof body.run_id !== "string" || typeof body.node_id !== "string" || typeof body.exp !== "number") {
+        throw new Error("malformed verify response");
+      }
+      return { valid: true, claims: { runId: body.run_id, nodeId: body.node_id, exp: body.exp } };
+    }
+
+    return markAuth(async (req: AuthRequest, res: AuthResponse, next: AuthNext) => {
+      if (isDevMode()) {
+        next();
+        return;
+      }
+
+      const provided = header(req, "x-api-key") ?? "";
+      if (!provided) {
+        unauthorized(res, "Missing API key");
+        return;
+      }
+
+      if (legacyMatches(provided)) {
+        next();
+        return;
+      }
+
+      const digest = createHash("sha256").update(provided).digest("hex");
+      const cached = verdictCache.get(digest);
+      const now = Date.now();
+      if (cached && cached.expiresAt > now) {
+        if (cached.valid) {
+          next();
+          return;
+        }
+        unauthorized(res, "Invalid node token");
+        return;
+      }
+
+      const baseUrl = process.env[verifyBaseUrlEnvVar] ?? "";
+      if (!baseUrl) {
+        unauthorized(res, "Authentication not configured");
+        return;
+      }
+
+      let verdict: { valid: boolean; claims?: NodeTokenClaims };
+      try {
+        verdict = await remoteVerify(provided, baseUrl);
+      } catch {
+        // Fail-closed (DA-1949): transport errors answer 503, never cached.
+        res.status(503).json({ detail: "Token validator unavailable" });
+        return;
+      }
+
+      if (verdictCache.size >= 1024) verdictCache.clear();
+      if (verdict.valid && verdict.claims) {
+        const expiresAt = now + Math.max(0, Math.min(cacheTtlMs, verdict.claims.exp * 1000 - now));
+        verdictCache.set(digest, { valid: true, claims: verdict.claims, expiresAt });
+        next();
+        return;
+      }
+      verdictCache.set(digest, { valid: false, expiresAt: now + cacheTtlMs });
+      unauthorized(res, "Invalid node token");
     });
   }
 
