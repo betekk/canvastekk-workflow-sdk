@@ -6,9 +6,13 @@ required (the verifier must be able to judge nodes built without the SDK).
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 import pytest
+from fastapi.testclient import TestClient
 
+from canvastekk_workflow_sdk import BaseNode
 from canvastekk_workflow_sdk.conformance import verify_node
 from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 from canvastekk_workflow_sdk.registry import RegistrationError, register_node
@@ -353,3 +357,108 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
         main()
     assert exc.value.code == 0
     assert captured.get("dry_run") is True
+
+
+class _CentralEchoNode(BaseNode):
+    """Echo node used to probe central-mode authentication end to end."""
+
+    definition = WorkflowNodeManifest(
+        slug="echo",
+        version="1.0.0",
+        name="Echo",
+        description="Returns input unchanged",
+        input_schema={"type": "object"},
+        output_schema={"type": "object"},
+        token_cost=0.0,
+    )
+
+    def execute(self, inputs: dict, context: Any) -> dict:
+        return {"message": inputs.get("message", "")}
+
+
+def _start_cwe_stub(key: str):
+    """Serve the verify endpoint with real token verification."""
+    import json as _json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from canvastekk_workflow_sdk.node_token import verify_node_token
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 - http.server API
+            if self.path != "/api/nodes/verify-token":
+                self.send_response(404)
+                self.end_headers()
+                return
+            body = _json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            claims = verify_node_token(body.get("token", ""), key)
+            payload = (
+                {"valid": True, "run_id": claims.run_id, "node_id": claims.node_id, "exp": claims.exp}
+                if claims
+                else {"valid": False}
+            )
+            encoded = _json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
+    """A central-mode node passes conformance when probed with a real token.
+
+    End to end over real code paths: verify_node → ASGI app →
+    _CentralAuth → local CWE stub → verify_node_token (#3825).
+    """
+    from canvastekk_workflow_sdk.app import create_node_app
+    from canvastekk_workflow_sdk.auth import NodeAuth
+    from canvastekk_workflow_sdk.node_token import mint_node_token
+
+    key = "conformance-signing-key-0123456789abcdef"
+    server = _start_cwe_stub(key)
+    try:
+        monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
+        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+
+        def fake_client(**kw: Any) -> TestClient:
+            return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))
+
+        monkeypatch.setattr(httpx, "Client", fake_client)
+
+        token = mint_node_token("run-c1", "echo", key, ttl_seconds=300)
+        report = verify_node("http://node.test", api_key=token)
+        assert report.ok, [c.route for c in report.checks if not c.ok]
+        assert all(c.ok for c in report.checks)
+        assert len(report.checks) >= 6  # manifest + derived route probes
+    finally:
+        server.shutdown()
+
+
+def test_verify_node_central_mode_without_token_fails_at_manifest(monkeypatch) -> None:
+    """Without a token the manifest fetch cannot succeed — report not ok."""
+    from canvastekk_workflow_sdk.app import create_node_app
+    from canvastekk_workflow_sdk.auth import NodeAuth
+
+    key = "conformance-signing-key-0123456789abcdef"
+    server = _start_cwe_stub(key)
+    try:
+        monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
+        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+
+        def fake_client(**kw: Any) -> TestClient:
+            return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))
+
+        monkeypatch.setattr(httpx, "Client", fake_client)
+
+        report = verify_node("http://node.test")
+        assert not report.ok
+        assert any("manifest" in c.route for c in report.checks if not c.ok)
+    finally:
+        server.shutdown()
