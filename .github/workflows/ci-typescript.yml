@@ -2,12 +2,12 @@ name: TypeScript CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, prod]
     paths:
       - 'typescript/**'
       - '.github/workflows/ci-typescript.yml'
   pull_request:
-    branches: [main]
+    branches: [dev, prod]
     paths:
       - 'typescript/**'
       - '.github/workflows/ci-typescript.yml'
