@@ -78,8 +78,7 @@ jobs:
     # Fleet standard (#3857): the version-file bump + final tag flow runs on the
     # prod lane only. dev mints counter tags (see dev-tag job below) without
     # touching version files — versions finalize at prod (two-lane standard).
-    if: github.ref_name == 'prod'
-    if: github.actor != 'github-actions[bot]'
+    if: github.ref_name == 'prod' && github.actor != 'github-actions[bot]'
 
     steps:
       - name: Checkout
