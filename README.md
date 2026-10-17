@@ -470,6 +470,26 @@ The former `minimum_sdk_version` / `maximum_sdk_version` manifest fields were **
 app = create_node_app(node, auth="api-key")  # reads CANVASTEKK_API_KEY
 ```
 
+### Central Token Auth (org production mode, v0.54.0)
+
+Org nodes authenticate engine calls with run-scoped tokens verified by the
+engine — nodes hold no platform credential (`docs/NODE-TOKEN-CONTRACT.md`):
+
+```python
+from canvastekk_workflow_sdk.auth import NodeAuth
+
+# Dual-accept transition (default): legacy static key still honored;
+# the legacy leg goes inert when CANVASTEKK_API_KEY is unset.
+app = create_node_app(node, auth=NodeAuth.central())          # reads CWE_API_BASE_URL
+
+# Central-only (steady state / post-purge):
+app = create_node_app(node, auth=NodeAuth.central(legacy_key_env_var=None))
+```
+
+Verdicts are cached ~60s, bounded by token expiry; the validator fails
+closed (unreachable engine → 503, never fail-open). `NodeAuth.api_key()`
+remains the documented mode for local dev, CI fixtures, and tests.
+
 ### Output Upload Retry
 
 Session-based output uploads retry transient part failures with backoff and
