@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - dev
+      - prod
     paths-ignore:
       - 'CHANGELOG.md'
   workflow_dispatch:
@@ -74,6 +75,10 @@ jobs:
     name: Release
     needs: [pick-runner]
     runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    # Fleet standard (#3857): the version-file bump + final tag flow runs on the
+    # prod lane only. dev mints counter tags (see dev-tag job below) without
+    # touching version files — versions finalize at prod (two-lane standard).
+    if: github.ref_name == 'prod'
     if: github.actor != 'github-actions[bot]'
 
     steps:
@@ -437,3 +442,24 @@ jobs:
               "breaking_changes": ${{ steps.detect-breaking.outputs.breaking_changes_json || '[]' }},
               "released_at": "${{ github.run_id }}"
             }
+
+  # Fleet standard (#3857): dev merges mint vX.Y.Z-dev.N counter tags
+  # (tag-only — no version-file changes; versions finalize at prod).
+  dev-tag:
+    name: Mint dev prerelease tag
+    if: github.ref_name == 'dev'
+    needs: [pick-runner]
+    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Bump version and push dev tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          fetch_all_tags: true
+          pre_release_suffix: dev
+          tag_prefix: v
+          default_bump: patch

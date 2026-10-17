@@ -2,11 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.54.0] - 2026-10-17
+
+### Features
+
+- **auth**: Central-validation node auth + run-token contract (v0.54.0) (#149)
+
+
+## [0.53.3] - 2026-10-15
+
+### Miscellaneous Tasks
+
+- Ignore local .opencode state
+- **release**: Prepare v0.53.3
+
+
 ## [0.53.2] - 2026-10-14
 
 ### Documentation
 
 - Correct the registry-token dispatch contract in the author guide (#147)
+
+
+### Miscellaneous Tasks
+
+- **release**: Prepare v0.53.2
 
 
 ## [0.53.1] - 2026-10-14

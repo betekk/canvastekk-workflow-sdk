@@ -543,7 +543,8 @@ Secrets are **never stored in code**. Use your CI/CD provider's secrets store.
 |--------|--------------|-------------|
 | `CANVASTEKK_REGISTRY_TOKEN` | CI/CD registration | Service credential for automated registration. The header is picked from the token shape: a `ctk_` credential rides `Authorization: Bearer`, a legacy service token rides `X-Service-Token`. Issued by the platform team. |
 | `REGISTRY_API_KEY` | Manual registration | API key for the registry (`X-API-Key` header). Provided by the platform team. |
-| `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. |
+| `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. Local dev / CI profile; org production nodes use central token mode. |
+| `CWE_API_BASE_URL` | Node auth (central token mode) | Workflow engine base URL for `NodeAuth.central()` token verification (v0.54.0+, `docs/NODE-TOKEN-CONTRACT.md`). |
 | `CANVASTEKK_KEYCLOAK_SERVER_URL` | Node auth (Keycloak mode) | Keycloak base URL. Only needed if using Keycloak auth. |
 | `CANVASTEKK_KEYCLOAK_REALM` | Node auth (Keycloak mode) | Keycloak realm name. |
 | `CANVASTEKK_JWT_SECRET` | Node auth (JWT mode) | HS256 signing secret. Only needed if using JWT auth. |

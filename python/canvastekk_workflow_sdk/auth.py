@@ -27,6 +27,7 @@ Example::
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import logging
 import os
@@ -116,6 +117,175 @@ class _ApiKeyAuth(_AuthBackend):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
         return {"auth_mode": "api_key"}
+
+
+class _CentralAuth(_AuthBackend):
+    """Validate engine-issued run tokens via the workflow engine (#3825).
+
+    Production auth mode for org nodes ("secretless nodes"): the presented
+    ``X-API-Key`` value carries a run-scoped token minted by the engine at
+    dispatch; this backend delegates verification to the engine's verify
+    endpoint and caches verdicts by token hash.
+
+    Dual-accept transition: when ``legacy_key_env_var`` names a set env var,
+    a constant-time static-key match is accepted first (``auth_mode`` =
+    ``legacy_api_key``); the legacy leg is inert when the env var is unset —
+    retirement happens by env removal, not code change (#3838).
+
+    Fail-closed law (DA-1949): a definitive ``valid: false`` verdict is a
+    401; any transport failure (unreachable engine, timeout, malformed
+    response) is a 503 — the backend never fails open. Transport errors are
+    never cached. Token values are never logged.
+    """
+
+    _CACHE_MAX_ENTRIES = 1024
+
+    def __init__(
+        self,
+        verify_base_url_env_var: str = "CWE_API_BASE_URL",
+        verify_path: str = "/api/nodes/verify-token",
+        cache_ttl: float = 60.0,
+        timeout: float = 5.0,
+        legacy_key_env_var: str | None = "CANVASTEKK_API_KEY",
+    ) -> None:
+        """Initialize the backend with verify-endpoint and cache settings.
+
+        Args:
+            verify_base_url_env_var: Env var holding the engine base URL.
+            verify_path: Path of the verify endpoint on the engine.
+            cache_ttl: Verdict cache lifetime in seconds (also bounds valid
+                verdicts by the token's own expiry).
+            timeout: Verify-endpoint call timeout in seconds.
+            legacy_key_env_var: Env var holding the legacy static key
+                (dual-accept transition); ``None`` disables the legacy leg.
+        """
+        self._verify_base_url_env_var = verify_base_url_env_var
+        self._verify_path = verify_path
+        self._cache_ttl = cache_ttl
+        self._timeout = timeout
+        self._legacy_key_env_var = legacy_key_env_var
+        # sha256(token) -> (valid, claims_or_none, monotonic_expiry)
+        self._verdict_cache: dict[str, tuple[bool, dict[str, Any] | None, float]] = {}
+
+    def _legacy_matches(self, provided: str) -> bool:
+        """Return True when the credential matches the configured legacy key."""
+        if not self._legacy_key_env_var:
+            return False
+        keys = (
+            os.environ.get(self._legacy_key_env_var, ""),
+            os.environ.get(f"{self._legacy_key_env_var}_NEXT", ""),
+        )
+        expected = [key for key in keys if key]
+        return any(
+            hmac.compare_digest(provided.encode(), key.encode()) for key in expected
+        )
+
+    def _cache_expiry(self, valid: bool, claims: dict[str, Any] | None) -> float:
+        """Return the monotonic instant a cached verdict expires."""
+        now = _time.monotonic()
+        if not valid or not isinstance(claims.get("exp"), (int, float)):
+            return now + self._cache_ttl
+        wall_remaining = float(claims["exp"]) - _time.time()
+        return now + max(0.0, min(self._cache_ttl, wall_remaining))
+
+    def _remote_verify(self, token: str, base_url: str) -> tuple[bool, dict[str, Any] | None]:
+        """Call the engine verify endpoint; return the parsed verdict.
+
+        Raises:
+            _VerifyUnavailableError: On any transport or protocol failure — the
+                caller must fail closed (503), never cache.
+        """
+        import http.client
+        import json
+        import urllib.error
+        import urllib.request
+
+        url = f"{base_url}{self._verify_path}"
+        body = json.dumps({"token": token}).encode("utf-8")
+        request = urllib.request.Request(
+            url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout) as response:
+                payload = json.loads(response.read())
+        except (
+            urllib.error.URLError,
+            http.client.HTTPException,  # malformed status line / truncated body
+            TimeoutError,
+            OSError,
+            ValueError,
+        ) as error:
+            raise _VerifyUnavailableError(str(error)) from error
+        if not isinstance(payload, dict) or not isinstance(payload.get("valid"), bool):
+            raise _VerifyUnavailableError("Malformed verify response")
+        if payload["valid"]:
+            run_id = payload.get("run_id")
+            node_id = payload.get("node_id")
+            exp = payload.get("exp")
+            if not isinstance(run_id, str) or not isinstance(node_id, str) or not isinstance(
+                exp, (int, float)
+            ):
+                raise _VerifyUnavailableError("Malformed verify response")
+            claims = {"run_id": run_id, "node_id": node_id, "exp": exp}
+            return True, claims
+        return False, None
+
+    def _validated_claims(self, token: str) -> dict[str, Any] | None:
+        """Return claims for a valid token, honoring the verdict cache.
+
+        Raises:
+            _VerifyUnavailableError: When the engine cannot be reached and no
+                cached verdict covers the token.
+        """
+        from fastapi import HTTPException
+
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        cached = self._verdict_cache.get(digest)
+        if cached is not None and cached[2] > _time.monotonic():
+            valid, claims, _ = cached
+            return claims if valid else None
+
+        base_url = os.environ.get(self._verify_base_url_env_var, "").rstrip("/")
+        if not base_url:
+            raise HTTPException(status_code=401, detail="Authentication not configured")
+
+        valid, claims = self._remote_verify(token, base_url)
+        if len(self._verdict_cache) >= self._CACHE_MAX_ENTRIES:
+            self._verdict_cache.clear()
+        self._verdict_cache[digest] = (valid, claims, self._cache_expiry(valid, claims))
+        return claims if valid else None
+
+    def authenticate(self, request: Request) -> dict[str, Any]:
+        """Validate the ``X-API-Key`` token (or legacy key) centrally."""
+        from fastapi import HTTPException
+        if _is_dev_mode():
+            logger.debug("Dev mode: skipping central token authentication")
+            return {"auth_mode": "dev_bypass"}
+
+        provided = request.headers.get("X-API-Key", "")
+        if not provided:
+            raise HTTPException(status_code=401, detail="Missing API key")
+
+        if self._legacy_matches(provided):
+            return {"auth_mode": "legacy_api_key"}
+
+        try:
+            claims = self._validated_claims(provided)
+        except _VerifyUnavailableError as error:
+            raise HTTPException(
+                status_code=503, detail="Token validator unavailable"
+            ) from error
+        if claims is None:
+            raise HTTPException(status_code=401, detail="Invalid node token")
+        return {
+            "auth_mode": "central",
+            "run_id": claims.get("run_id"),
+            "node_id": claims.get("node_id"),
+        }
+
+
+class _VerifyUnavailableError(Exception):
+    """The engine verify endpoint could not deliver a verdict (fail-closed)."""
 
 
 class _JwtAuth(_AuthBackend):
@@ -387,6 +557,42 @@ class NodeAuth:
             An ``_ApiKeyAuth`` instance usable as a FastAPI dependency.
         """
         return _ApiKeyAuth(key_env_var=key_env_var)
+
+    @staticmethod
+    def central(
+        verify_base_url_env_var: str = "CWE_API_BASE_URL",
+        verify_path: str = "/api/nodes/verify-token",
+        cache_ttl: float = 60.0,
+        timeout: float = 5.0,
+        legacy_key_env_var: str | None = "CANVASTEKK_API_KEY",
+    ) -> _CentralAuth:
+        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        globals().setdefault("Request", Request)
+        """Create a central-validation auth backend (engine-issued tokens).
+
+        Production mode for org nodes (#3825): the ``X-API-Key`` header
+        carries a run-scoped token minted by the engine; verdicts come from
+        the engine's verify endpoint (cached, fail-closed per DA-1949).
+
+        Args:
+            verify_base_url_env_var: Env var holding the engine base URL.
+            verify_path: Path of the verify endpoint on the engine.
+            cache_ttl: Verdict cache lifetime in seconds.
+            timeout: Verify-endpoint call timeout in seconds.
+            legacy_key_env_var: Env var holding the legacy static key —
+                dual-accept transition; set ``None`` for central-only (the
+                legacy leg is inert whenever the env var is unset).
+
+        Returns:
+            A ``_CentralAuth`` instance usable as a FastAPI dependency.
+        """
+        return _CentralAuth(
+            verify_base_url_env_var=verify_base_url_env_var,
+            verify_path=verify_path,
+            cache_ttl=cache_ttl,
+            timeout=timeout,
+            legacy_key_env_var=legacy_key_env_var,
+        )
 
     @staticmethod
     def jwt(

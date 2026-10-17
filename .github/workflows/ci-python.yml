@@ -2,13 +2,13 @@ name: Python CI
 
 on:
   push:
-    branches: [main]
+    branches: [dev, prod]
     paths:
       - 'python/**'
       - '.agents/skills/**'
       - '.github/workflows/ci-python.yml'
   pull_request:
-    branches: [main]
+    branches: [dev, prod]
     paths:
       - 'python/**'
       - '.agents/skills/**'
