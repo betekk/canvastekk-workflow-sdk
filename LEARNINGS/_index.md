@@ -14,6 +14,7 @@
 - [ambient-run-context-als-contextvars](patterns/ambient-run-context-als-contextvars.md) — per-run state on stateless nodes via AsyncLocalStorage/contextvars; store absence = no-op signal
 
 ## decisions
+- [x-api-key-slot-token-semantics](decisions/x-api-key-slot-token-semantics.md) — #3825: keep the X-API-Key wire slot, swap semantics to engine-minted run tokens; dual-accept default makes retirement env removal, not code change
 - [heap-trim-in-finally-not-background-task](decisions/heap-trim-in-finally-not-background-task.md) — DA-3009 trim placement: synchronous finally over BackgroundTask (Lambda freeze semantics)
 - [wire-parse-tolerance-loud-seam-on-legacy-removal](decisions/wire-parse-tolerance-loud-seam-on-legacy-removal.md) — DA-3340: parse boundaries stay tolerant when a wire union member is removed; the domain seam raises the fail-loud error (companion to parity-port-must-widen-wire-schema)
 - [fixed-tmp-paths-on-shared-runner-pool](anti-patterns/fixed-tmp-paths-on-shared-runner-pool.md) — DA-3160: literal /tmp paths collide cross-run on persistent pool boxes; swap to $RUNNER_TEMP/mktemp before routing
@@ -44,3 +45,6 @@
 - [shipped-docs-must-verify-cli-surface](anti-patterns/shipped-docs-must-verify-cli-surface.md) — grep the dispatch surface before shipping any CLI snippet in skills/docs; export_definition is a function, not a subcommand (#144)
 - [git-add-all-sweeps-worktree-artifacts](anti-patterns/git-add-all-sweeps-worktree-artifacts.md) — stage explicit paths per phase commit; sessions drop .opencode/ and typo files (e.g. a file named =0) that -A commits (#144)
 - [full-pytest-needs-fastapi-extra](conventions/full-pytest-needs-fastapi-extra.md) — fresh venv: poetry install -E fastapi (ci-python.yml:106) before pytest; fastapi collection errors are environmental (#144)
+
+## anti-patterns
+- [urllib-httpexception-escapes-urlerror-catch](anti-patterns/urllib-httpexception-escapes-urlerror-catch.md) — http.client.HTTPException escapes a URLError-only catch as an unhandled 500; add it to any fail-closed urllib guard
