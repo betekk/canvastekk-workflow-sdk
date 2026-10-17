@@ -1,5 +1,6 @@
 """Tests for authentication module (Phase 2)."""
 
+import json
 from typing import Any
 
 import pytest
@@ -725,3 +726,32 @@ class TestCentralAuth:
         auth = NodeAuth.central(legacy_key_env_var=None)
         assert auth._legacy_key_env_var is None
         assert auth._legacy_matches("anything") is False
+
+    def test_valid_verdict_missing_claims_fails_closed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Parity with TS: valid:true without well-formed claims is malformed → 503."""
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802 - http.server API
+                body = json.dumps({"valid": True})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body.encode())
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
+            auth = self._auth()
+            with pytest.raises(HTTPException) as exc:
+                auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
+            assert exc.value.status_code == 503
+        finally:
+            server.shutdown()

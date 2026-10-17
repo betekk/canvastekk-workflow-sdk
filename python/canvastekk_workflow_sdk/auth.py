@@ -195,6 +195,7 @@ class _CentralAuth(_AuthBackend):
             _VerifyUnavailableError: On any transport or protocol failure — the
                 caller must fail closed (503), never cache.
         """
+        import http.client
         import json
         import urllib.error
         import urllib.request
@@ -207,16 +208,25 @@ class _CentralAuth(_AuthBackend):
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
                 payload = json.loads(response.read())
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        except (
+            urllib.error.URLError,
+            http.client.HTTPException,  # malformed status line / truncated body
+            TimeoutError,
+            OSError,
+            ValueError,
+        ) as error:
             raise _VerifyUnavailableError(str(error)) from error
         if not isinstance(payload, dict) or not isinstance(payload.get("valid"), bool):
             raise _VerifyUnavailableError("Malformed verify response")
         if payload["valid"]:
-            claims = {
-                "run_id": payload.get("run_id"),
-                "node_id": payload.get("node_id"),
-                "exp": payload.get("exp"),
-            }
+            run_id = payload.get("run_id")
+            node_id = payload.get("node_id")
+            exp = payload.get("exp")
+            if not isinstance(run_id, str) or not isinstance(node_id, str) or not isinstance(
+                exp, (int, float)
+            ):
+                raise _VerifyUnavailableError("Malformed verify response")
+            claims = {"run_id": run_id, "node_id": node_id, "exp": exp}
             return True, claims
         return False, None
 
