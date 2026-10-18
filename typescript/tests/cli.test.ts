@@ -128,7 +128,7 @@ describe("cliMain register (DA-2603)", () => {
   }
 
   beforeEach(() => {
-    vi.stubEnv("CANVASTEKK_REGISTRY_TOKEN", "t0ps3cret");
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "t0ps3cret");
   });
 
   afterEach(() => {
@@ -143,7 +143,7 @@ describe("cliMain register (DA-2603)", () => {
   });
 
   it("exit 2 without token", async () => {
-    vi.stubEnv("CANVASTEKK_REGISTRY_TOKEN", "");
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "");
     expect(
       await cliMain(["register", "--manifest", manifestPath, "--engine-url", "https://eng"]),
     ).toBe(2);
