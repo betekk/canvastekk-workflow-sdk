@@ -233,7 +233,7 @@ def _run_register(args: list[str]) -> int:
     legacy service token rides ``X-Service-Token``.
 
     Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx ·
-    6 network. The token is read from ``CANVASTEKK_REGISTRY_TOKEN`` and is
+    6 network. The token is read from ``CANVASTEKK_NODE_REGISTRATION_KEY`` and is
     never printed.
     """
     import os
@@ -265,9 +265,9 @@ def _run_register(args: list[str]) -> int:
     if (not module_path and not manifest_source) or not engine_url:
         return _usage()
 
-    token = os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
+    token = (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))  # tracker#3911: old name dies at #3838
     if not token:
-        print("Error: CANVASTEKK_REGISTRY_TOKEN is not set (service credential)", file=sys.stderr)
+        print("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)", file=sys.stderr)
         return 2
 
     name_suffix = _flag("--name-suffix") or ""

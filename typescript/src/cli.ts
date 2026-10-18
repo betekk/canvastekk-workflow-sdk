@@ -11,7 +11,7 @@
  * {engine}/api/workflows/nodes/, then verifies via by-name/{name}. The
  * credential's wire form follows its type (#135): a ctk_ token rides
  * Authorization: Bearer (engine DA-1949); a legacy service token rides
- * X-Service-Token. Read from CANVASTEKK_REGISTRY_TOKEN, never printed.
+ * X-Service-Token. Read from CANVASTEKK_NODE_REGISTRATION_KEY, never printed.
  *
  * Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx/server
  * · 6 network. The token is never printed.
@@ -172,9 +172,9 @@ async function runRegister(args: string[]): Promise<number> {
   const engineUrl = flag(args, "--engine-url");
   if (!manifestSource || !engineUrl) return usage();
 
-  const token = process.env.CANVASTEKK_REGISTRY_TOKEN ?? "";
+  const token = (process.env.CANVASTEKK_NODE_REGISTRATION_KEY ?? process.env.CANVASTEKK_REGISTRY_TOKEN) ?? "";
   if (!token) {
-    process.stderr.write("Error: CANVASTEKK_REGISTRY_TOKEN is not set (service credential)\n");
+    process.stderr.write("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)\n");
     return 2;
   }
 

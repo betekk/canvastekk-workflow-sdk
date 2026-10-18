@@ -82,7 +82,7 @@ class TestProbeDefinition:
 
 class TestRunRegister:
     def _run(self, argv, token="t0ps3cret", environ=None):
-        env = {"CANVASTEKK_REGISTRY_TOKEN": token, **(environ or {})}
+        env = {"CANVASTEKK_NODE_REGISTRATION_KEY": token, **(environ or {})}
         buf_out, buf_err = io.StringIO(), io.StringIO()
         with patch.dict("os.environ", env), redirect_stdout(buf_out), redirect_stderr(buf_err):
             code = _run_register(argv)
@@ -91,7 +91,7 @@ class TestRunRegister:
     def test_missing_token_is_usage_error(self) -> None:
         code, _, err = self._run(["m:d", "--engine-url", "https://eng"], token="")
         assert code == 2
-        assert "CANVASTEKK_REGISTRY_TOKEN" in err
+        assert "CANVASTEKK_NODE_REGISTRATION_KEY" in err
 
     def test_missing_engine_url_is_usage_error(self) -> None:
         assert self._run(["m:d"])[0] == 2
@@ -214,7 +214,7 @@ class TestRegisterManifestFileInput:
                 response.status = 200
             return response
 
-        with patch.dict("os.environ", {"CANVASTEKK_REGISTRY_TOKEN": "t"}), patch(
+        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}), patch(
             "urllib.request.urlopen", side_effect=fake_urlopen
         ):
             code = _run_register(["--manifest", str(path), "--engine-url", "https://eng", "--json"])
@@ -222,7 +222,7 @@ class TestRegisterManifestFileInput:
         assert calls[0][1] == "https://eng/api/workflows/nodes/"
 
     def test_manifest_missing_file_is_usage_error(self, tmp_path) -> None:
-        with patch.dict("os.environ", {"CANVASTEKK_REGISTRY_TOKEN": "t"}):
+        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}):
             assert _run_register(["--manifest", str(tmp_path / "nope.json"), "--engine-url", "https://eng"]) == 2
 
 

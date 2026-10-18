@@ -1093,7 +1093,7 @@ Response from `POST /execute`:
 python -m canvastekk_workflow_sdk probe my_node.handler:definition
 
 # Publish to the engine registry from CI (service identity)
-export CANVASTEKK_REGISTRY_TOKEN=<service token>
+export CANVASTEKK_NODE_REGISTRATION_KEY=<service token>
 python -m canvastekk_workflow_sdk register my_node.handler:definition \
   --engine-url https://cwe.example.com [--invoke-url URL] [--name-suffix -lambda]
 ```

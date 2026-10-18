@@ -485,7 +485,7 @@ Defines what a node is. Maps to the engine's **registry-level node type** (`Work
 
 ```bash
 canvastekk-workflow-sdk probe --manifest manifest.json
-CANVASTEKK_REGISTRY_TOKEN=<token> canvastekk-workflow-sdk register \
+CANVASTEKK_NODE_REGISTRATION_KEY=<token> canvastekk-workflow-sdk register \
   --manifest manifest.json --engine-url https://cwe.example.com \
   [--invoke-url URL] [--name-suffix -lambda]
 ```

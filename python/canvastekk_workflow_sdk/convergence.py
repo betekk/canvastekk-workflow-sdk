@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--token",
         default=None,
-        help="service token; defaults to $CANVASTEKK_REGISTRY_TOKEN",
+        help="service token; defaults to $CANVASTEKK_NODE_REGISTRATION_KEY",
     )
     parser.add_argument(
         "--staged",
@@ -215,9 +215,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
+    token = args.token or (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))  # tracker#3911: old name dies at #3838
     if not token:
-        print("::error::no service token (pass --token or set CANVASTEKK_REGISTRY_TOKEN)")
+        print("::error::no service token (pass --token or set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return 2
 
     declared_list = load_declared(args.slugs_file)
