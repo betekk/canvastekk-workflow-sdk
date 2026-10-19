@@ -1,0 +1,248 @@
+name: reusable-release
+# Fleet release workflow — ONE mechanism for the dev/uat/beta/prod channels.
+# Ported from the canonical byte-identical copies (CDS/CLS/CWE — tracker#3805
+# org reference) with the beta channel added (epic canvastekk-tracker#3845):
+#   dev  -> vX.Y.Z-dev.N   tag only
+#   uat  -> vX.Y.Z-uat.N   tag only
+#   beta -> vX.Y.Z-beta.N  tag + GitHub PRERELEASE (customer-visible)
+#   prod -> vX.Y.Z         final; PR label (major/minor/patch) bumps the base,
+#                          git-cliff changelog + GitHub Release (makeLatest)
+# The same commit sha promotes through all lanes; versions are labels —
+# deploys key on sha-<40> images, never on version tags (tracker#3797).
+#
+# Caller contract (consumer repos):
+#   jobs:
+#     release:
+#       uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.4.0
+#       permissions:
+#         contents: write
+#         pull-requests: read
+#         issues: write          # notify-failure opens issue on release failure;
+#                                # reusable permissions are capped by the caller —
+#                                # without this the notify job 403s
+#       with:
+#         runner_pool: ubuntu-24.04   # optional; default auto (org local-if-idle)
+#   Chained jobs gate on the outputs (v1.7.2+ — job outputs do NOT cross the
+#   workflow_call boundary unless re-exported here). Caller-side guard shape
+#   (see any library release.yml): needs [release] + outputs.new_tag non-empty
+#   + prod-lane check per the caller's own lane policy.
+on:
+  workflow_call:
+    outputs:
+      new_tag:
+        description: Minted version tag incl. prefix (e.g. v1.2.3, v1.2.3-dev.4); empty when no tag was minted
+        value: ${{ jobs.release.outputs.new_tag }}
+      new_version:
+        description: Minted version without the tag prefix (bare semver, e.g. 1.2.3, 1.2.3-dev.4)
+        value: ${{ jobs.release.outputs.new_version }}
+
+    inputs:
+      tag_prefix:
+        description: Version tag prefix
+        type: string
+        default: v
+      cliff_config:
+        description: Repo-relative path to the git-cliff config used for the prod changelog
+        type: string
+        default: cliff.toml
+      runner_pool:
+        description: "'auto' = org local-if-idle probe (requires GH_APP_ID/GH_APP_PRIVATE_KEY vars); any other value is used as the literal runs-on label"
+        type: string
+        default: auto
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
+  # Use an org `local` self-hosted runner (betekk pool) when one is online+idle,
+  # else ubuntu-24.04. Probe/API failures degrade to ubuntu-24.04 with a
+  # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
+  # loudly (by design — managed credentials). Callers without the GH App vars
+  # pass `runner_pool: <label>` to skip this job entirely.
+  pick-runner:
+    if: inputs.runner_pool == 'auto'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+    steps:
+      # Runner probe authenticates as the canvastekk-config-manager GitHub
+      # App (org "Self-hosted runners: read-only") — a short-lived per-run
+      # installation token, not a personal org PAT.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: betekk
+      - id: pick
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          probe() {
+            gh api orgs/betekk/actions/runners --paginate \
+              --jq '[.runners[] | select(.labels[].name=="local") | select(.status=="online" and .busy==false)] | length' 2>/dev/null
+          }
+          # Retry: a transient API failure must not cost us the local pool
+          # when runners are actually idle. --paginate applies the jq filter
+          # PER PAGE (one count line per page) — never capture that raw into
+          # a shell variable; awk sums the pages into one scalar. The
+          # `if pages=$(probe)` form keeps Actions' default `bash -e` from
+          # errexit-ing the retry/degrade machinery on a hard API failure.
+          idle=""
+          for attempt in 1 2 3; do
+            if pages=$(probe); then
+              idle=$(printf '%s\n' "$pages" | awk 'NR>0 { s+=$1 } END { print s+0 }')
+              if [ "$idle" -gt 0 ]; then break; fi
+            fi
+            sleep 2
+          done
+          if [ -n "$idle" ] && [ "$idle" -gt 0 ]; then
+            echo "Local pool: $idle idle runner(s) — routing to self-hosted."
+            echo 'labels=["self-hosted","local"]' >> "$GITHUB_OUTPUT"
+          elif [ -z "$idle" ]; then
+            # Probe failed 3x: distinguish from a genuinely busy pool so the
+            # degradation is visible instead of silent.
+            echo "::warning::Runner probe failed after 3 attempts — degrading to ubuntu-24.04. Check GH_APP_ID / GH_APP_PRIVATE_KEY (canvastekk-config-manager app)."
+            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "Local pool busy (0 idle) — routing to ubuntu-24.04."
+            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Release
+    needs: [pick-runner]
+    # pick-runner is skipped when the caller passes a literal runner_pool.
+    if: ${{ always() && (needs.pick-runner.result == 'success' || needs.pick-runner.result == 'skipped') }}
+    runs-on: ${{ inputs.runner_pool == 'auto' && fromJSON(needs.pick-runner.outputs.labels) || inputs.runner_pool }}
+    # DA-2385: caps runner-alive hangs; tag action + git-cliff are sub-minute.
+    timeout-minutes: 15
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      new_version: ${{ steps.tag_version.outputs.new_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine pre-release suffix
+        id: prerelease
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          case "$BRANCH" in
+            dev)  SUFFIX="dev"  ;;
+            uat)  SUFFIX="uat"  ;;
+            beta) SUFFIX="beta" ;;
+            prod) SUFFIX=""     ;;
+            *)    SUFFIX="$BRANCH" ;;
+          esac
+          echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "is_prod=$( [ "$BRANCH" = "prod" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+
+      - name: Determine version bump type from PR label
+        id: bump_type
+        if: steps.prerelease.outputs.is_prod == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            // Find the merged PR for this commit and read its semver label.
+            // Falls back to "patch" when no label is present.
+            const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            const labels = result.data[0]?.labels?.map((l) => l.name) || [];
+            core.info(`PR labels: ${JSON.stringify(labels)}`);
+            let type = "patch";
+            if (labels.includes("major")) type = "major";
+            else if (labels.includes("minor")) type = "minor";
+            core.setOutput("type", type);
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Default is false: without tags the action assumes previous
+          # version 0.0.0 and proposes an already-taken tag ("Reference
+          # already exists"). fetch-depth 0 on checkout does not fetch tags.
+          fetch_all_tags: true
+          pre_release_suffix: ${{ steps.prerelease.outputs.suffix }}
+          tag_prefix: ${{ inputs.tag_prefix }}
+          # On prod the PR label drives the bump; on dev/uat/beta we only
+          # ever increment the prerelease counter, so patch is a safe no-op base.
+          default_bump: ${{ steps.bump_type.outputs.type || 'patch' }}
+
+      - name: Generate changelog (prod only)
+        if: steps.prerelease.outputs.is_prod == 'true' && steps.tag_version.outputs.new_tag != ''
+        id: changelog
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
+        with:
+          config: ${{ inputs.cliff_config }}
+          args: --latest --strip header
+        env:
+          OUTPUT: cliff-changelog.md
+
+      - name: Create GitHub Release (prod only)
+        if: steps.prerelease.outputs.is_prod == 'true' && steps.tag_version.outputs.new_tag != ''
+        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 # v1.16.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          bodyFile: cliff-changelog.md
+          makeLatest: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Beta is the customer-visible preview channel: the tag alone is not
+      # discoverable enough, so publish a GitHub prerelease. makeLatest stays
+      # false — prod remains the latest stable. Full changelog ships with the
+      # next prod release.
+      - name: Create GitHub prerelease (beta only)
+        if: steps.prerelease.outputs.branch == 'beta' && steps.tag_version.outputs.new_tag != ''
+        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 # v1.16.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body: "Prerelease from the `beta` channel (external preview). Full changelog ships with the next prod release."
+          makeLatest: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # DA-3538: a Release failure starves Deploy silently (Deploy never runs, so
+  # no failure() fires downstream). Surface it at the source.
+  notify-failure:
+    name: Notify on failure
+    needs: [pick-runner, release]
+    if: ${{ always() && failure() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Open failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Release failed on ${{ github.ref_name }}"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" -R "$GITHUB_REPOSITORY" --body "Recurred on \`$GITHUB_REF_NAME\`: $RUN_URL"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "[CI]: $TITLE" --body "Release failure on \`$GITHUB_REF_NAME\` — investigate: $RUN_URL"
+          fi

@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   release:
-    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.4.0
+    uses: ./.github/workflows/reusable-release.yml
     with:
       runner_pool: ubuntu-24.04
     secrets: inherit
