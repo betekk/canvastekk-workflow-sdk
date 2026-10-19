@@ -47,4 +47,8 @@
 - [full-pytest-needs-fastapi-extra](conventions/full-pytest-needs-fastapi-extra.md) — fresh venv: poetry install -E fastapi (ci-python.yml:106) before pytest; fastapi collection errors are environmental (#144)
 
 ## anti-patterns
+- [workflow-call-outputs-need-workflow-level-reexport](anti-patterns/workflow-call-outputs-need-workflow-level-reexport.md) — chained jobs on reusable outputs silently no-op unless the reusable re-exports them under workflow_call.outputs (fixed betekk-gha v1.7.2)
 - [urllib-httpexception-escapes-urlerror-catch](anti-patterns/urllib-httpexception-escapes-urlerror-catch.md) — http.client.HTTPException escapes a URLError-only catch as an unhandled 500; add it to any fail-closed urllib guard
+
+## solutions
+- [gh-token-env-with-persist-credentials-false](solutions/gh-token-env-with-persist-credentials-false.md) — gh CLI 401s after persist-credentials:false checkouts; every gh step needs explicit GH_TOKEN env
