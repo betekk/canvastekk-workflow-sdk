@@ -13,7 +13,7 @@ name: Release
 # in-repo version files freeze at the last released value (lockstep with
 # poetry.lock, which therefore never needs regenerating on this path).
 #
-# Caller contract (reusable-release.yml@v1.7.2 — v1.7.2 added the
+# Caller contract (reusable-release.yml@8ceff2b0c11bb741651b2a91a016a8d9c0a8348b — v1.7.2 added the
 # workflow_call.outputs re-export that chained jobs gate on):
 #   - secrets: inherit REQUIRED (launch-fails with 0 jobs otherwise)
 #   - NO caller-level concurrency (the reusable owns release-<ref>)
@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   release:
-    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.7.2
+    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@8ceff2b0c11bb741651b2a91a016a8d9c0a8348b
     with:
       tag_prefix: v
       cliff_config: cliff.toml
