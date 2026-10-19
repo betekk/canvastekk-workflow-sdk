@@ -1,0 +1,10 @@
+name: Probe reusable call
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  release:
+    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.7.2
+    with:
+      runner_pool: ubuntu-24.04
+    secrets: inherit
