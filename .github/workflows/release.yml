@@ -1,189 +1,105 @@
 name: Release
 
+# Fleet standard release mechanism (betekk/canvastekk-tracker#3845 / #3855):
+# reusable-release@v1.7.2 mints dev counter tags / prod finals + git-cliff
+# changelog + GitHub Release. The chained publish job ships PROD FINALS ONLY:
+# wheel + tgz release assets (consumer-pinned URLs — canvastekk-ml-service
+# deploy/register.sh pins the wheel; DA-2677 tgz channel), dual GitHub-Packages
+# publishes (pip + npm), import smokes, and the sdk-released dispatch to
+# canvastekk-workflow-nodes (payload contract: nodes deploy-lambda.yml:18).
+#
+# Version files are TAG-DERIVED at build time: scripts/bump_versions.py runs
+# ephemerally against the minted tag and its output is never committed — the
+# in-repo version files freeze at the last released value (lockstep with
+# poetry.lock, which therefore never needs regenerating on this path).
+#
+# Caller contract (reusable-release.yml@v1.7.2 — v1.7.2 added the
+# workflow_call.outputs re-export that chained jobs gate on):
+#   - secrets: inherit REQUIRED (launch-fails with 0 jobs otherwise)
+#   - NO caller-level concurrency (the reusable owns release-<ref>)
+#   - issues: write needed by the reusable's notify-failure job
+
 on:
   push:
-    branches:
-      - dev
-      - prod
-    paths-ignore:
-      - 'CHANGELOG.md'
+    branches: [dev, prod]
   workflow_dispatch:
 
 permissions:
   contents: write
-  packages: write
   pull-requests: read
+  issues: write
 
 jobs:
-  # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
-  # Use an org `local` self-hosted runner (org pool) when one is online+idle,
-  # else ubuntu-24.04. Probe/API failures degrade to ubuntu-24.04 with a
-  # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
-  # loudly (by design — managed credentials).
-  pick-runner:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {}
-    outputs:
-      labels: ${{ steps.pick.outputs.labels }}
-    steps:
-      # Runner probe authenticates as the canvastekk-config-manager GitHub
-      # App (org "Self-hosted runners: read-only") — a short-lived per-run
-      # installation token, not a personal org PAT.
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
-        id: app-token
-        with:
-          client-id: ${{ vars.GH_APP_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-      - id: pick
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          probe() {
-            gh api orgs/${{ github.repository_owner }}/actions/runners --paginate \
-              --jq '[.runners[] | select(.labels[].name=="local") | select(.status=="online" and .busy==false)] | length' 2>/dev/null
-          }
-          # Retry: a transient API failure must not cost us the local pool
-          # when runners are actually idle. --paginate applies the jq filter
-          # PER PAGE (one count line per page) — never capture that raw into
-          # a shell variable; awk sums the pages into one scalar. The
-          # `if pages=$(probe)` form keeps Actions' default `bash -e` from
-          # errexiting the retry/degrade machinery on a hard API failure.
-          idle=""
-          for attempt in 1 2 3; do
-            if pages=$(probe); then
-              idle=$(printf '%s\n' "$pages" | awk 'NR>0 { s+=$1 } END { print s+0 }')
-              if [ "$idle" -gt 0 ]; then break; fi
-            fi
-            sleep 2
-          done
-          if [ -n "$idle" ] && [ "$idle" -gt 0 ]; then
-            echo "Local pool: $idle idle runner(s) — routing to self-hosted."
-            echo 'labels=["self-hosted","local"]' >> "$GITHUB_OUTPUT"
-          elif [ -z "$idle" ]; then
-            # Probe failed 3x: distinguish from a genuinely busy pool so the
-            # degradation is visible instead of silent.
-            echo "::warning::Runner probe failed after 3 attempts — degrading to ubuntu-24.04. Check GH_APP_CLIENT_ID / GH_APP_PRIVATE_KEY (canvastekk-config-manager app)."
-            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
-          else
-            echo "Local pool busy (0 idle) — routing to ubuntu-24.04."
-            echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
-          fi
-
   release:
-    name: Release
-    needs: [pick-runner]
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
-    # Fleet standard (#3857): the version-file bump + final tag flow runs on the
-    # prod lane only. dev mints counter tags (see dev-tag job below) without
-    # touching version files — versions finalize at prod (two-lane standard).
-    if: github.ref_name == 'prod' && github.actor != 'github-actions[bot]'
+    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.7.2
+    with:
+      tag_prefix: v
+      cliff_config: cliff.toml
+      runner_pool: auto
+    secrets: inherit
 
+  publish:
+    name: Build & publish SDK (prod finals only)
+    needs: [release]
+    if: github.ref_name == 'prod' && needs.release.outputs.new_tag != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+    env:
+      NEW_TAG: ${{ needs.release.outputs.new_tag }}
+      RELEASE_VERSION: ${{ needs.release.outputs.new_version }}
     steps:
-      - name: Checkout
+      - name: Checkout the minted tag
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.release.outputs.new_tag }}
+          persist-credentials: false
 
-      - name: Generate changelog and determine next version
-        id: git-cliff
-        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
-        with:
-          config: cliff.toml
-          args: --bump
-        env:
-          OUTPUT: CHANGELOG.md
-          GITHUB_REPO: ${{ github.repository }}
+      - name: Assert HEAD is the tagged commit (stale-build guard, DA-1302 class)
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-parse "${NEW_TAG}^{commit}")"
+          if [ "$HEAD_SHA" != "$TAG_SHA" ]; then
+            echo "::error::HEAD ${HEAD_SHA} != ${NEW_TAG} (${TAG_SHA})"
+            exit 1
+          fi
+          # The bump script validates ^X.Y.Z — reject a v-prefixed leak loudly.
+          case "$RELEASE_VERSION" in
+            v*) echo "::error::RELEASE_VERSION '${RELEASE_VERSION}' must be bare semver" >&2; exit 1 ;;
+          esac
+          echo "Building ${NEW_TAG} (bare ${RELEASE_VERSION}) from ${HEAD_SHA}"
 
-      - name: Bump version in ALL language configs
-        if: steps.git-cliff.outputs.version != ''
-        env:
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
-        run: python3 scripts/bump_versions.py "${NEW_VERSION}"
+      - name: Tag-derived version stamp (ephemeral — never committed)
+        run: |
+          # Stamps all five version sources incl. the _version.py RELEASE_DATE
+          # support-horizon leaf (DA-3359 / DA-3425 enumeration rule).
+          python3 scripts/bump_versions.py "${RELEASE_VERSION}"
+          git diff --stat || true   # informational only; runner discards the tree
+
+      # ─── Python SDK: build wheel, attach, publish, verify ──────────
 
       - name: Set up Python
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.12'
 
       - name: Install Poetry
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         run: pip install "poetry>=2.2"
 
-      - name: Update poetry.lock
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
+      - name: Build wheel from the tagged commit
         working-directory: python
-        run: python -m poetry lock --regenerate
-
-      - name: Commit, tag and push
-        if: steps.git-cliff.outputs.version != ''
-        env:
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add CHANGELOG.md
-          for f in python/pyproject.toml python/poetry.lock \
-                   python/canvastekk_workflow_sdk/__init__.py \
-                   typescript/package.json typescript/package-lock.json \
-                   typescript/src/version.ts \
-                   dotnet/Directory.Build.props; do
-            [ -f "$f" ] && git add "$f"
-          done
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "chore(release): prepare ${NEW_VERSION}"
-          git tag "${NEW_VERSION}"
-          git push
-          git push --tags
-
-      - name: Create GitHub Release
-        if: steps.git-cliff.outputs.version != ''
-        id: create_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
-        run: |
-          CURRENT_NOTES=$(awk "/^## \[${NEW_VERSION#v}\]/,/^## \[/ { print }" CHANGELOG.md | head -n -1)
-          # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
-          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
-          echo "$CURRENT_NOTES" > "$NOTES_FILE"
-
-          gh release create "${NEW_VERSION}" \
-            --title "${NEW_VERSION}" \
-            --notes-file "$NOTES_FILE"
-
-      - name: Build and upload Python SDK to GitHub Release
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
-        working-directory: python
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
-        run: |
-          # Assert we are building from the tagged commit (prevents stale wheel bug [DA-1302])
-          HEAD_SHA=$(git rev-parse HEAD)
-          TAG_SHA=$(git rev-parse "${NEW_VERSION}^{commit}" 2>/dev/null || echo "")
-          if [ -n "${TAG_SHA}" ] && [ "${HEAD_SHA}" != "${TAG_SHA}" ]; then
-            echo "ERROR: HEAD (${HEAD_SHA}) does not match tag ${NEW_VERSION} (${TAG_SHA})" >&2
-            exit 1
-          fi
-          echo "Building from tagged commit ${HEAD_SHA} (${NEW_VERSION})"
-
-          # Clean dist/ to prevent stale artifacts from previous builds
+          # No `poetry lock` step: the committed lock stays consistent with the
+          # frozen in-repo pyproject; the ephemeral stamp above only affects
+          # the wheel being built (poetry build does not consult the lock).
           rm -rf dist/
-
-          # Build wheel from the tagged commit
           python -m poetry build
-          # Verify the built wheel contains expected symbols (prevents stale wheel bug [DA-1302])
-          echo "Verifying wheel contents..."
+
+      - name: Verify wheel contents (prevents stale wheel bug, DA-1302)
+        working-directory: python
+        run: |
           WHEEL_FILE=$(ls dist/*.whl)
           python3 -c "
           import zipfile, sys
@@ -197,14 +113,16 @@ jobs:
               print('Pre-upload verification passed: all expected symbols present in wheel')
           "
 
-          # Generate SHA256 hash for provenance attestation
+      - name: Checksum and attach wheel to the GitHub Release
+        working-directory: python
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          WHEEL_FILE=$(ls dist/*.whl)
           sha256sum "${WHEEL_FILE}" > "${WHEEL_FILE}.sha256"
-
-          # Upload wheel and hash (use --clobber to replace any existing asset)
-          gh release upload "${NEW_VERSION}" dist/*.whl dist/*.whl.sha256 --clobber
+          gh release upload "${NEW_TAG}" dist/*.whl dist/*.whl.sha256 --clobber
 
       - name: Pre-publish smoke test (local wheel install)
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         working-directory: python
         run: |
           # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
@@ -212,7 +130,6 @@ jobs:
           python3 -m venv "$VENV"
           WHEEL_FILE=$(ls dist/*.whl)
           "$VENV/bin/pip" install "${WHEEL_FILE}"
-
           "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
@@ -225,7 +142,6 @@ jobs:
           "
 
       - name: Publish Python SDK to GitHub Packages
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         continue-on-error: true
         working-directory: python
         env:
@@ -240,25 +156,18 @@ jobs:
             dist/canvastekk_workflow_sdk-*.whl
 
       - name: Verify published wheel (post-publish smoke test)
-        if: steps.git-cliff.outputs.version != '' && hashFiles('python/pyproject.toml') != ''
         continue-on-error: true
         env:
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION_NUM="${NEW_VERSION#v}"
-
-          # Create clean virtualenv
           # DA-3160: $RUNNER_TEMP not /tmp — shared persistent pool boxes
           VENV="$RUNNER_TEMP/verify-venv"
           python3 -m venv "$VENV"
-
-          # Install from GitHub Packages with auth + retry for propagation latency
           INDEX_URL="https://betekk:${GITHUB_TOKEN}@pypi.pkg.github.com/betekk/"
           INSTALL_SUCCESS=false
           for i in 1 2 3; do
             if "$VENV/bin/pip" install \
-              "canvastekk-workflow-sdk==${VERSION_NUM}" \
+              "canvastekk-workflow-sdk==${RELEASE_VERSION}" \
               --index-url "${INDEX_URL}"; then
               INSTALL_SUCCESS=true
               break
@@ -267,62 +176,59 @@ jobs:
             sleep 10
           done
           if [ "$INSTALL_SUCCESS" = false ]; then
-            echo "::error::Failed to install canvastekk-workflow-sdk==${VERSION_NUM} after 3 attempts"
+            echo "::error::Failed to install canvastekk-workflow-sdk==${RELEASE_VERSION} after 3 attempts"
             exit 1
           fi
-
-          # Verify all canonical names import correctly from published wheel
           "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
               RetryConfig, BaseNode, ExecutionContext,
           )
-
           from canvastekk_workflow_sdk.workflow.models import (
               WorkflowDefinitionNode, WorkflowEdgeDefinition, WorkflowDefinitionSpec,
           )
-
           print('Post-publish verification passed: all canonical names resolve correctly')
           "
 
-      # ─── TypeScript SDK: Build + Publish ───────────────────────────
+      # ─── TypeScript SDK: build, attach, publish, verify ────────────
 
       - name: Set up Node.js
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@betekk'
 
+      - name: Sync TS version files (package.json + lock, tag-derived)
+        working-directory: typescript
+        run: |
+          # bump_versions.py already stamped package.json and src/version.ts;
+          # npm version also syncs package-lock.json so `npm ci` sees a
+          # consistent pair. --no-git-tag-version keeps the runner tree clean.
+          npm version "${RELEASE_VERSION}" --no-git-tag-version --allow-same-version
+
       - name: Install TypeScript dependencies
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
         working-directory: typescript
         run: npm ci --legacy-peer-deps
 
       - name: Build TypeScript SDK
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
         working-directory: typescript
         run: npm run build
 
-      - name: Build and upload TypeScript SDK to GitHub Release
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
+      - name: Pack and attach TypeScript SDK to the GitHub Release
         working-directory: typescript
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
         run: |
           # DA-2677: attach the packed tarball so TS consumers can pin the exact
           # released version via a public release-asset URL (mirrors the python
           # wheel channel; no registry token needed by consumers).
           npm pack --pack-destination .
-          VERSION_NUM="${NEW_VERSION#v}"
-          mv "betekk-canvastekk-workflow-sdk-${VERSION_NUM}.tgz" \
-             "canvastekk-workflow-sdk-${VERSION_NUM}.tgz"
-          gh release upload "${NEW_VERSION}" "canvastekk-workflow-sdk-${VERSION_NUM}.tgz"
+          mv "betekk-canvastekk-workflow-sdk-${RELEASE_VERSION}.tgz" \
+             "canvastekk-workflow-sdk-${RELEASE_VERSION}.tgz"
+          gh release upload "${NEW_TAG}" "canvastekk-workflow-sdk-${RELEASE_VERSION}.tgz" --clobber
 
       - name: Publish TypeScript SDK to GitHub Packages
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
         continue-on-error: true
         working-directory: typescript
         env:
@@ -330,59 +236,43 @@ jobs:
         run: npm publish
 
       - name: Verify published TypeScript package
-        if: steps.git-cliff.outputs.version != '' && hashFiles('typescript/package.json') != ''
         continue-on-error: true
         env:
-          NEW_VERSION: ${{ steps.git-cliff.outputs.version }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION_NUM="${NEW_VERSION#v}"
           TEMP_DIR=$(mktemp -d)
           cd "$TEMP_DIR"
-
           npm init -y > /dev/null 2>&1
           echo "@betekk:registry=https://npm.pkg.github.com" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
-
-          npm install "@betekk/canvastekk-workflow-sdk@${VERSION_NUM}" --legacy-peer-deps 2>&1
-
+          npm install "@betekk/canvastekk-workflow-sdk@${RELEASE_VERSION}" --legacy-peer-deps 2>&1
           node -e "
           const { VERSION, WorkflowBuilder, ResolverError } = require('@betekk/canvastekk-workflow-sdk');
-          if (VERSION !== '${VERSION_NUM}') {
-            console.error('Version mismatch: expected ${VERSION_NUM}, got ' + VERSION);
+          if (VERSION !== '${RELEASE_VERSION}') {
+            console.error('Version mismatch: expected ${RELEASE_VERSION}, got ' + VERSION);
             process.exit(1);
           }
           console.log('Post-publish TS verification passed: version ' + VERSION + ' resolved correctly');
           "
 
-      # ─── Phase 5 [DA-1546]: Post-release dispatch to Nodes ──────────
+      # ─── Post-release dispatch to Nodes (DA-1546 chain) ─────────────
 
       - name: Detect breaking changes
         id: detect-breaking
-        if: steps.git-cliff.outputs.version != ''
         run: |
           set -euo pipefail
-          # Find the previous tag (before this release)
+          # Find the previous final tag (before this release)
           PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p' || true)
           if [ -z "$PREV_TAG" ]; then
-            # No previous tag — scan all commits
             RANGE="HEAD"
           else
             RANGE="${PREV_TAG}..HEAD"
           fi
-
           echo "Scanning commits in range: $RANGE"
-
-          # Collect breaking changes:
-          # 1. Subjects with `!:` marker (e.g., `feat(api)!: ...`)
-          # 2. Bodies with `BREAKING CHANGE:` footer
           BREAKING_SUBJECTS=$(git log "$RANGE" --format='%s' | grep -E '^[a-z]+(\([^)]+\))?!:' || true)
           BREAKING_FOOTERS=$(git log "$RANGE" --format='%B' | grep -E '^BREAKING[ -]CHANGE:' -i || true)
-
           BREAKING_LIST=""
-          if [ -n "$BREAKING_SUBJECTS" ]; then
-            BREAKING_LIST="$BREAKING_SUBJECTS"
-          fi
+          if [ -n "$BREAKING_SUBJECTS" ]; then BREAKING_LIST="$BREAKING_SUBJECTS"; fi
           if [ -n "$BREAKING_FOOTERS" ]; then
             if [ -n "$BREAKING_LIST" ]; then
               BREAKING_LIST="$BREAKING_LIST"$'\n'"$BREAKING_FOOTERS"
@@ -390,15 +280,12 @@ jobs:
               BREAKING_LIST="$BREAKING_FOOTERS"
             fi
           fi
-
           if [ -n "$BREAKING_LIST" ]; then
-            IS_BREAKING="true"
             echo "::warning::Breaking changes detected — Nodes rebuild will be mandatory"
+            IS_BREAKING="true"
           else
             IS_BREAKING="false"
           fi
-
-          # Convert list to JSON array (one entry per line, properly escaped)
           if [ -n "$BREAKING_LIST" ]; then
             BREAKING_JSON=$(echo "$BREAKING_LIST" | python3 -c "
           import sys, json
@@ -408,7 +295,6 @@ jobs:
           else
             BREAKING_JSON='[]'
           fi
-
           echo "breaking=$IS_BREAKING" >> "$GITHUB_OUTPUT"
           echo "breaking_changes_json=$BREAKING_JSON" >> "$GITHUB_OUTPUT"
           echo "Breaking: $IS_BREAKING"
@@ -416,7 +302,6 @@ jobs:
 
       - name: Generate Nodes dispatch token
         id: nodes-token
-        if: success() && steps.git-cliff.outputs.version != ''
         continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
@@ -426,7 +311,6 @@ jobs:
           repositories: canvastekk-workflow-nodes
 
       - name: Notify Nodes repo of SDK release (dispatch rebuild)
-        if: success() && steps.git-cliff.outputs.version != ''
         continue-on-error: true
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
         with:
@@ -435,30 +319,9 @@ jobs:
           event-type: sdk-released
           client-payload: |
             {
-              "sdk_version": "${{ steps.git-cliff.outputs.version }}",
+              "sdk_version": "${{ needs.release.outputs.new_tag }}",
               "environment": "prod",
               "breaking": ${{ steps.detect-breaking.outputs.breaking }},
               "breaking_changes": ${{ steps.detect-breaking.outputs.breaking_changes_json || '[]' }},
               "released_at": "${{ github.run_id }}"
             }
-
-  # Fleet standard (#3857): dev merges mint vX.Y.Z-dev.N counter tags
-  # (tag-only — no version-file changes; versions finalize at prod).
-  dev-tag:
-    name: Mint dev prerelease tag
-    if: github.ref_name == 'dev'
-    needs: [pick-runner]
-    runs-on: ${{ fromJSON(needs.pick-runner.outputs.labels) }}
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - name: Bump version and push dev tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          fetch_all_tags: true
-          pre_release_suffix: dev
-          tag_prefix: v
-          default_bump: patch
