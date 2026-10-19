@@ -20,6 +20,8 @@ name: Release
 #   - issues: write needed by the reusable's notify-failure job
 
 on:
+  pull_request:
+    branches: [probe-validate]
   push:
     branches: [dev, prod]
   workflow_dispatch:
