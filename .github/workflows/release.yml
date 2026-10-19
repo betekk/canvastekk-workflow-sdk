@@ -21,7 +21,6 @@ name: Release
 
 on:
   pull_request:
-    branches: [probe-validate]
   push:
     branches: [dev, prod]
   workflow_dispatch:
