@@ -1,7 +1,7 @@
 name: Release
 
 # Fleet standard release mechanism (betekk/canvastekk-tracker#3845 / #3855):
-# reusable-release@v1.6.0 mints dev counter tags / prod finals + git-cliff
+# reusable-release@v1.7.2 mints dev counter tags / prod finals + git-cliff
 # changelog + GitHub Release. The chained publish job ships PROD FINALS ONLY:
 # wheel + tgz release assets (consumer-pinned URLs — canvastekk-ml-service
 # deploy/register.sh pins the wheel; DA-2677 tgz channel), dual GitHub-Packages
@@ -13,7 +13,8 @@ name: Release
 # in-repo version files freeze at the last released value (lockstep with
 # poetry.lock, which therefore never needs regenerating on this path).
 #
-# Caller contract (reusable-release.yml@v1.6.0):
+# Caller contract (reusable-release.yml@v1.7.2 — v1.7.2 added the
+# workflow_call.outputs re-export that chained jobs gate on):
 #   - secrets: inherit REQUIRED (launch-fails with 0 jobs otherwise)
 #   - NO caller-level concurrency (the reusable owns release-<ref>)
 #   - issues: write needed by the reusable's notify-failure job
@@ -30,7 +31,7 @@ permissions:
 
 jobs:
   release:
-    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.6.0
+    uses: betekk/betekk-gha/.github/workflows/reusable-release.yml@v1.7.2
     with:
       tag_prefix: v
       cliff_config: cliff.toml
