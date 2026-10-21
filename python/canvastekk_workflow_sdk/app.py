@@ -383,6 +383,15 @@ def create_node_app(
         # is the EXCLUSIVE source. Body-supplied values are stripped so no
         # caller can forge account identity. Absent/empty → None (local runs).
         body.pop("account_id", None)
+        # S.4 (SDK#161): the #833 capability is engine-controlled the same
+        # way — X-Node-Capability is the exclusive source; body-supplied
+        # values are stripped. Opaque string: strip whitespace only, never
+        # parse (CDS-side verification is the auth library's).
+        body.pop("capability", None)
+        capability: str | None = None
+        capability_header = request.headers.get("x-node-capability")
+        if capability_header is not None and capability_header.strip():
+            capability = capability_header.strip()
         account_id: int | None = None
         account_header = request.headers.get("x-account-id")
         if account_header is not None and account_header.strip():
@@ -406,7 +415,9 @@ def create_node_app(
             account_id = parsed
 
         try:
-            exec_request = NodeExecutionRequest(**body, account_id=account_id)
+            exec_request = NodeExecutionRequest(
+                **body, account_id=account_id, capability=capability
+            )
         except ValidationError:
             return JSONResponse(
                 status_code=422,

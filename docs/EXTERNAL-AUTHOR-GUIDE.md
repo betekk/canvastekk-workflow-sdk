@@ -324,7 +324,7 @@ Fully offline — no network calls. Exit code `0` = registration-ready.
 Publish a node to the engine registry from a pipeline under a service identity:
 
 ```bash
-export CANVASTEKK_REGISTRY_TOKEN=<service token>
+export CANVASTEKK_NODE_REGISTRATION_KEY=<service token>
 python -m canvastekk_workflow_sdk register handler:definition \
   --engine-url https://cwe.example.com \
   --invoke-url https://nodes.example.com/my-node/execute \
@@ -541,7 +541,7 @@ Secrets are **never stored in code**. Use your CI/CD provider's secrets store.
 
 | Secret | When Required | Description |
 |--------|--------------|-------------|
-| `CANVASTEKK_REGISTRY_TOKEN` | CI/CD registration | Service credential for automated registration. The header is picked from the token shape: a `ctk_` credential rides `Authorization: Bearer`, a legacy service token rides `X-Service-Token`. Issued by the platform team. |
+| `CANVASTEKK_NODE_REGISTRATION_KEY` (deprecated alias: `CANVASTEKK_REGISTRY_TOKEN`, removed at fleet purge tracker#3838) | CI/CD registration | Service credential for automated registration. The header is picked from the token shape: a `ctk_` credential rides `Authorization: Bearer`, a legacy service token rides `X-Service-Token`. Issued by the platform team. |
 | `REGISTRY_API_KEY` | Manual registration | API key for the registry (`X-API-Key` header). Provided by the platform team. |
 | `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. Local dev / CI profile; org production nodes use central token mode. |
 | `CWE_API_BASE_URL` | Node auth (central token mode) | Workflow engine base URL for `NodeAuth.central()` token verification (v0.54.0+, `docs/NODE-TOKEN-CONTRACT.md`). |
@@ -597,7 +597,7 @@ jobs:
 
       - name: Register node with engine
         env:
-          CANVASTEKK_REGISTRY_TOKEN: ${{ secrets.CANVASTEKK_REGISTRY_TOKEN }}
+          CANVASTEKK_NODE_REGISTRATION_KEY: ${{ secrets.CANVASTEKK_NODE_REGISTRATION_KEY }}
         run: |
           python -c "
           import os
@@ -608,7 +608,7 @@ jobs:
               MyNode(),
               registry_url='${{ env.ENGINE_URL }}',
               invoke_url='https://my-node.example.com',
-              service_token=os.environ['CANVASTEKK_REGISTRY_TOKEN'],
+              service_token=os.environ['CANVASTEKK_NODE_REGISTRATION_KEY'],
               tags=['ci-cd', 'auto-registered'],
           )
           print('Registration successful')
@@ -617,7 +617,7 @@ jobs:
       - name: Validate registration
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-Service-Token: ${{ secrets.CANVASTEKK_REGISTRY_TOKEN }}" \
+            -H "X-Service-Token: ${{ secrets.CANVASTEKK_NODE_REGISTRATION_KEY }}" \
             "${{ env.ENGINE_URL }}/my-node-v1.0.0")
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "Registration verification failed (HTTP $HTTP_STATUS)"
@@ -632,7 +632,7 @@ Configure these in **Settings > Secrets and variables > Actions**:
 
 | Secret | Description |
 |--------|-------------|
-| `CANVASTEKK_REGISTRY_TOKEN` | Service token for engine registration |
+| `CANVASTEKK_NODE_REGISTRATION_KEY` | Service token for engine registration |
 | `REGISTRY_USERNAME` | Container registry username |
 | `REGISTRY_PASSWORD` | Container registry password |
 

@@ -1,9 +1,44 @@
 /**
+ * S.2 error taxonomy (SDK#161): every SDK exception classifies into exactly
+ * one category. Engine-minted codes join the same registry — the engine's
+ * D.2 synthesized envelopes carry `type` values from this tuple.
+ */
+export const ERROR_CATEGORIES = [
+  "transport",
+  "validation",
+  "domain",
+  "timeout",
+  "lifecycle",
+] as const;
+
+export type ErrorCategory = (typeof ERROR_CATEGORIES)[number];
+
+/**
+ * S.3 error envelope (SDK#161): the one error shape the engine synthesizes on
+ * failed node results (D.2), frontend ERROR rows render (CFN#2080), and node
+ * repos raise against (D.4).
+ */
+export const ERROR_ENVELOPE_KEYS = ["type", "message", "code"] as const;
+
+/**
+ * S.6 transport sub-codes (SDK#161): machine-readable reasons carried in
+ * `details["sub_code"]` by the SDK's download paths (both languages).
+ */
+export const IO_SUBCODE_DOWNLOAD_FAILED = "IO_DOWNLOAD_FAILED";
+export const IO_SUBCODE_URL_POLICY_BLOCKED = "IO_URL_POLICY_BLOCKED";
+export const IO_SUBCODE_SIZE_EXCEEDED = "IO_SIZE_EXCEEDED";
+
+/**
  * Base error class for all node execution errors with error code and details.
+ *
+ * Unclassified errors (a bare `NodeExecutionError` or an uncaught exception
+ * the app wraps) are `domain` — the node's own logic failed, not the
+ * transport, validation, timeout, or lifecycle machinery.
  */
 export class NodeExecutionError extends Error {
   readonly errorCode: string;
   readonly details: Record<string, unknown>;
+  readonly category: ErrorCategory = "domain";
 
   /**
    * Creates a new NodeExecutionError.
@@ -25,11 +60,12 @@ export class NodeExecutionError extends Error {
 
   /**
    * Converts error to dictionary for serialization.
-   * @returns Dictionary with error_code, message, and details
+   * @returns Dictionary with error_code, category, message, and details
    */
   toDict(): Record<string, unknown> {
     return {
       error_code: this.errorCode,
+      category: this.category,
       message: this.message,
       details: this.details,
     };
@@ -37,9 +73,24 @@ export class NodeExecutionError extends Error {
 }
 
 /**
+ * Serialize an error to the S.3 envelope shape `{type, message, code}`.
+ * @param error - The exception to envelope
+ * @returns Dict with the ERROR_ENVELOPE_KEYS triple
+ */
+export function errorEnvelope(error: NodeExecutionError): {
+  type: ErrorCategory;
+  message: string;
+  code: string;
+} {
+  return { type: error.category, message: error.message, code: error.errorCode };
+}
+
+/**
  * Error thrown when node execution exceeds timeout limit.
  */
 export class NodeTimeoutError extends NodeExecutionError {
+  readonly category: ErrorCategory = "timeout";
+
   readonly timeoutSeconds: number;
 
   /**
@@ -64,6 +115,8 @@ export class NodeTimeoutError extends NodeExecutionError {
  * Error thrown when node input validation fails.
  */
 export class NodeValidationError extends NodeExecutionError {
+  readonly category: ErrorCategory = "validation";
+
   readonly errors: Record<string, unknown>[];
 
   /**
@@ -96,6 +149,8 @@ export class NodeValidationError extends NodeExecutionError {
  * Error thrown when node output validation fails.
  */
 export class NodeOutputValidationError extends NodeExecutionError {
+  readonly category: ErrorCategory = "validation";
+
   readonly errors: Record<string, unknown>[];
 
   /**
@@ -128,6 +183,8 @@ export class NodeOutputValidationError extends NodeExecutionError {
  * Error thrown when file I/O operations fail.
  */
 export class NodeIOError extends NodeExecutionError {
+  readonly category: ErrorCategory = "transport";
+
   readonly path: string | null;
 
   /**
@@ -154,6 +211,8 @@ export class NodeIOError extends NodeExecutionError {
  * Error thrown when node configuration is invalid.
  */
 export class NodeConfigurationError extends NodeExecutionError {
+  readonly category: ErrorCategory = "lifecycle";
+
   /**
    * Creates a new NodeConfigurationError.
    * @param message - Error message
@@ -161,9 +220,15 @@ export class NodeConfigurationError extends NodeExecutionError {
    */
   constructor(
     message: string,
-    { details }: { details?: Record<string, unknown> } = {},
+    {
+      errorCode = "CONFIGURATION_ERROR",
+      details,
+    }: {
+      errorCode?: string;
+      details?: Record<string, unknown>;
+    } = {},
   ) {
-    super(message, { errorCode: "CONFIGURATION_ERROR", details });
+    super(message, { errorCode, details });
     this.name = "NodeConfigurationError";
   }
 }
@@ -198,6 +263,8 @@ export class WorkflowExecutionError extends NodeExecutionError {
  * Error thrown when workflow validation fails.
  */
 export class WorkflowValidationError extends NodeExecutionError {
+  readonly category: ErrorCategory = "validation";
+
   readonly errors: string[];
 
   /**

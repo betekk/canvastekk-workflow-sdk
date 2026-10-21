@@ -78,6 +78,17 @@ class NodeExecutionRequest(BaseModel):
             "None for local runs."
         ),
     )
+    capability: str | None = Field(
+        default=None,
+        description=(
+            "Run-scoped CDS capability token (#833, SDK#161 S.4) — opaque "
+            "HMAC string minted by the engine at dispatch. "
+            "Engine-controlled: /execute sets this exclusively from the "
+            "X-Node-Capability header — body-supplied values are stripped. "
+            "The SDK transports it, never parses it (CDS-side verification "
+            "is canvastekk-auth-library's). None for local runs."
+        ),
+    )
     callback_url: str | None = Field(
         default=None,
         description="For async execution - URL to POST result to when complete",

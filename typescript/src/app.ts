@@ -131,6 +131,14 @@ export function createNodeApp(
       return;
     }
     const execRequest = parsed.data;
+    // S.4 (SDK#161): the capability is engine-controlled — the
+    // X-Node-Capability header is the EXCLUSIVE source; body-supplied
+    // values are stripped so no caller can forge one.
+    const capabilityHeader = req.headers["x-node-capability"];
+    execRequest.capability =
+      typeof capabilityHeader === "string" && capabilityHeader.trim()
+        ? capabilityHeader.trim()
+        : null;
 
     const def = node.nodeDefinition;
     // DA-3499: hosts enforce the effective bound (budget capped by the hard

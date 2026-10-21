@@ -163,6 +163,19 @@ class ExecutionContext:
         return None
 
     @property
+    def capability(self) -> str | None:
+        """Run-scoped CDS capability token (#833, SDK#161 S.4).
+
+        Opaque HMAC string minted by the engine at dispatch — set
+        exclusively from the ``X-Node-Capability`` header on ``/execute``.
+        Transported for the node to present to CDS; never parsed here.
+        ``None`` for local runs and request-less contexts.
+        """
+        if self._request is not None:
+            return self._request.capability
+        return None
+
+    @property
     def output_dir(self) -> Path:
         """Local temp directory for outputs."""
         return self._output_dir

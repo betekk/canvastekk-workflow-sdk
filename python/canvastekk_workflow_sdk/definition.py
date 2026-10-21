@@ -525,7 +525,19 @@ class WorkflowNodeManifest(BaseModel):
         A field is considered a file input if it has `format: "file"` in the input_schema properties.
         """
         properties = self.input_schema.get("properties", {})
-        return [name for name, schema in properties.items() if schema.get("format") == "file"]
+
+        def _is_file(schema: dict[str, Any]) -> bool:
+            # S.1 (SDK#161): a file field is either a string with format
+            # "file" or an array whose items are.
+            if schema.get("format") == "file":
+                return True
+            return (
+                schema.get("type") == "array"
+                and isinstance(schema.get("items"), dict)
+                and schema["items"].get("format") == "file"
+            )
+
+        return [name for name, schema in properties.items() if _is_file(schema)]
 
     @property
     def has_file_inputs(self) -> bool:
@@ -555,6 +567,9 @@ class WorkflowNodeManifest(BaseModel):
         """
         properties = self.input_schema.get("properties", {})
         schema = properties.get(field_name, {})
+        # S.1 (SDK#161): array file fields carry their constraints on items.
+        if schema.get("type") == "array":
+            schema = schema.get("items", {})
 
         x_accept = schema.get("x-accept")
         if x_accept and file_path.suffix:
@@ -598,6 +613,15 @@ class WorkflowNodeManifest(BaseModel):
                         f"Use format 'file' instead. (See DA-894 migration guide.)"
                     )
 
+                items = prop_schema.get("items")
+                if field_type == "array" and isinstance(items, dict) and items.get("format") == "file":
+                    # S.1 (SDK#161): array-of-file fields are valid; items
+                    # must be strings (a file element is a presigned URL).
+                    if items.get("type") not in (None, "string"):
+                        raise ValueError(
+                            f"Field '{name}' is an array whose items have format 'file' "
+                            f"but items type is '{items.get('type')}' (expected 'string')."
+                        )
                 if field_format == "file" and field_type != "string":
                     raise ValueError(
                         f"Field '{name}' has format 'file' but type is '{field_type}'. "

@@ -1500,3 +1500,71 @@ class TestManifestContractStamping:
         client = TestClient(create_node_app(DeclaredHookNode()))
         routes = client.get("/manifest").json()["contract"]["routes"]
         assert "/hook" in routes
+
+
+class TestCapabilityAndVersionHeaderSdk161:
+    """S.4 capability passthrough + X-SDK-Version stamp (SDK#161)."""
+
+    def test_capability_header_reaches_request_and_context(self, echo_client):
+        captured = {}
+
+        class CaptureNode(EchoNode):
+            def execute(self, inputs, context):
+                captured["capability"] = context.capability
+                return super().execute(inputs, context)
+
+        from fastapi.testclient import TestClient
+
+        client = TestClient(create_node_app(CaptureNode()))
+        response = client.post(
+            "/execute",
+            json={"run_id": "r-cap", "node_id": "n-cap", "inputs": {}},
+            headers={"X-Node-Capability": "cap-token-123"},
+        )
+        assert response.status_code == 200
+        assert captured["capability"] == "cap-token-123"
+
+    def test_capability_body_supplied_is_stripped(self):
+        from fastapi.testclient import TestClient
+
+        captured = {}
+
+        class CaptureNode(EchoNode):
+            def execute(self, inputs, context):
+                captured["capability"] = context.capability
+                return super().execute(inputs, context)
+
+        client = TestClient(create_node_app(CaptureNode()))
+        response = client.post(
+            "/execute",
+            json={
+                "run_id": "r-cap2",
+                "node_id": "n-cap2",
+                "inputs": {},
+                "capability": "forged-token",
+            },
+        )
+        assert response.status_code == 200
+        assert captured["capability"] is None
+
+    def test_capability_absent_is_none(self):
+        from fastapi.testclient import TestClient
+
+        captured = {}
+
+        class CaptureNode(EchoNode):
+            def execute(self, inputs, context):
+                captured["capability"] = context.capability
+                return super().execute(inputs, context)
+
+        client = TestClient(create_node_app(CaptureNode()))
+        client.post(
+            "/execute", json={"run_id": "r-cap3", "node_id": "n-cap3", "inputs": {}}
+        )
+        assert captured["capability"] is None
+
+    def test_sdk_version_header_stamped(self, echo_client):
+        import canvastekk_workflow_sdk as sdk
+
+        response = echo_client.get("/health")
+        assert response.headers.get("X-SDK-Version") == sdk.__version__

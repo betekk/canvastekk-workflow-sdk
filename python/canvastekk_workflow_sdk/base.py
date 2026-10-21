@@ -32,6 +32,9 @@ from canvastekk_workflow_sdk._url import (
 from canvastekk_workflow_sdk.context import ExecutionContext, execution_context_var
 from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 from canvastekk_workflow_sdk.exceptions import (
+    IO_SUBCODE_DOWNLOAD_FAILED,
+    IO_SUBCODE_SIZE_EXCEEDED,
+    IO_SUBCODE_URL_POLICY_BLOCKED,
     NodeConfigurationError,
     NodeExecutionError,
     NodeIOError,
@@ -297,15 +300,24 @@ class BaseNode(ABC):
                 except httpx.TimeoutException as exc:
                     raise NodeIOError(f"Timeout downloading file for field '{field_name}': {exc}") from exc
                 except httpx.HTTPError as exc:
-                    raise NodeIOError(f"Failed to download file for field '{field_name}': {exc}") from exc
+                    raise NodeIOError(
+                        f"Failed to download file for field '{field_name}': {exc}",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    ) from exc
 
                 if resp.status_code in (301, 302, 303, 307, 308):
                     hops += 1
                     if hops > MAX_REDIRECT_HOPS:
-                        raise NodeIOError(f"Too many redirects downloading file for field '{field_name}'")
+                        raise NodeIOError(
+                        f"Too many redirects downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
                     next_url = resp.headers.get("location")
                     if not next_url:
-                        raise NodeIOError(f"Redirect without Location header downloading file for field '{field_name}'")
+                        raise NodeIOError(
+                        f"Redirect without Location header downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
                     current_url = validate_external_url(
                         next_url if "://" in next_url else str(urljoin(current_url, next_url))
                     )
@@ -313,7 +325,10 @@ class BaseNode(ABC):
                     continue
 
                 if resp.status_code >= 400:
-                    raise NodeIOError(f"HTTP {resp.status_code} downloading file for field '{field_name}'")
+                    raise NodeIOError(
+                        f"HTTP {resp.status_code} downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
 
                 local_path = context.downloads_dir / filename
 
@@ -326,7 +341,8 @@ class BaseNode(ABC):
                 if content_length and content_length.isdigit():
                     if int(content_length) > max_bytes:
                         raise NodeIOError(
-                            f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)"
+                            f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)",
+                            details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
                         )
 
                 try:
@@ -338,7 +354,8 @@ class BaseNode(ABC):
                             running += len(chunk)
                             if running > max_bytes:
                                 raise NodeIOError(
-                                    f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)"
+                                    f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)",
+                                    details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
                                 )
                             if time.monotonic() > deadline:
                                 raise NodeIOError(f"Download deadline exceeded for field '{field_name}'")
@@ -348,7 +365,10 @@ class BaseNode(ABC):
                     raise
                 return local_path
         except UrlPolicyError as exc:
-            raise NodeIOError(f"Blocked URL for field '{field_name}': {exc}") from exc
+            raise NodeIOError(
+                f"Blocked URL for field '{field_name}': {exc}",
+                details={"sub_code": IO_SUBCODE_URL_POLICY_BLOCKED},
+            ) from exc
 
     def _prepare_file_inputs(
         self,
@@ -377,6 +397,44 @@ class BaseNode(ABC):
         try:
             for field_name in self.definition.file_input_fields:
                 value = inputs.get(field_name)
+
+                if isinstance(value, list):
+                    # S.1 (SDK#161): array file inputs — every URL element is
+                    # downloaded, validated, and replaced by its local path;
+                    # non-URL elements pass through untouched (mirrors the
+                    # single-value skip rule). Failure cleans every file of
+                    # the run via the shared ``downloaded`` registry.
+                    entries: list[dict[str, Any]] = []
+                    new_elements: list[Any] = []
+                    for element in value:
+                        if (
+                            isinstance(element, str)
+                            and element.strip()
+                            and element.startswith(("http://", "https://"))
+                        ):
+                            context.report_progress(0.05, f"Downloading {field_name}")
+                            local_path = self._download_one(field_name, element, context)
+                            downloaded.append(local_path)
+                            self.definition.validate_file_input(field_name, local_path)
+                            file_size = local_path.stat().st_size
+                            entries.append(
+                                {
+                                    "original_url": element,
+                                    "local_path": str(local_path),
+                                    "size_bytes": file_size,
+                                }
+                            )
+                            new_elements.append(str(local_path))
+                        else:
+                            new_elements.append(element)
+                    if entries:
+                        context.metadata[field_name] = entries
+                        inputs[field_name] = new_elements
+                        context.report_progress(
+                            0.1,
+                            f"Downloaded {len(entries)} element(s) of {field_name}",
+                        )
+                    continue
 
                 if value is None or not isinstance(value, str) or not value.strip():
                     continue
@@ -433,9 +491,17 @@ class BaseNode(ABC):
             return
         replacement = dep.replacement_slug or "unspecified"
         if dep.sunset_date is not None and datetime.now(UTC).date() > dep.sunset_date:
+            # S.2 (SDK#161): sunset is structured, not message-only — the
+            # lifecycle category plus NODE_SUNSET code and machine-readable
+            # details let consumers react without parsing prose.
             raise NodeConfigurationError(
                 f"Node '{self.definition.slug}' was sunset on {dep.sunset_date.isoformat()} "
-                f"and refuses to run; migrate to '{replacement}' ({dep.notice})"
+                f"and refuses to run; migrate to '{replacement}' ({dep.notice})",
+                error_code="NODE_SUNSET",
+                details={
+                    "sunset_date": dep.sunset_date.isoformat(),
+                    "replacement_slug": replacement,
+                },
             )
         logger.warning(
             "Node '%s' is deprecated (since %s): %s — migrate to '%s'",
