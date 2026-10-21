@@ -1506,8 +1506,6 @@ class TestCapabilityAndVersionHeaderSdk161:
     """S.4 capability passthrough + X-SDK-Version stamp (SDK#161)."""
 
     def test_capability_header_reaches_request_and_context(self, echo_client):
-        import canvastekk_workflow_sdk as sdk
-
         captured = {}
 
         class CaptureNode(EchoNode):

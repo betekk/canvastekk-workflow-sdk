@@ -81,9 +81,10 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
 
 ### Phase 5: verification gate (full tier — ticket exit gate, BOTH languages)
 
-- [ ] **5.1** Full gate: python (pytest + ruff) AND typescript (vitest + eslint + `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json` + `tsup` build); grep proves zero CDS-client code (AC3); append `tier=full` memo. Tagging rides the two-lane release workflow on merge (dev counter → prod final) — no hand-bump in this PR
+- [x] **5.1** Full gate: python (pytest + ruff) AND typescript (vitest + eslint + `tsc --noEmit` + `tsc --noEmit -p tsconfig.tests.json` + `tsup` build); grep proves zero CDS-client code (AC3); append `tier=full` memo. Tagging rides the two-lane release workflow on merge (dev counter → prod final) — no hand-bump in this PR
     — **Why:** the exit gate is unconditional; AC3 needs a mechanical check, not a claim
     — **Done when:** all gates green on the final tree; `grep -ri "cds" python/canvastekk_workflow_sdk typescript/src` shows no client surface (only doc mentions if any); memo recorded
+    — **Done:** py 945 + ruff clean; ts 430 + eslint + tsc×2 + tsup build clean; AC3 grep: only docstring/comment mentions (capability docs + multipart.py's historical porting note); fixes: 1 unused import (ruff)
     — **Consumers affected:** none (verification)
 
 ## S3 mechanism audit (pre-completion, 2026-10-21 — verified in canvastekk-workflow-engine@origin/dev)
@@ -118,3 +119,4 @@ Question: does S.1 match how definitions actually deliver S3 files, and what is 
 
 | Phase | Commit | Gate |
 |-------|--------|------|
+| 5 | cd792c7 | GATE cd792c7 tier=full lint=t(py ruff+ts eslint) typecheck=t(tsc x2) build=t(tsup) unit=t(py 945+ts 430) e2e=n.a |
