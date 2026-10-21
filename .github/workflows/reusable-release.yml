@@ -171,7 +171,17 @@ jobs:
           # version 0.0.0 and proposes an already-taken tag ("Reference
           # already exists"). fetch-depth 0 on checkout does not fetch tags.
           fetch_all_tags: true
-          pre_release_suffix: ${{ steps.prerelease.outputs.suffix }}
+          # v6.2 renamed the inputs: `pre_release_suffix` no longer exists
+          # (it was silently IGNORED — the warning is buried in the Release
+          # job log — so prod fell out of the default release_branches
+          # (master,main), was treated as a PRE-RELEASE branch, and got
+          # `-prod.0` counter tags; poetry then rejected the version stamp,
+          # killing the finals publish). The correct spelling:
+          # release_branches names the final-cutting lanes; every other
+          # branch is a prerelease lane whose suffix IS its branch name
+          # (dev -> -dev.N, uat -> -uat.N, beta -> -beta.N — same counters
+          # as before, now by design).
+          release_branches: prod
           tag_prefix: ${{ inputs.tag_prefix }}
           # On prod the PR label drives the bump; on dev/uat/beta we only
           # ever increment the prerelease counter, so patch is a safe no-op base.
