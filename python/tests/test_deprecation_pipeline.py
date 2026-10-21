@@ -14,7 +14,13 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
+from canvastekk_workflow_sdk import (
+    BaseNode,
+    ExecutionContext,
+    NodeConfigurationError,
+    NodeExecutionRequest,
+    WorkflowNodeManifest,
+)
 from canvastekk_workflow_sdk.definition import DeprecationInfo
 from canvastekk_workflow_sdk.registry import build_registry_payload
 
@@ -120,6 +126,26 @@ class TestRuntimeSunsetLifecycle:
         error_text = str(response.error)
         assert "was sunset" in error_text
         assert "cds-file" in error_text
+
+    def test_sunset_refusal_is_structured_sdk161(self) -> None:
+        """S.2: sunset refusal carries NODE_SUNSET + machine-readable details."""
+        sunset_date = datetime.now(UTC).date() - timedelta(days=1)
+        node = _make_node(
+            DeprecationInfo(
+                deprecated_at=date(2025, 1, 1),
+                sunset_date=sunset_date,
+                replacement_slug="cds-file",
+                notice="Sunset yesterday.",
+            )
+        )
+        try:
+            node._check_deprecation_lifecycle()
+            raise AssertionError("sunset must refuse")
+        except NodeConfigurationError as exc:
+            assert exc.error_code == "NODE_SUNSET"
+            assert exc.category == "lifecycle"
+            assert exc.details["sunset_date"] == sunset_date.isoformat()
+            assert exc.details["replacement_slug"] == "cds-file"
 
     def test_sunset_day_is_inclusive_node_still_runs(self) -> None:
         """The sunset date itself is the last day of service (RFC 8594 reading)."""

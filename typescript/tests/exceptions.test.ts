@@ -11,6 +11,10 @@ import {
   RegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
+  ERROR_CATEGORIES,
+  ERROR_ENVELOPE_KEYS,
+  IO_SUBCODE_DOWNLOAD_FAILED,
+  errorEnvelope,
 } from "../src/exceptions.js";
 
 describe("NodeExecutionError", () => {
@@ -21,6 +25,7 @@ describe("NodeExecutionError", () => {
     expect(err.details).toEqual({});
     expect(err.toDict()).toEqual({
       error_code: "EXECUTION_ERROR",
+      category: "domain",
       message: "something broke",
       details: {},
     });
@@ -159,5 +164,70 @@ describe("getHttpStatusForError", () => {
   it("returns 500 for unknown error code", () => {
     const err = new NodeExecutionError("x", { errorCode: "UNKNOWN" });
     expect(getHttpStatusForError(err)).toBe(500);
+  });
+});
+
+describe("error taxonomy (S.2, SDK#161)", () => {
+  it("ERROR_CATEGORIES is the five axes", () => {
+    expect(ERROR_CATEGORIES).toEqual([
+      "transport",
+      "validation",
+      "domain",
+      "timeout",
+      "lifecycle",
+    ]);
+  });
+
+  it("subclass category mapping", () => {
+    expect(new NodeTimeoutError(10).category).toBe("timeout");
+    expect(new NodeValidationError("x").category).toBe("validation");
+    expect(new NodeIOError("x").category).toBe("transport");
+    expect(new NodeConfigurationError("x").category).toBe("lifecycle");
+    expect(new NodeOutputValidationError("x").category).toBe("validation");
+    expect(new WorkflowValidationError(["bad"]).category).toBe("validation");
+  });
+
+  it("base defaults to domain", () => {
+    expect(new NodeExecutionError("boom").category).toBe("domain");
+  });
+
+  it("toDict carries category", () => {
+    const payload = new NodeIOError("download failed").toDict();
+    expect(payload.category).toBe("transport");
+    expect(payload.error_code).toBe("IO_ERROR");
+  });
+});
+
+describe("error envelope (S.3, SDK#161)", () => {
+  it("ERROR_ENVELOPE_KEYS constant", () => {
+    expect(ERROR_ENVELOPE_KEYS).toEqual(["type", "message", "code"]);
+  });
+
+  it("envelope triple", () => {
+    expect(errorEnvelope(new NodeIOError("download failed"))).toEqual({
+      type: "transport",
+      message: "download failed",
+      code: "IO_ERROR",
+    });
+  });
+
+  it("envelope on subcoded error", () => {
+    const err = new NodeIOError("download failed", {
+      details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED },
+    });
+    expect(errorEnvelope(err).code).toBe("IO_ERROR");
+    expect(err.details.sub_code).toBe("IO_DOWNLOAD_FAILED");
+  });
+});
+
+describe("structured sunset (S.2, SDK#161)", () => {
+  it("sunset refusal carries NODE_SUNSET + details", () => {
+    const err = new NodeConfigurationError("was sunset", {
+      errorCode: "NODE_SUNSET",
+      details: { sunset_date: "2026-01-01", replacement_slug: "next" },
+    });
+    expect(err.errorCode).toBe("NODE_SUNSET");
+    expect(err.category).toBe("lifecycle");
+    expect(err.details.replacement_slug).toBe("next");
   });
 });

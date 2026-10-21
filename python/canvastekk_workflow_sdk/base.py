@@ -433,9 +433,17 @@ class BaseNode(ABC):
             return
         replacement = dep.replacement_slug or "unspecified"
         if dep.sunset_date is not None and datetime.now(UTC).date() > dep.sunset_date:
+            # S.2 (SDK#161): sunset is structured, not message-only — the
+            # lifecycle category plus NODE_SUNSET code and machine-readable
+            # details let consumers react without parsing prose.
             raise NodeConfigurationError(
                 f"Node '{self.definition.slug}' was sunset on {dep.sunset_date.isoformat()} "
-                f"and refuses to run; migrate to '{replacement}' ({dep.notice})"
+                f"and refuses to run; migrate to '{replacement}' ({dep.notice})",
+                error_code="NODE_SUNSET",
+                details={
+                    "sunset_date": dep.sunset_date.isoformat(),
+                    "replacement_slug": replacement,
+                },
             )
         logger.warning(
             "Node '%s' is deprecated (since %s): %s — migrate to '%s'",

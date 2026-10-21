@@ -43,7 +43,14 @@ export {
   RegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
+  ERROR_CATEGORIES,
+  ERROR_ENVELOPE_KEYS,
+  IO_SUBCODE_DOWNLOAD_FAILED,
+  IO_SUBCODE_SIZE_EXCEEDED,
+  IO_SUBCODE_URL_POLICY_BLOCKED,
+  errorEnvelope,
 } from "./exceptions.js";
+export type { ErrorCategory } from "./exceptions.js";
 export {
   NodeExecutionRequestSchema,
   type NodeExecutionRequest,

@@ -29,13 +29,15 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
 
 ### Phase 1: S.2 taxonomy + S.3 envelope (both languages)
 
-- [ ] **1.1** Add `ERROR_CATEGORIES = ("transport", "validation", "domain", "timeout", "lifecycle")` and a `category` property to `NodeExecutionError` (subclass mapping: `NodeIOError`→transport, `NodeValidationError`/`NodeOutputValidationError`/`WorkflowValidationError`→validation, `NodeTimeoutError`→timeout, `NodeConfigurationError`→lifecycle; uncaught/bare exceptions the app wraps → domain); include `category` in `to_dict()`; sunset refusal (`_check_deprecation_lifecycle`) raises with structured `error_code="NODE_SUNSET"` + `details={"sunset_date", "replacement_slug"}`; add `error_envelope(exc) -> {"type","message","code"}` + `ERROR_ENVELOPE_KEYS` constant
+- [x] **1.1** Add `ERROR_CATEGORIES = ("transport", "validation", "domain", "timeout", "lifecycle")` and a `category` property to `NodeExecutionError` (subclass mapping: `NodeIOError`→transport, `NodeValidationError`/`NodeOutputValidationError`/`WorkflowValidationError`→validation, `NodeTimeoutError`→timeout, `NodeConfigurationError`→lifecycle; uncaught/bare exceptions the app wraps → domain); include `category` in `to_dict()`; sunset refusal (`_check_deprecation_lifecycle`) raises with structured `error_code="NODE_SUNSET"` + `details={"sunset_date", "replacement_slug"}`; add `error_envelope(exc) -> {"type","message","code"}` + `ERROR_ENVELOPE_KEYS` constant
     — **Why:** the epic's error architecture needs one taxonomy registry and one envelope shape shared by engine (D.2), nodes (D.4), and frontend (envelope rows)
     — **Done when:** python tests assert the five category mappings, bare-Exception→domain wrap, the envelope triple, and the structured sunset code; ruff green
+    — **Done:** taxonomy+envelope+sunset+IO_* constants+exports; 37 tests green, ruff clean; files: exceptions.py, base.py, __init__.py, tests; fixes: category-before-docstring stamp bug (fixed pre-gate), 2 stale to_dict expectations updated
     — **Consumers affected:** CWE#852, CWN#549/CISA#308/CRS#175/CPCA#309, CFN#2080
-- [ ] **1.2** Mirror 1.1 in TypeScript (`exceptions.ts`: `ERROR_CATEGORIES`, `category` getter, envelope helper, sunset structure in the deprecation pipeline)
+- [x] **1.2** Mirror 1.1 in TypeScript (`exceptions.ts`: `ERROR_CATEGORIES`, `category` getter, envelope helper, sunset structure in the deprecation pipeline)
     — **Why:** AC1 — both languages, one contract
     — **Done when:** vitest mirrors the python assertions; eslint + tsc green
+    — **Done:** mirrored constants/getters/envelope/sunset; 34 tests green, eslint+tsc×2 clean; files: exceptions.ts, base-node.ts, index.ts, tests; fixes: 1 stale toDict expectation updated
     — **Consumers affected:** same as 1.1 (CISA apps/node consumes TS)
 
 ### Phase 2: S.5 NodeExecutionStatus + S.6 IO_* sub-codes (both languages)

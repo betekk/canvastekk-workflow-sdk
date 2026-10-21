@@ -9,9 +9,39 @@ from __future__ import annotations
 
 from typing import Any
 
+# S.2 error taxonomy (SDK#161): every SDK exception classifies into exactly
+# one category. Engine-minted codes join the same registry — the engine's
+# D.2 synthesized envelopes carry ``type`` values from this tuple.
+ERROR_CATEGORIES: tuple[str, ...] = (
+    "transport",
+    "validation",
+    "domain",
+    "timeout",
+    "lifecycle",
+)
+
+# S.3 error envelope (SDK#161): the one error shape the engine synthesizes on
+# failed node results (D.2), frontend ERROR rows render (CFN#2080), and node
+# repos raise against (D.4). ``type`` = taxonomy category, ``code`` =
+# structured error code (IO_* sub-codes included).
+ERROR_ENVELOPE_KEYS: tuple[str, ...] = ("type", "message", "code")
+
+# S.6 transport sub-codes (SDK#161): machine-readable reasons carried in
+# ``details["sub_code"]`` by the SDK's download paths (both languages).
+IO_SUBCODE_DOWNLOAD_FAILED = "IO_DOWNLOAD_FAILED"
+IO_SUBCODE_URL_POLICY_BLOCKED = "IO_URL_POLICY_BLOCKED"
+IO_SUBCODE_SIZE_EXCEEDED = "IO_SIZE_EXCEEDED"
+
 
 class NodeExecutionError(Exception):
-    """Base exception for all node execution errors."""
+    """Base exception for all node execution errors.
+
+    Unclassified errors (a bare ``NodeExecutionError`` or an uncaught
+    exception the app wraps) are ``domain`` — the node's own logic failed,
+    not the transport, validation, timeout, or lifecycle machinery.
+    """
+
+    category: str = "domain"
 
     def __init__(
         self,
@@ -36,17 +66,36 @@ class NodeExecutionError(Exception):
         """Serialize the error to a JSON-friendly dict.
 
         Returns:
-            Dict with ``error_code``, ``message``, and ``details`` keys.
+            Dict with ``error_code``, ``category``, ``message``, and
+            ``details`` keys.
         """
         return {
             "error_code": self.error_code,
+            "category": self.category,
             "message": self.message,
             "details": self.details,
         }
 
 
+def error_envelope(error: NodeExecutionError) -> dict[str, str]:
+    """Serialize an error to the S.3 envelope shape ``{type, message, code}``.
+
+    Args:
+        error: The exception to envelope.
+
+    Returns:
+        Dict with the ``ERROR_ENVELOPE_KEYS`` triple.
+    """
+    return {
+        "type": error.category,
+        "message": error.message,
+        "code": error.error_code,
+    }
+
+
 class NodeTimeoutError(NodeExecutionError):
     """Raised when node execution exceeds the configured timeout."""
+    category = "timeout"
 
     def __init__(
         self,
@@ -70,6 +119,7 @@ class NodeTimeoutError(NodeExecutionError):
 
 class NodeValidationError(NodeExecutionError):
     """Raised when input validation against JSON Schema fails."""
+    category = "validation"
 
     def __init__(
         self,
@@ -105,6 +155,7 @@ class NodeValidationError(NodeExecutionError):
 
 class NodeIOError(NodeExecutionError):
     """Raised when file I/O operations fail."""
+    category = "transport"
 
     def __init__(
         self,
@@ -133,28 +184,33 @@ class NodeIOError(NodeExecutionError):
 
 class NodeConfigurationError(NodeExecutionError):
     """Raised when node configuration is invalid."""
+    category = "lifecycle"
 
     def __init__(
         self,
         message: str,
         *,
+        error_code: str = "CONFIGURATION_ERROR",
         details: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the configuration exception.
 
         Args:
             message: Human-readable error message.
+            error_code: Structured error code (``NODE_SUNSET`` for
+                post-sunset refusals, S.2).
             details: Additional error context.
         """
         super().__init__(
             message,
-            error_code="CONFIGURATION_ERROR",
+            error_code=error_code,
             details=details or {},
         )
 
 
 class WorkflowExecutionError(NodeExecutionError):
     """Raised when local workflow execution fails."""
+    category = "domain"
 
     def __init__(
         self,
@@ -183,6 +239,7 @@ class WorkflowExecutionError(NodeExecutionError):
 
 class WorkflowValidationError(NodeExecutionError):
     """Raised when workflow spec validation fails."""
+    category = "validation"
 
     def __init__(
         self,
@@ -218,6 +275,7 @@ class WorkflowValidationError(NodeExecutionError):
 
 class NodeOutputValidationError(NodeExecutionError):
     """Raised when output validation against JSON Schema fails."""
+    category = "validation"
 
     def __init__(
         self,

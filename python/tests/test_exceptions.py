@@ -28,7 +28,12 @@ class TestNodeExecutionError:
     def test_to_dict(self) -> None:
         err = NodeExecutionError("msg", error_code="TEST", details={"a": 1})
         d = err.to_dict()
-        assert d == {"error_code": "TEST", "message": "msg", "details": {"a": 1}}
+        assert d == {
+            "error_code": "TEST",
+            "category": "domain",
+            "message": "msg",
+            "details": {"a": 1},
+        }
 
     def test_is_exception(self) -> None:
         with pytest.raises(NodeExecutionError):
@@ -67,6 +72,7 @@ class TestNodeTimeoutError:
         assert err.details == details
         assert err.to_dict() == {
             "error_code": "TIMEOUT",
+            "category": "timeout",
             "message": "Node execution timed out after 1710s",
             "details": details,
         }
@@ -128,3 +134,72 @@ class TestGetHttpStatusCode:
 
     def test_unknown_defaults_to_500(self) -> None:
         assert get_http_status_for_error(NodeExecutionError("x")) == 500
+
+
+class TestErrorTaxonomySdk161:
+    """S.2 (SDK#161): every exception classifies into exactly one category."""
+
+    def test_categories_registry_is_the_five_axes(self) -> None:
+        from canvastekk_workflow_sdk.exceptions import ERROR_CATEGORIES
+
+        assert ERROR_CATEGORIES == (
+            "transport",
+            "validation",
+            "domain",
+            "timeout",
+            "lifecycle",
+        )
+
+    def test_subclass_category_mapping(self) -> None:
+        assert NodeTimeoutError(10).category == "timeout"
+        assert NodeValidationError("x").category == "validation"
+        assert NodeIOError("x").category == "transport"
+        assert NodeConfigurationError("x").category == "lifecycle"
+
+    def test_base_defaults_to_domain(self) -> None:
+        # Bare/unclassified errors (including the app's wrap of uncaught
+        # exceptions) are domain — the node's own logic failed.
+        assert NodeExecutionError("boom").category == "domain"
+
+    def test_to_dict_carries_category(self) -> None:
+        payload = NodeIOError("download failed").to_dict()
+        assert payload["category"] == "transport"
+        assert payload["error_code"] == "IO_ERROR"
+
+    def test_workflow_exceptions_classified(self) -> None:
+        from canvastekk_workflow_sdk.exceptions import (
+            NodeOutputValidationError,
+            WorkflowValidationError,
+        )
+
+        assert NodeOutputValidationError("x").category == "validation"
+        assert WorkflowValidationError(["bad"]).category == "validation"
+
+
+class TestErrorEnvelopeSdk161:
+    """S.3 (SDK#161): the one {type, message, code} envelope shape."""
+
+    def test_envelope_keys_constant(self) -> None:
+        from canvastekk_workflow_sdk.exceptions import ERROR_ENVELOPE_KEYS
+
+        assert ERROR_ENVELOPE_KEYS == ("type", "message", "code")
+
+    def test_envelope_triple(self) -> None:
+        from canvastekk_workflow_sdk import error_envelope
+
+        envelope = error_envelope(NodeIOError("download failed"))
+        assert envelope == {
+            "type": "transport",
+            "message": "download failed",
+            "code": "IO_ERROR",
+        }
+
+    def test_envelope_on_subcoded_error(self) -> None:
+        from canvastekk_workflow_sdk import error_envelope
+        from canvastekk_workflow_sdk.exceptions import IO_SUBCODE_DOWNLOAD_FAILED
+
+        err = NodeIOError(
+            "download failed", details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED}
+        )
+        assert error_envelope(err)["code"] == "IO_ERROR"
+        assert err.details["sub_code"] == "IO_DOWNLOAD_FAILED"

@@ -420,8 +420,18 @@ export abstract class BaseNode {
     if (dep.sunset_date) {
       const today = new Date().toISOString().slice(0, 10);
       if (today > dep.sunset_date) {
+        // S.2 (SDK#161): sunset is structured, not message-only — the
+        // lifecycle category plus NODE_SUNSET code and machine-readable
+        // details let consumers react without parsing prose.
         throw new NodeConfigurationError(
           `Node '${name}' was sunset on ${dep.sunset_date} and refuses to run; migrate to '${replacement}' (${dep.notice})`,
+          {
+            errorCode: "NODE_SUNSET",
+            details: {
+              sunset_date: dep.sunset_date,
+              replacement_slug: replacement,
+            },
+          },
         );
       }
     }
