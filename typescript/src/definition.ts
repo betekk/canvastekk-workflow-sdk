@@ -124,6 +124,17 @@ function validateFileFieldFormats(
       );
     }
 
+    const items = propSchema.items as Record<string, unknown> | undefined;
+    if (fieldType === "array" && items?.format === "file") {
+      // S.1 (SDK#161): array-of-file fields are valid; items must be
+      // strings (a file element is a presigned URL).
+      if (items.type !== undefined && items.type !== "string") {
+        throw new Error(
+          `Field '${name}' is an array whose items have format 'file' but items type is '${items.type}' (expected 'string').`,
+        );
+      }
+    }
+
     if (fieldFormat === "file" && fieldType !== "string") {
       throw new Error(
         `Field '${name}' has format 'file' but type is '${fieldType}'. File fields must have type 'string'.`,
@@ -390,8 +401,15 @@ export function getFileInputFields(def: WorkflowNodeManifest): string[] {
     string,
     Record<string, unknown>
   >;
+  const isFileField = (schema: Record<string, unknown>): boolean => {
+    // S.1 (SDK#161): a file field is either a string with format "file"
+    // or an array whose items are.
+    if (schema.format === "file") return true;
+    const items = schema.items as Record<string, unknown> | undefined;
+    return schema.type === "array" && items !== undefined && items.format === "file";
+  };
   return Object.entries(properties)
-    .filter(([, schema]) => schema.format === "file")
+    .filter(([, schema]) => isFileField(schema))
     .map(([name]) => name);
 }
 
@@ -435,7 +453,12 @@ export function validateFileInput(
     string,
     Record<string, unknown>
   >;
-  const schema = properties[fieldName] ?? {};
+  const propSchema = properties[fieldName] ?? {};
+  // S.1 (SDK#161): array file fields carry their constraints on items.
+  const schema =
+    propSchema.type === "array"
+      ? ((propSchema.items as Record<string, unknown>) ?? {})
+      : propSchema;
 
   const xAccept = schema["x-accept"] as string[] | undefined;
   if (xAccept) {

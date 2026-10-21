@@ -932,3 +932,179 @@ class TestIoSubcodesSdk161:
         assert IO_SUBCODE_DOWNLOAD_FAILED == "IO_DOWNLOAD_FAILED"
         assert IO_SUBCODE_URL_POLICY_BLOCKED == "IO_URL_POLICY_BLOCKED"
         assert IO_SUBCODE_SIZE_EXCEEDED == "IO_SIZE_EXCEEDED"
+
+
+class ArrayFileInputNode(BaseNode):
+    """S.1 (SDK#161): an array-of-file input field."""
+
+    definition = WorkflowNodeManifest(
+        id="array-file-v1.0.0",
+        name="array-file",
+        version="1.0.0",
+        title="Array File",
+        description="Accepts an array of file inputs",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "parts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "file",
+                        "x-accept": [".ply"],
+                        "x-maxSizeBytes": 10485760,
+                    },
+                },
+            },
+            "required": ["parts"],
+        },
+        output_schema={"type": "object"},
+    )
+
+    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        return {"parts": [Path(p).stat().st_size for p in inputs["parts"] if isinstance(p, str) and p.startswith("/")]}
+
+
+class TestArrayFileInputsSdk161:
+    """S.1: array file inputs download element-wise."""
+
+    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    def test_array_urls_downloaded_element_wise(self, mock_stream):
+        payloads = {
+            "https://s3.example.com/a.ply": b"AAAA",
+            "https://s3.example.com/b.ply": b"BBBBBB",
+        }
+
+        def _serve(url, *args, **kwargs):
+            return _make_mock_stream(
+                payloads[url],
+                {"content-disposition": f'attachment; filename="{url.rsplit("/", 1)[1]}"'},
+            )
+
+        mock_stream.side_effect = _serve
+        response = ArrayFileInputNode().run(
+            NodeExecutionRequest(
+                run_id="r-arr",
+                node_id="n-arr",
+                inputs={
+                    "parts": [
+                        "https://s3.example.com/a.ply",
+                        "https://s3.example.com/b.ply",
+                    ]
+                },
+            )
+        )
+        assert response.status == "pass"
+        assert sorted(response.outputs["parts"]) == [4, 6]
+
+    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    def test_array_metadata_is_per_element_list(self, mock_stream):
+        mock_stream.return_value = _make_mock_stream(
+            b"XX", {"content-disposition": 'attachment; filename="a.ply"'}
+        )
+        captured = {}
+
+        class CaptureNode(ArrayFileInputNode):
+            def execute(self, inputs, context):
+                captured.update(context.metadata)
+                return super().execute(inputs, context)
+
+        CaptureNode().run(
+            NodeExecutionRequest(
+                run_id="r-meta",
+                node_id="n-meta",
+                inputs={"parts": ["https://s3.example.com/a.ply", "https://s3.example.com/a.ply"]},
+            )
+        )
+        entries = captured["parts"]
+        assert isinstance(entries, list) and len(entries) == 2
+        assert all(e["original_url"] == "https://s3.example.com/a.ply" for e in entries)
+        assert all("local_path" in e and e["size_bytes"] == 2 for e in entries)
+
+    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    def test_mixed_elements_pass_non_urls_through(self, mock_stream):
+        mock_stream.return_value = _make_mock_stream(
+            b"ZZZ", {"content-disposition": 'attachment; filename="a.ply"'}
+        )
+        captured = {}
+
+        class CaptureNode(ArrayFileInputNode):
+            def execute(self, inputs, context):
+                captured.update(inputs)
+                return super().execute(inputs, context)
+
+        CaptureNode().run(
+            NodeExecutionRequest(
+                run_id="r-mix",
+                node_id="n-mix",
+                inputs={"parts": ["https://s3.example.com/a.ply", "already-local.ply"]},
+            )
+        )
+        parts = captured["parts"]
+        assert parts[0].startswith("/")  # downloaded to local path
+        assert parts[1] == "already-local.ply"  # non-URL passes through
+
+    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    def test_mid_list_failure_cleans_downloads(self, mock_stream):
+        payloads = {
+            "https://s3.example.com/a.ply": b"AAAA",
+        }
+
+        def _serve(url, *args, **kwargs):
+            if url in payloads:
+                return _make_mock_stream(
+                    payloads[url],
+                    {"content-disposition": 'attachment; filename="a.ply"'},
+                )
+            raise httpx.ConnectError("boom")
+
+        mock_stream.side_effect = _serve
+        node = ArrayFileInputNode()
+        first_downloads: list[Path] = []
+        real_download = node._download_one
+
+        def recording_download(field_name, url, context):
+            path = real_download(field_name, url, context)
+            first_downloads.append(path)
+            return path
+
+        with patch.object(node, "_download_one", side_effect=recording_download):
+            response = node.run(
+                NodeExecutionRequest(
+                    run_id="r-fail",
+                    node_id="n-fail",
+                    inputs={
+                        "parts": [
+                            "https://s3.example.com/a.ply",
+                            "https://s3.example.com/dead.ply",
+                        ]
+                    },
+                )
+            )
+        assert response.status == "fail"
+        assert response.error_type == "NodeIOError"
+        # the first element's download was cleaned up with the failed run
+        assert first_downloads, "element 1 must have downloaded before the failure"
+        assert not first_downloads[0].exists(), (
+            f"expected cleanup of {first_downloads[0]}"
+        )
+
+    def test_empty_array_passes_through(self):
+        captured = {}
+
+        class CaptureNode(ArrayFileInputNode):
+            def execute(self, inputs, context):
+                captured.update(inputs)
+                return super().execute(inputs, context)
+
+        CaptureNode().run(
+            NodeExecutionRequest(
+                run_id="r-empty", node_id="n-empty", inputs={"parts": []}
+            )
+        )
+        assert captured["parts"] == []
+
+    def test_manifest_accepts_array_of_file(self):
+        # constructing the node at all proves the manifest validator accepts
+        # type: array + items.format: file (S.1)
+        assert "parts" in ArrayFileInputNode().definition.file_input_fields

@@ -622,3 +622,124 @@ describe("run() dry-run (D10 #111)", () => {
     expect(resp.error_code).toBe("VALIDATION_ERROR");
   });
 });
+
+describe("array file inputs (S.1, SDK#161)", () => {
+  class ArrayDownloadNode extends BaseNode {
+    definition: WorkflowNodeManifest = {
+      slug: "array-download",
+      version: "1.0.0",
+      name: "Array Download",
+      description: "Downloads an array of file inputs",
+      input_schema: {
+        type: "object",
+        properties: {
+          parts: {
+            type: "array",
+            items: {
+              type: "string",
+              format: "file",
+              "x-accept": [".ply"],
+              "x-maxSizeBytes": 10000,
+            },
+          },
+        },
+      },
+      output_schema: { type: "object" },
+    };
+
+    execute(inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+      return {
+        sizes: (inputs.parts as string[]).map((p) =>
+          p.startsWith("/") ? readFileSync(p, "utf8").length : -1,
+        ),
+      };
+    }
+  }
+
+  it("downloads array elements element-wise", async () => {
+    const payloads: Record<string, string> = {
+      "https://public.example.com/a.ply": "AAAA",
+      "https://public.example.com/b.ply": "BBBBBB",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        makeResponse({ chunks: [payloads[url] ?? ""] }),
+      ),
+    );
+    const resp = await new ArrayDownloadNode().run({
+      run_id: "r-arr",
+      node_id: "n-arr",
+      inputs: {
+        parts: ["https://public.example.com/a.ply", "https://public.example.com/b.ply"],
+      },
+    });
+    expect(resp.status).toBe("pass");
+    expect(resp.outputs.sizes).toEqual([4, 6]);
+  });
+
+  it("passes non-URL elements through and records per-element metadata", async () => {
+    let captured: Record<string, unknown> = {};
+    class CaptureNode extends ArrayDownloadNode {
+      execute(inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+        captured = { inputs: { ...inputs }, metadata: { ...context.metadata } };
+        const parts = inputs.parts as string[];
+        return {
+          sizes: parts.map((p) => (p.startsWith("/") ? readFileSync(p, "utf8").length : -1)),
+        };
+      }
+    }
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => makeResponse({ chunks: ["XX"] })),
+    );
+    const resp = await new CaptureNode().run({
+      run_id: "r-mix",
+      node_id: "n-mix",
+      inputs: { parts: ["https://public.example.com/a.ply", "already-local.ply"] },
+    });
+    expect(resp.status).toBe("pass");
+    const parts = (captured.inputs as Record<string, unknown>).parts as unknown[];
+    expect(typeof parts[0]).toBe("string");
+    expect((parts[0] as string).startsWith("/")).toBe(true);
+    expect(parts[1]).toBe("already-local.ply");
+    const entries = (captured.metadata as Record<string, unknown>).parts as Record<string, unknown>[];
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries.length).toBe(1);
+    expect(entries[0].original_url).toBe("https://public.example.com/a.ply");
+  });
+
+  it("mid-list failure fails the run and cleans downloads", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        call += 1;
+        if (call === 1) return makeResponse({ chunks: ["AAAA"] });
+        throw new Error("connection boom");
+      }),
+    );
+    const resp = await new ArrayDownloadNode().run({
+      run_id: "r-fail",
+      node_id: "n-fail",
+      inputs: {
+        parts: ["https://public.example.com/a.ply", "https://public.example.com/dead.ply"],
+      },
+    });
+    expect(resp.status).toBe("fail");
+    expect(resp.error_type).toBe("NodeIOError");
+    const downloadsDir = join(tmpRoot, "r-fail", "n-fail", "downloads");
+    if (existsSync(downloadsDir)) expect(readdirSync(downloadsDir)).toHaveLength(0);
+  });
+
+  it("empty array passes through", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => makeResponse({ chunks: ["never"] })));
+    const resp = await new ArrayDownloadNode().run({
+      run_id: "r-empty",
+      node_id: "n-empty",
+      inputs: { parts: [] },
+    });
+    expect(resp.status).toBe("pass");
+    expect(resp.outputs.sizes).toEqual([]);
+  });
+});

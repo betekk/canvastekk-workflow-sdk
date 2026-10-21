@@ -513,6 +513,45 @@ export abstract class BaseNode {
       for (const fieldName of fileFields) {
         const value = inputs[fieldName];
 
+        if (Array.isArray(value)) {
+          // S.1 (SDK#161): array file inputs — every URL element is
+          // downloaded, validated, and replaced by its local path; non-URL
+          // elements pass through untouched (mirrors the single-value skip
+          // rule). Failure cleans every file via the shared registry.
+          const entries: Array<Record<string, unknown>> = [];
+          const newElements: unknown[] = [];
+          for (const element of value) {
+            if (
+              typeof element === "string" &&
+              element.trim() &&
+              (element.startsWith("http://") || element.startsWith("https://"))
+            ) {
+              context.reportProgress(0.05, `Downloading ${fieldName}`);
+              const localPath = await this.downloadOne(fieldName, element, context);
+              downloaded.push(localPath);
+              const fileSize = statSync(localPath).size;
+              validateFileInput(def, fieldName, localPath, fileSize);
+              entries.push({
+                original_url: element,
+                local_path: localPath,
+                size_bytes: fileSize,
+              });
+              newElements.push(localPath);
+            } else {
+              newElements.push(element);
+            }
+          }
+          if (entries.length > 0) {
+            context.metadata[fieldName] = entries;
+            inputs[fieldName] = newElements;
+            context.reportProgress(
+              0.1,
+              `Downloaded ${entries.length} element(s) of ${fieldName}`,
+            );
+          }
+          continue;
+        }
+
         if (value == null || typeof value !== "string" || !value.trim()) continue;
         if (!value.startsWith("http://") && !value.startsWith("https://")) continue;
 

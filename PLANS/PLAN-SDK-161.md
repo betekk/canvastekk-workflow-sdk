@@ -55,13 +55,15 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
 
 ### Phase 3: S.1 array file inputs (both languages)
 
-- [ ] **3.1** `_prepare_file_inputs` (python) accepts lists per file field: iterate elements, download URL strings element-wise, validate per-element, replace with local paths, record `context.metadata[field]` as a list of per-element entries; non-URL elements pass through; failure mid-list cleans every downloaded file of the run (existing cleanup invariant)
+- [x] **3.1** `_prepare_file_inputs` (python) accepts lists per file field: iterate elements, download URL strings element-wise, validate per-element, replace with local paths, record `context.metadata[field]` as a list of per-element entries; non-URL elements pass through; failure mid-list cleans every downloaded file of the run (existing cleanup invariant)
     — **Why:** `ifc_parts: [s3://…]` cannot flow today — the presign walk (CWE#851) delivers arrays and the SDK must materialize them
     — **Done when:** python tests cover URL-array→paths, mixed elements, empty list, mid-list failure cleanup; single-value behavior unchanged (existing tests green)
+    — **Done:** list branch + manifest/schema support (array-of-file fields: discovery, validator, items-carried x-* constraints); 6 new tests; full suite 941 green; files: base.py, definition.py, tests; fixes: none
     — **Consumers affected:** CISA#307, CWE#851, model-checker group runs
-- [ ] **3.2** Mirror 3.1 in `prepareFileInputs` (TS)
+- [x] **3.2** Mirror 3.1 in `prepareFileInputs` (TS)
     — **Why:** AC1 — CISA's node side is TypeScript
     — **Done when:** vitest mirrors 3.1's cases
+    — **Done:** mirrored list branch + definition helpers + validator; 4 new tests (26 files/426 tests green, eslint+tsc×2+tsup green); files: base-node.ts, definition.ts, tests; fixes: super() in nested class tripped esbuild (recomputed inline), manifest declaration pattern corrected
     — **Consumers affected:** same as 3.1
 
 ### Phase 4: S.4 capability field + X-SDK-Version parity
@@ -81,6 +83,15 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
     — **Why:** the exit gate is unconditional; AC3 needs a mechanical check, not a claim
     — **Done when:** all gates green on the final tree; `grep -ri "cds" python/canvastekk_workflow_sdk typescript/src` shows no client surface (only doc mentions if any); memo recorded
     — **Consumers affected:** none (verification)
+
+## S3 mechanism audit (pre-completion, 2026-10-21 — verified in canvastekk-workflow-engine@origin/dev)
+
+Question: does S.1 match how definitions actually deliver S3 files, and what is the unit-test pattern for the S3 seam?
+
+- **Mechanism (verified `fastapi_app/temporal/activities.py:781-798`)**: definitions/upstream hand-offs carry `s3://bucket/key` URIs; at dispatch the engine's presign walk iterates `file_input_fields`, presigns each STRING value (`generate_download_url`, `core/storage.py:192` — botocore presigned GET + sanitized Content-Disposition filename), swaps in the https URL; non-S3 values pass through unchanged. **Strings only — the array gap is exactly CWE#851's scope.**
+- **The "temp bucket"**: node outputs upload via multipart sessions into the workflow runs bucket (`workflow_runs_bucket`, keys `runs/{run_id}/{class}/outputs/{node_id}/{field}`; the expiring temp lane keys `temp-outputs/{run_id}/…` per tracker #747 with a devops lifecycle rule) and are replaced with `s3://` pointers after execution (`activities.py:869-873`) — those pointers are the downstream inputs the walk presigns.
+- **S.1 contract verdict**: nodes receive arrays of presigned https URLs; the SDK downloads https (never S3 — AC3 holds). Raw `s3://` elements arriving unpresigned pass through untouched, mirroring the engine's own non-S3 passthrough semantics. Contract-carry note for CWE#851: the walk must presign each `s3://` STRING element, leaving non-`s3://` elements untouched — symmetric semantics on both sides of the wire.
+- **Unit-test pattern for the S3 seam (three tiers, all in-repo precedented)**: (1) engine integration — `mock_s3` fixture (`tests/conftest.py:795`): in-process moto `mock_aws()` intercepting botocore, creates `test-workflow-runs`, resets the `_s3_client` singleton; (2) engine unit — `unittest.mock.patch` of `generate_download_url`/`_get_activity_client`, no S3; (3) SDK tier — mock `httpx.get` (py) / stub `fetch` (TS): the SDK only ever sees https, so its tests never touch S3. S.1's tests ride tier 3.
 
 ## Technical Notes
 

@@ -398,6 +398,44 @@ class BaseNode(ABC):
             for field_name in self.definition.file_input_fields:
                 value = inputs.get(field_name)
 
+                if isinstance(value, list):
+                    # S.1 (SDK#161): array file inputs — every URL element is
+                    # downloaded, validated, and replaced by its local path;
+                    # non-URL elements pass through untouched (mirrors the
+                    # single-value skip rule). Failure cleans every file of
+                    # the run via the shared ``downloaded`` registry.
+                    entries: list[dict[str, Any]] = []
+                    new_elements: list[Any] = []
+                    for element in value:
+                        if (
+                            isinstance(element, str)
+                            and element.strip()
+                            and element.startswith(("http://", "https://"))
+                        ):
+                            context.report_progress(0.05, f"Downloading {field_name}")
+                            local_path = self._download_one(field_name, element, context)
+                            downloaded.append(local_path)
+                            self.definition.validate_file_input(field_name, local_path)
+                            file_size = local_path.stat().st_size
+                            entries.append(
+                                {
+                                    "original_url": element,
+                                    "local_path": str(local_path),
+                                    "size_bytes": file_size,
+                                }
+                            )
+                            new_elements.append(str(local_path))
+                        else:
+                            new_elements.append(element)
+                    if entries:
+                        context.metadata[field_name] = entries
+                        inputs[field_name] = new_elements
+                        context.report_progress(
+                            0.1,
+                            f"Downloaded {len(entries)} element(s) of {field_name}",
+                        )
+                    continue
+
                 if value is None or not isinstance(value, str) or not value.strip():
                     continue
 
