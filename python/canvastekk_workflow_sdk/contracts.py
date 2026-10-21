@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
@@ -44,6 +45,55 @@ CONTRACT_VERSION = "1.0.0"
 # =============================================================================
 # Base Contract
 # =============================================================================
+
+
+class NodeExecutionStatus(StrEnum):
+    """S.5 (SDK#161): the node-execution status vocabulary (lowercase wire).
+
+    Extends the response's ``pass``/``fail`` with the engine-synthesized
+    ``skipped`` (D.6 skip-on-upstream-failure) and ``timeout`` — nodes keep
+    answering ``pass``/``fail``; the engine synthesizes the other two on
+    failed/timed-out/skipped node results.
+    """
+
+    PASS = "pass"
+    FAIL = "fail"
+    SKIPPED = "skipped"
+    TIMEOUT = "timeout"
+
+
+def parse_node_execution_status(value: Any) -> NodeExecutionStatus:
+    """Parse a node-execution status strictly (S.5, SDK#161).
+
+    STRICT BY DEFAULT and ARMED: missing, non-string, or unknown values
+    raise a validation-class error — never a silent default. The ENGINE's
+    flip from lenient to strict happens when it bumps its SDK pin to this
+    release (CWE#852, gated on the F.4 floor confirmation).
+
+    Args:
+        value: Wire value (expected: one of ``pass``/``fail``/``skipped``/``timeout``).
+
+    Returns:
+        The matching :class:`NodeExecutionStatus`.
+
+    Raises:
+        NodeValidationError: If the value is missing or unknown
+            (validation category, S.2 taxonomy).
+    """
+    if isinstance(value, NodeExecutionStatus):
+        return value
+    if isinstance(value, str):
+        try:
+            return NodeExecutionStatus(value)
+        except ValueError:
+            pass
+    from canvastekk_workflow_sdk.exceptions import NodeValidationError
+
+    raise NodeValidationError(
+        f"Unknown node execution status {value!r}; expected one of "
+        f"{[s.value for s in NodeExecutionStatus]}",
+        details={"received": repr(value), "expected": [s.value for s in NodeExecutionStatus]},
+    )
 
 
 class BaseContract(BaseModel):

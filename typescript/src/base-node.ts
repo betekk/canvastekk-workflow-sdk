@@ -27,6 +27,9 @@ import {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
+  IO_SUBCODE_DOWNLOAD_FAILED,
+  IO_SUBCODE_SIZE_EXCEEDED,
+  IO_SUBCODE_URL_POLICY_BLOCKED,
 } from "./exceptions.js";
 import { createLogger } from "./logging.js";
 /**
@@ -274,7 +277,9 @@ export abstract class BaseNode {
       return await this.downloadOneInner(fieldName, url, context, maxBytes, deadline);
     } catch (err) {
       if (err instanceof UrlPolicyError) {
-        throw new NodeIOError(`Blocked URL for field '${fieldName}': ${err}`);
+        throw new NodeIOError(`Blocked URL for field '${fieldName}': ${err}`, {
+          details: { sub_code: IO_SUBCODE_URL_POLICY_BLOCKED },
+        });
       }
       throw err;
     }
@@ -306,7 +311,7 @@ export abstract class BaseNode {
       } catch (err) {
         throw new NodeIOError(
           `Failed to download file for field '${fieldName}': ${err}`,
-          { path: currentUrl },
+          { path: currentUrl, details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
         );
       }
 
@@ -315,12 +320,14 @@ export abstract class BaseNode {
         if (hops > MAX_REDIRECT_HOPS) {
           throw new NodeIOError(
             `Too many redirects downloading file for field '${fieldName}'`,
+            { details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
           );
         }
         const location = resp.headers.get("location");
         if (!location) {
           throw new NodeIOError(
             `Redirect without Location header downloading file for field '${fieldName}'`,
+            { details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
           );
         }
         currentUrl = await validateExternalUrl(
@@ -333,7 +340,7 @@ export abstract class BaseNode {
       if (resp.status >= 400) {
         throw new NodeIOError(
           `HTTP ${resp.status} downloading file for field '${fieldName}'`,
-          { path: currentUrl },
+          { path: currentUrl, details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
         );
       }
 
@@ -348,6 +355,7 @@ export abstract class BaseNode {
         if (Number.parseInt(contentLength, 10) > maxBytes) {
           throw new NodeIOError(
             `File for field '${fieldName}' exceeds size cap (${contentLength} > ${maxBytes} bytes)`,
+            { details: { sub_code: IO_SUBCODE_SIZE_EXCEEDED } },
           );
         }
       }
@@ -375,6 +383,7 @@ export abstract class BaseNode {
           if (running > maxBytes) {
             throw new NodeIOError(
               `File for field '${fieldName}' exceeds size cap (${running} > ${maxBytes} bytes)`,
+              { details: { sub_code: IO_SUBCODE_SIZE_EXCEEDED } },
             );
           }
           if (Date.now() > deadline) {

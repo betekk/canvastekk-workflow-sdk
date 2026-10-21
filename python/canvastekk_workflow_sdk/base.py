@@ -32,6 +32,9 @@ from canvastekk_workflow_sdk._url import (
 from canvastekk_workflow_sdk.context import ExecutionContext, execution_context_var
 from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 from canvastekk_workflow_sdk.exceptions import (
+    IO_SUBCODE_DOWNLOAD_FAILED,
+    IO_SUBCODE_SIZE_EXCEEDED,
+    IO_SUBCODE_URL_POLICY_BLOCKED,
     NodeConfigurationError,
     NodeExecutionError,
     NodeIOError,
@@ -297,15 +300,24 @@ class BaseNode(ABC):
                 except httpx.TimeoutException as exc:
                     raise NodeIOError(f"Timeout downloading file for field '{field_name}': {exc}") from exc
                 except httpx.HTTPError as exc:
-                    raise NodeIOError(f"Failed to download file for field '{field_name}': {exc}") from exc
+                    raise NodeIOError(
+                        f"Failed to download file for field '{field_name}': {exc}",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    ) from exc
 
                 if resp.status_code in (301, 302, 303, 307, 308):
                     hops += 1
                     if hops > MAX_REDIRECT_HOPS:
-                        raise NodeIOError(f"Too many redirects downloading file for field '{field_name}'")
+                        raise NodeIOError(
+                        f"Too many redirects downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
                     next_url = resp.headers.get("location")
                     if not next_url:
-                        raise NodeIOError(f"Redirect without Location header downloading file for field '{field_name}'")
+                        raise NodeIOError(
+                        f"Redirect without Location header downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
                     current_url = validate_external_url(
                         next_url if "://" in next_url else str(urljoin(current_url, next_url))
                     )
@@ -313,7 +325,10 @@ class BaseNode(ABC):
                     continue
 
                 if resp.status_code >= 400:
-                    raise NodeIOError(f"HTTP {resp.status_code} downloading file for field '{field_name}'")
+                    raise NodeIOError(
+                        f"HTTP {resp.status_code} downloading file for field '{field_name}'",
+                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                    )
 
                 local_path = context.downloads_dir / filename
 
@@ -326,7 +341,8 @@ class BaseNode(ABC):
                 if content_length and content_length.isdigit():
                     if int(content_length) > max_bytes:
                         raise NodeIOError(
-                            f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)"
+                            f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)",
+                            details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
                         )
 
                 try:
@@ -338,7 +354,8 @@ class BaseNode(ABC):
                             running += len(chunk)
                             if running > max_bytes:
                                 raise NodeIOError(
-                                    f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)"
+                                    f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)",
+                                    details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
                                 )
                             if time.monotonic() > deadline:
                                 raise NodeIOError(f"Download deadline exceeded for field '{field_name}'")
@@ -348,7 +365,10 @@ class BaseNode(ABC):
                     raise
                 return local_path
         except UrlPolicyError as exc:
-            raise NodeIOError(f"Blocked URL for field '{field_name}': {exc}") from exc
+            raise NodeIOError(
+                f"Blocked URL for field '{field_name}': {exc}",
+                details={"sub_code": IO_SUBCODE_URL_POLICY_BLOCKED},
+            ) from exc
 
     def _prepare_file_inputs(
         self,

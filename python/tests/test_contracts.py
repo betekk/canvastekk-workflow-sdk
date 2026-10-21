@@ -361,3 +361,47 @@ class TestImportGraph:
                 assert all("contracts" not in a.name for a in node.names), node.names
             elif isinstance(node, ast.ImportFrom):
                 assert "contracts" not in (node.module or ""), node.module
+
+
+class TestNodeExecutionStatusSdk161:
+    """S.5: status vocabulary + strict parsing ARMED (SDK#161)."""
+
+    def test_wire_values_lowercase(self) -> None:
+        from canvastekk_workflow_sdk.contracts import NodeExecutionStatus
+
+        assert [s.value for s in NodeExecutionStatus] == [
+            "pass",
+            "fail",
+            "skipped",
+            "timeout",
+        ]
+
+    def test_parse_accepts_known_and_enum(self) -> None:
+        from canvastekk_workflow_sdk.contracts import (
+            NodeExecutionStatus,
+            parse_node_execution_status,
+        )
+
+        assert parse_node_execution_status("pass") is NodeExecutionStatus.PASS
+        assert parse_node_execution_status("fail") is NodeExecutionStatus.FAIL
+        assert parse_node_execution_status("skipped") is NodeExecutionStatus.SKIPPED
+        assert parse_node_execution_status("timeout") is NodeExecutionStatus.TIMEOUT
+        assert (
+            parse_node_execution_status(NodeExecutionStatus.PASS) is NodeExecutionStatus.PASS
+        )
+
+    def test_parse_strict_missing_and_unknown(self) -> None:
+        from canvastekk_workflow_sdk.contracts import parse_node_execution_status
+        from canvastekk_workflow_sdk.exceptions import NodeValidationError
+
+        for bad in (None, "", "success", "PASS", 1, {}):
+            with pytest.raises(NodeValidationError, match="Unknown node execution status"):
+                parse_node_execution_status(bad)
+
+    def test_parse_failure_is_validation_category(self) -> None:
+        from canvastekk_workflow_sdk.contracts import parse_node_execution_status
+        from canvastekk_workflow_sdk.exceptions import NodeValidationError
+
+        with pytest.raises(NodeValidationError) as excinfo:
+            parse_node_execution_status("nope")
+        assert excinfo.value.category == "validation"

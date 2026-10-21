@@ -3,7 +3,10 @@ import {
   NodeExecutionResponseFactory,
   NodeExecutionResponseSchema,
   HealthResponseSchema,
+  NodeExecutionStatusSchema,
+  parseNodeExecutionStatus,
 } from "../src/response.js";
+import { NodeValidationError } from "../src/exceptions.js";
 
 describe("NodeExecutionResponseFactory", () => {
   describe("success()", () => {
@@ -108,5 +111,35 @@ describe("HealthResponseSchema", () => {
         version: "1.0.0",
       }),
     ).toThrow();
+  });
+});
+
+describe("NodeExecutionStatus (S.5, SDK#161)", () => {
+  it("wire values lowercase", () => {
+    expect(NodeExecutionStatusSchema.options).toEqual([
+      "pass",
+      "fail",
+      "skipped",
+      "timeout",
+    ]);
+  });
+
+  it("parses known values", () => {
+    expect(parseNodeExecutionStatus("pass")).toBe("pass");
+    expect(parseNodeExecutionStatus("fail")).toBe("fail");
+    expect(parseNodeExecutionStatus("skipped")).toBe("skipped");
+    expect(parseNodeExecutionStatus("timeout")).toBe("timeout");
+  });
+
+  it("strict: missing/unknown raise validation-class errors", () => {
+    for (const bad of [null, undefined, "", "success", "PASS", 1, {}]) {
+      expect(() => parseNodeExecutionStatus(bad)).toThrow(NodeValidationError);
+    }
+    try {
+      parseNodeExecutionStatus("nope");
+      throw new Error("unreachable");
+    } catch (err) {
+      expect((err as NodeValidationError).category).toBe("validation");
+    }
   });
 });

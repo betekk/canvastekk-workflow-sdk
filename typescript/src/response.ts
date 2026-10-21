@@ -1,4 +1,44 @@
 import { z } from "zod";
+import { NodeValidationError } from "./exceptions.js";
+
+/**
+ * S.5 (SDK#161): the node-execution status vocabulary (lowercase wire).
+ *
+ * Extends the response's `pass`/`fail` with the engine-synthesized `skipped`
+ * (D.6 skip-on-upstream-failure) and `timeout` — nodes keep answering
+ * `pass`/`fail`; the engine synthesizes the other two.
+ */
+export const NodeExecutionStatusSchema = z.enum([
+  "pass",
+  "fail",
+  "skipped",
+  "timeout",
+]);
+
+export type NodeExecutionStatus = z.infer<typeof NodeExecutionStatusSchema>;
+
+/**
+ * Parse a node-execution status strictly (S.5, SDK#161).
+ *
+ * STRICT BY DEFAULT and ARMED: missing, non-string, or unknown values raise
+ * a validation-class error — never a silent default. The ENGINE's flip from
+ * lenient to strict happens when it bumps its SDK pin to this release
+ * (CWE#852, gated on the F.4 floor confirmation).
+ *
+ * @param value - Wire value (pass | fail | skipped | timeout)
+ * @returns The matching status literal
+ * @throws {NodeValidationError} On missing/unknown values (validation category)
+ */
+export function parseNodeExecutionStatus(value: unknown): NodeExecutionStatus {
+  const parsed = NodeExecutionStatusSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new NodeValidationError(
+      `Unknown node execution status ${JSON.stringify(value)}; expected one of ["pass","fail","skipped","timeout"]`,
+      { details: { received: JSON.stringify(value) } },
+    );
+  }
+  return parsed.data;
+}
 
 export const NodeExecutionResponseSchema = z.object({
   execution_id: z.string(),

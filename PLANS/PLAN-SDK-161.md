@@ -42,13 +42,15 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
 
 ### Phase 2: S.5 NodeExecutionStatus + S.6 IO_* sub-codes (both languages)
 
-- [ ] **2.1** Add `NodeExecutionStatus` enum (wire values lowercase: `success`, `failed`, `skipped`, `timeout`) + `parse_node_execution_status(value)` that is STRICT by default (missing/unknown → validation-class error) — the engine's flip is its pin-bump to this release (CWE#852, gated on F.4)
+- [x] **2.1** Add `NodeExecutionStatus` enum (wire values lowercase: `success`, `failed`, `skipped`, `timeout`) + `parse_node_execution_status(value)` that is STRICT by default (missing/unknown → validation-class error) — the engine's flip is its pin-bump to this release (CWE#852, gated on F.4)
     — **Why:** strict status is the epic's honest-failure backbone; the SDK ships it ARMED so the engine's adoption is a single version bump
     — **Done when:** python+TS tests assert enum values, strict rejection of unknown/missing, and the validation-class category
+    — **Done:** StrEnum pass|fail|skipped|timeout (extends the existing response wire vocabulary — discovered pass/fail already live) + strict parser; response schema UNCHANGED (nodes keep answering pass/fail; engine synthesizes the rest); files: contracts.py, response.ts, __init__.py, index.ts; fixes: import-miss caught by gate (F821), StrEnum lint
     — **Consumers affected:** CWE#852 (flip), engine run status agreement (epic AC)
-- [ ] **2.2** Add IO_* sub-codes (`IO_DOWNLOAD_FAILED`, `IO_URL_POLICY_BLOCKED`, `IO_SIZE_EXCEEDED`) carried in `details["sub_code"]` by the download paths (`_download_one`/`downloadOne`, URL-policy block, size validation) in both languages
+- [x] **2.2** Add IO_* sub-codes (`IO_DOWNLOAD_FAILED`, `IO_URL_POLICY_BLOCKED`, `IO_SIZE_EXCEEDED`) carried in `details["sub_code"]` by the download paths (`_download_one`/`downloadOne`, URL-policy block, size validation) in both languages
     — **Why:** S.6 — transport-class failures need machine-readable sub-codes for the frontend's envelope rows and the incident-replay gate
     — **Done when:** tests assert each sub-code surfaces on its failure path
+    — **Done:** 7 raise-sites wired per language (download-failed ×4, size-exceeded ×2, url-policy ×1); py 88+49 tests, ts 38 tests green; files: base.py, base-node.ts, tests; fixes: none
     — **Consumers affected:** CFN#2080, incident replay (G.4)
 
 ### Phase 3: S.1 array file inputs (both languages)

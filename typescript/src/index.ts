@@ -57,9 +57,12 @@ export {
 } from "./request.js";
 export {
   NodeExecutionResponseSchema,
+  NodeExecutionStatusSchema,
+  parseNodeExecutionStatus,
   NodeExecutionResponseFactory,
   HealthResponseSchema,
   type NodeExecutionResponse,
+  type NodeExecutionStatus,
   type HealthResponse,
 } from "./response.js";
 export {

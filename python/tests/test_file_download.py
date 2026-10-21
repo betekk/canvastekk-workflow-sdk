@@ -902,3 +902,33 @@ class TestDownloadPolicy:
         assert response.error_type == "NodeIOError"
         assert "cancelled" in response.error.lower()
         mock_get.assert_not_called()
+
+
+class TestIoSubcodesSdk161:
+    """S.6: transport sub-codes on the download paths (SDK#161)."""
+
+    def test_http_error_carries_download_failed_subcode(self) -> None:
+        from canvastekk_workflow_sdk.exceptions import (
+            IO_SUBCODE_DOWNLOAD_FAILED,
+            NodeIOError,
+        )
+
+        # The download path wraps HTTP >= 400 with the sub-code; assert the
+        # constant contract the engine/frontend consume.
+        err = NodeIOError(
+            "HTTP 404 downloading file for field 'x'",
+            details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+        )
+        assert err.details["sub_code"] == "IO_DOWNLOAD_FAILED"
+        assert err.category == "transport"
+
+    def test_subcode_constants(self) -> None:
+        from canvastekk_workflow_sdk.exceptions import (
+            IO_SUBCODE_DOWNLOAD_FAILED,
+            IO_SUBCODE_SIZE_EXCEEDED,
+            IO_SUBCODE_URL_POLICY_BLOCKED,
+        )
+
+        assert IO_SUBCODE_DOWNLOAD_FAILED == "IO_DOWNLOAD_FAILED"
+        assert IO_SUBCODE_URL_POLICY_BLOCKED == "IO_URL_POLICY_BLOCKED"
+        assert IO_SUBCODE_SIZE_EXCEEDED == "IO_SIZE_EXCEEDED"
