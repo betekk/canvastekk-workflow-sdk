@@ -647,7 +647,7 @@ describe("array file inputs (S.1, SDK#161)", () => {
       output_schema: { type: "object" },
     };
 
-    execute(inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+    execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
       return {
         sizes: (inputs.parts as string[]).map((p) =>
           p.startsWith("/") ? readFileSync(p, "utf8").length : -1,

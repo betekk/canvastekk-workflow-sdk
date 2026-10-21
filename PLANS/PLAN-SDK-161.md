@@ -120,3 +120,4 @@ Question: does S.1 match how definitions actually deliver S3 files, and what is 
 | Phase | Commit | Gate |
 |-------|--------|------|
 | 5 | cd792c7 | GATE cd792c7 tier=full lint=t(py ruff+ts eslint) typecheck=t(tsc x2) build=t(tsup) unit=t(py 945+ts 430) e2e=n.a |
+| ci-fix | 25b617f | CI lint (stricter than local): unused context param → _context; tree re-gated full green (ts 430 + lint + tsc x2 + tsup) — round 1/2 |
