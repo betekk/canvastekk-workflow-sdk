@@ -27,6 +27,9 @@ import {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
+  IO_SUBCODE_DOWNLOAD_FAILED,
+  IO_SUBCODE_SIZE_EXCEEDED,
+  IO_SUBCODE_URL_POLICY_BLOCKED,
 } from "./exceptions.js";
 import { createLogger } from "./logging.js";
 /**
@@ -274,7 +277,9 @@ export abstract class BaseNode {
       return await this.downloadOneInner(fieldName, url, context, maxBytes, deadline);
     } catch (err) {
       if (err instanceof UrlPolicyError) {
-        throw new NodeIOError(`Blocked URL for field '${fieldName}': ${err}`);
+        throw new NodeIOError(`Blocked URL for field '${fieldName}': ${err}`, {
+          details: { sub_code: IO_SUBCODE_URL_POLICY_BLOCKED },
+        });
       }
       throw err;
     }
@@ -306,7 +311,7 @@ export abstract class BaseNode {
       } catch (err) {
         throw new NodeIOError(
           `Failed to download file for field '${fieldName}': ${err}`,
-          { path: currentUrl },
+          { path: currentUrl, details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
         );
       }
 
@@ -315,12 +320,14 @@ export abstract class BaseNode {
         if (hops > MAX_REDIRECT_HOPS) {
           throw new NodeIOError(
             `Too many redirects downloading file for field '${fieldName}'`,
+            { details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
           );
         }
         const location = resp.headers.get("location");
         if (!location) {
           throw new NodeIOError(
             `Redirect without Location header downloading file for field '${fieldName}'`,
+            { details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
           );
         }
         currentUrl = await validateExternalUrl(
@@ -333,7 +340,7 @@ export abstract class BaseNode {
       if (resp.status >= 400) {
         throw new NodeIOError(
           `HTTP ${resp.status} downloading file for field '${fieldName}'`,
-          { path: currentUrl },
+          { path: currentUrl, details: { sub_code: IO_SUBCODE_DOWNLOAD_FAILED } },
         );
       }
 
@@ -348,6 +355,7 @@ export abstract class BaseNode {
         if (Number.parseInt(contentLength, 10) > maxBytes) {
           throw new NodeIOError(
             `File for field '${fieldName}' exceeds size cap (${contentLength} > ${maxBytes} bytes)`,
+            { details: { sub_code: IO_SUBCODE_SIZE_EXCEEDED } },
           );
         }
       }
@@ -375,6 +383,7 @@ export abstract class BaseNode {
           if (running > maxBytes) {
             throw new NodeIOError(
               `File for field '${fieldName}' exceeds size cap (${running} > ${maxBytes} bytes)`,
+              { details: { sub_code: IO_SUBCODE_SIZE_EXCEEDED } },
             );
           }
           if (Date.now() > deadline) {
@@ -420,8 +429,18 @@ export abstract class BaseNode {
     if (dep.sunset_date) {
       const today = new Date().toISOString().slice(0, 10);
       if (today > dep.sunset_date) {
+        // S.2 (SDK#161): sunset is structured, not message-only — the
+        // lifecycle category plus NODE_SUNSET code and machine-readable
+        // details let consumers react without parsing prose.
         throw new NodeConfigurationError(
           `Node '${name}' was sunset on ${dep.sunset_date} and refuses to run; migrate to '${replacement}' (${dep.notice})`,
+          {
+            errorCode: "NODE_SUNSET",
+            details: {
+              sunset_date: dep.sunset_date,
+              replacement_slug: replacement,
+            },
+          },
         );
       }
     }
@@ -493,6 +512,45 @@ export abstract class BaseNode {
     try {
       for (const fieldName of fileFields) {
         const value = inputs[fieldName];
+
+        if (Array.isArray(value)) {
+          // S.1 (SDK#161): array file inputs — every URL element is
+          // downloaded, validated, and replaced by its local path; non-URL
+          // elements pass through untouched (mirrors the single-value skip
+          // rule). Failure cleans every file via the shared registry.
+          const entries: Array<Record<string, unknown>> = [];
+          const newElements: unknown[] = [];
+          for (const element of value) {
+            if (
+              typeof element === "string" &&
+              element.trim() &&
+              (element.startsWith("http://") || element.startsWith("https://"))
+            ) {
+              context.reportProgress(0.05, `Downloading ${fieldName}`);
+              const localPath = await this.downloadOne(fieldName, element, context);
+              downloaded.push(localPath);
+              const fileSize = statSync(localPath).size;
+              validateFileInput(def, fieldName, localPath, fileSize);
+              entries.push({
+                original_url: element,
+                local_path: localPath,
+                size_bytes: fileSize,
+              });
+              newElements.push(localPath);
+            } else {
+              newElements.push(element);
+            }
+          }
+          if (entries.length > 0) {
+            context.metadata[fieldName] = entries;
+            inputs[fieldName] = newElements;
+            context.reportProgress(
+              0.1,
+              `Downloaded ${entries.length} element(s) of ${fieldName}`,
+            );
+          }
+          continue;
+        }
 
         if (value == null || typeof value !== "string" || !value.trim()) continue;
         if (!value.startsWith("http://") && !value.startsWith("https://")) continue;

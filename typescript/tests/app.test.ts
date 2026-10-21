@@ -479,3 +479,63 @@ describe("dry-run upload guard (D10 #111)", () => {
     }
   });
 });
+
+describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
+  class CapabilityCaptureNode extends BaseNode {
+    definition: WorkflowNodeManifest = {
+      slug: "cap-node",
+      version: "1.0.0",
+      name: "Cap Node",
+      description: "Captures context.capability",
+      input_schema: { type: "object" },
+      output_schema: { type: "object" },
+    };
+    static captured: string | null | undefined;
+    execute(_inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+      CapabilityCaptureNode.captured = context.capability;
+      return {};
+    }
+  }
+
+  it("header reaches the execution context", async () => {
+    const node = new CapabilityCaptureNode();
+    const app = createNodeApp(node);
+    const resp = await request(app)
+      .post("/execute")
+      .send({ run_id: "r-cap", node_id: "n-cap", inputs: {} })
+      .set("X-Node-Capability", "cap-token-123");
+    expect(resp.status).toBe(200);
+    expect(CapabilityCaptureNode.captured).toBe("cap-token-123");
+  });
+
+  it("body-supplied capability is stripped", async () => {
+    const node = new CapabilityCaptureNode();
+    const app = createNodeApp(node);
+    const resp = await request(app)
+      .post("/execute")
+      .send({
+        run_id: "r-cap2",
+        node_id: "n-cap2",
+        inputs: {},
+        capability: "forged-token",
+      });
+    expect(resp.status).toBe(200);
+    expect(CapabilityCaptureNode.captured).toBeNull();
+  });
+
+  it("absent header → null", async () => {
+    const node = new CapabilityCaptureNode();
+    const app = createNodeApp(node);
+    await request(app)
+      .post("/execute")
+      .send({ run_id: "r-cap3", node_id: "n-cap3", inputs: {} });
+    expect(CapabilityCaptureNode.captured).toBeNull();
+  });
+
+  it("X-SDK-Version stamped on responses", async () => {
+    const node = new CapabilityCaptureNode();
+    const app = createNodeApp(node);
+    const resp = await request(app).get("/health");
+    expect(resp.headers["x-sdk-version"]).toBeTruthy();
+  });
+});

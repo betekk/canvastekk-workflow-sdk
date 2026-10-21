@@ -47,9 +47,11 @@ from canvastekk_workflow_sdk.contracts import (
     InstanceSet,
     Measurement,
     MeasurementSet,
+    NodeExecutionStatus,
     Plane,
     PlaneSet,
     Point3D,
+    parse_node_execution_status,
 )
 from canvastekk_workflow_sdk.definition import (
     ColorPreset,
@@ -63,6 +65,11 @@ from canvastekk_workflow_sdk.definition import (
     export_definition,
 )
 from canvastekk_workflow_sdk.exceptions import (
+    ERROR_CATEGORIES,
+    ERROR_ENVELOPE_KEYS,
+    IO_SUBCODE_DOWNLOAD_FAILED,
+    IO_SUBCODE_SIZE_EXCEEDED,
+    IO_SUBCODE_URL_POLICY_BLOCKED,
     NodeConfigurationError,
     NodeExecutionError,
     NodeIOError,
@@ -71,6 +78,7 @@ from canvastekk_workflow_sdk.exceptions import (
     NodeValidationError,
     WorkflowExecutionError,
     WorkflowValidationError,
+    error_envelope,
 )
 from canvastekk_workflow_sdk.logging import StructuredJsonFormatter, configure_logging, get_node_logger
 from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, TimingMiddleware
@@ -112,6 +120,11 @@ __all__ = [
     "BaseNode",
     "BoundingBox3D",
     "ColorPreset",
+    "ERROR_CATEGORIES",
+    "ERROR_ENVELOPE_KEYS",
+    "IO_SUBCODE_DOWNLOAD_FAILED",
+    "IO_SUBCODE_SIZE_EXCEEDED",
+    "IO_SUBCODE_URL_POLICY_BLOCKED",
     "ContractCapabilities",
     "DeprecationInfo",
     "EdgeType",
@@ -136,10 +149,13 @@ __all__ = [
     "NodeExecutor",
     "NodeIOError",
     "NodeMiddleware",
+    "NodeExecutionStatus",
     "NodeOutputValidationError",
     "NodeResult",
     "NodeTimeoutError",
     "NodeValidationError",
+    "error_envelope",
+    "parse_node_execution_status",
     "OutputUploader",
     "Plane",
     "PlaneSet",
