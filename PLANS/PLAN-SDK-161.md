@@ -68,13 +68,15 @@ Cross-module consumers: EVERY node repo + the engine consume this SDK via pinned
 
 ### Phase 4: S.4 capability field + X-SDK-Version parity
 
-- [ ] **4.1** `NodeExecutionRequest.capability: str | None` + `ExecutionContext.capability` accessor (python + TS), header-exclusive via `X-Node-Capability` (DA-2242 account_id mirror: body-supplied value stripped before validation, header is the only source; opaque string, no parsing) — the header name is DEFINED here as the contract; CWE#851's mint writes it
+- [x] **4.1** `NodeExecutionRequest.capability: str | None` + `ExecutionContext.capability` accessor (python + TS), header-exclusive via `X-Node-Capability` (DA-2242 account_id mirror: body-supplied value stripped before validation, header is the only source; opaque string, no parsing) — the header name is DEFINED here as the contract; CWE#851's mint writes it
     — **Why:** the #833 run-scoped CDS capability must reach nodes without touching CDS code in the SDK
     — **Done when:** tests assert header→context, body-only→None, both languages
+    — **Done:** field+accessor+header-exclusive capture both languages (X-Node-Capability; body stripped); py 87 app tests, ts 29 app tests green; TS account_id gap (DA-2242 was python-only) NOTED, not backfilled — epic's TS-side need is the capability only; files: request.py, app.py, context.py, request.ts, app.ts, context.ts, tests; fixes: none
     — **Consumers affected:** CWE#851 (mint), CWN#548 (client presents)
-- [ ] **4.2** Python app sets the `X-SDK-Version` response header (TS middleware.ts:163 parity)
+- [x] **4.2** Python app sets the `X-SDK-Version` response header (TS middleware.ts:163 parity)
     — **Why:** AC2 — the version floor stamp must be observable on both stacks' responses
     — **Done when:** python test asserts the header on a node response
+    — **Done:** discovered python ALREADY stamps it (`_server_middleware.py:20` SDKVersionMiddleware — earlier grep missed the file); added the missing test assertion (py+ts); zero code change needed; fixes: none
     — **Consumers affected:** engine floor enforcement (F-track CI check)
 
 ### Phase 5: verification gate (full tier — ticket exit gate, BOTH languages)

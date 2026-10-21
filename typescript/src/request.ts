@@ -39,6 +39,11 @@ export const NodeExecutionRequestSchema = z.object({
   // namespaced 'dryrun-'. Honored only when the node declares
   // contract.capabilities.dry_run (docs/dry-run-contract.md).
   dry_run: z.boolean().default(false),
+  // S.4 (SDK#161): run-scoped CDS capability token (#833) — opaque HMAC
+  // string minted by the engine at dispatch. Engine-controlled: /execute
+  // sets this exclusively from the X-Node-Capability header — body-supplied
+  // values are stripped at the route. Transported, never parsed.
+  capability: z.string().nullable().optional(),
 });
 
 /**

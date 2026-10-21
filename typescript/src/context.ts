@@ -120,6 +120,17 @@ export class ExecutionContext {
     return this._outputDir.split("/").pop() ?? "unknown";
   }
 
+  /**
+   * Run-scoped CDS capability token (#833, SDK#161 S.4) — opaque HMAC string
+   * minted by the engine at dispatch, set exclusively from the
+   * X-Node-Capability header on /execute. Transported for the node to
+   * present to CDS; never parsed here. Null for local runs.
+   */
+  get capability(): string | null {
+    if (this._request) return this._request.capability ?? null;
+    return null;
+  }
+
   get outputDir(): string {
     return this._outputDir;
   }
