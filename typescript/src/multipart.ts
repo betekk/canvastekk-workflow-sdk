@@ -198,8 +198,18 @@ async function putPartChunk(
   });
 }
 
-async function initiate(session: UploadSessionDescriptor, size: number, contentType: string): Promise<InitiateBundle> {
-  const raw = await controlRequest("POST", session.initiate_url, { size, content_type: contentType });
+async function initiate(
+  session: UploadSessionDescriptor,
+  size: number,
+  contentType: string,
+  element?: { index: number; suffix: string },
+): Promise<InitiateBundle> {
+  // tracker#3969: array sessions carry the element ref on the initiate body.
+  const raw = await controlRequest("POST", session.initiate_url, {
+    size,
+    content_type: contentType,
+    ...(element ? { element } : {}),
+  });
   const bundle = raw as Partial<InitiateBundle>;
   if (
     !bundle ||
@@ -233,7 +243,10 @@ async function abortSession(session: UploadSessionDescriptor, uploadId: string):
 export async function uploadViaSession(
   session: UploadSessionDescriptor,
   filePath: string,
-  options: MultipartUploadOptions = {},
+  options: MultipartUploadOptions & {
+    /** tracker#3969: element ref for array-session redemption. */
+    element?: { index: number; suffix: string };
+  } = {},
 ): Promise<void> {
   const contentType = options.contentType ?? "application/octet-stream";
   const retryAttempts = options.retryAttempts ?? DEFAULT_RETRY_ATTEMPTS;
@@ -241,7 +254,7 @@ export async function uploadViaSession(
   const resumeAttempts = options.resumeAttempts ?? DEFAULT_RESUME_ATTEMPTS;
 
   const size = statSync(filePath).size;
-  const bundle = await initiate(session, size, contentType);
+  const bundle = await initiate(session, size, contentType, options.element);
   const partUrls = bundle.part_urls;
   const partSize = bundle.part_size;
   const totalParts = partUrls.length;

@@ -9,6 +9,7 @@ import { S3PresignedUploader, type UploadTarget } from "../src/uploads.js";
 interface SessionCall {
   method?: string;
   url?: string;
+  body?: unknown;
 }
 
 // Local HTTP server speaking the multipart session wire contract
@@ -17,9 +18,18 @@ interface SessionCall {
 async function startSessionServer() {
   const calls: SessionCall[] = [];
   const server: Server = createServer((req, res) => {
-    req.resume();
+    let raw = "";
+    req.on("data", (chunk: Buffer) => {
+      raw += chunk.toString();
+    });
     req.on("end", () => {
-      calls.push({ method: req.method, url: req.url });
+      let body: unknown;
+      try {
+        body = raw ? JSON.parse(raw) : undefined;
+      } catch {
+        body = undefined;
+      }
+      calls.push({ method: req.method, url: req.url, body });
       const url = req.url ?? "";
       if (url === "/initiate") {
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -113,6 +123,89 @@ describe("S3PresignedUploader", () => {
           ["out"],
         ),
       ).rejects.toThrow(/engine sent deprecated presigned target/);
+    });
+  });
+
+  describe("array file outputs (tracker#3969)", () => {
+    it("uploads each element with an indexed element ref on the wire", async () => {
+      const srv = await startSessionServer();
+      const dir = mkdtempSync(join(tmpdir(), "sdk-array-"));
+      try {
+        const files = ["a.las", "b.las", "c.zip"].map((name) => {
+          const p = join(dir, name);
+          writeFileSync(p, name);
+          return p;
+        });
+        const response = {
+          execution_id: "exec-1",
+          status: "pass" as const,
+          outputs: { buffers: files },
+          duration_ms: 1,
+        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+        await new S3PresignedUploader().uploadOutputs(
+          response,
+          { buffers: { ...srv.target, array: true } },
+          ["buffers"],
+        );
+        const initiates = srv.calls.filter((c) => c.url === "/initiate");
+        expect(initiates).toHaveLength(3);
+        expect(initiates.map((c) => (c.body as { element: { index: number } }).element.index)).toEqual([0, 1, 2]);
+        expect(
+          initiates.map((c) => (c.body as { element: { suffix: string } }).element.suffix),
+        ).toEqual([".las", ".las", ".zip"]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+        await srv.close();
+      }
+    });
+
+    it("element that is not a local file fails naming field and index", async () => {
+      const response = {
+        execution_id: "exec-1",
+        status: "pass" as const,
+        outputs: { buffers: ["/nonexistent/a.las"] },
+        duration_ms: 1,
+      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      await expect(
+        new S3PresignedUploader().uploadOutputs(
+          response,
+          { buffers: { ...untouchedTarget, array: true } },
+          ["buffers"],
+        ),
+      ).rejects.toThrow(/element 0 is not a local file/);
+    });
+
+    it("list value on a non-array target fails", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "sdk-array2-"));
+      try {
+        const p = join(dir, "a.las");
+        writeFileSync(p, "x");
+        const response = {
+          execution_id: "exec-1",
+          status: "pass" as const,
+          outputs: { buffers: [p] },
+          duration_ms: 1,
+        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+        await expect(
+          new S3PresignedUploader().uploadOutputs(response, { buffers: untouchedTarget }, ["buffers"]),
+        ).rejects.toThrow(/not an array session/);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("empty array is a no-op", async () => {
+      const response = {
+        execution_id: "exec-1",
+        status: "pass" as const,
+        outputs: { buffers: [] },
+        duration_ms: 1,
+      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      await new S3PresignedUploader().uploadOutputs(
+        response,
+        { buffers: { ...untouchedTarget, array: true } },
+        ["buffers"],
+      );
     });
   });
 

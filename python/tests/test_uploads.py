@@ -127,6 +127,91 @@ class TestS3PresignedUploader:
         mock_session_upload.assert_called_once()
         assert mock_session_upload.call_args[0][1] == str(test_file)
 
+    def test_upload_outputs_array_uploads_each_element_indexed(self, tmp_path: Path) -> None:
+        """tracker#3969: list value + array session → one indexed upload per element."""
+        uploader = S3PresignedUploader()
+        files = []
+        for name in ("a.las", "b.las", "c.zip"):
+            f = tmp_path / name
+            f.write_bytes(name.encode())
+            files.append(f)
+
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"buffers": [str(f) for f in files]},
+            duration_ms=100,
+        )
+        upload_urls = {"buffers": _session(array=True)}
+        file_output_fields = ["buffers"]
+
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+            uploader.upload_outputs(response, upload_urls, file_output_fields)
+
+        assert mock_session_upload.call_count == 3
+        indexes = [c.kwargs["element"]["index"] for c in mock_session_upload.call_args_list]
+        suffixes = [c.kwargs["element"]["suffix"] for c in mock_session_upload.call_args_list]
+        assert indexes == [0, 1, 2]
+        assert suffixes == [".las", ".las", ".zip"]
+        assert [c.args[1] for c in mock_session_upload.call_args_list] == [str(f) for f in files]
+
+    def test_upload_outputs_array_element_not_a_file_raises_with_index(self, tmp_path: Path) -> None:
+        uploader = S3PresignedUploader()
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"buffers": [str(tmp_path / "missing.las")]},
+            duration_ms=100,
+        )
+        with pytest.raises(NodeIOError, match="element 0"):
+            uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
+
+    def test_upload_outputs_array_element_not_a_string_raises_with_index(self) -> None:
+        uploader = S3PresignedUploader()
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"buffers": [42]},
+            duration_ms=100,
+        )
+        with pytest.raises(NodeIOError, match="element 0"):
+            uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
+
+    def test_upload_outputs_empty_array_is_noop(self) -> None:
+        uploader = S3PresignedUploader()
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"buffers": []},
+            duration_ms=100,
+        )
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+            uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
+        mock_session_upload.assert_not_called()
+
+    def test_upload_outputs_list_on_non_array_target_raises(self, tmp_path: Path) -> None:
+        uploader = S3PresignedUploader()
+        f = tmp_path / "a.las"
+        f.write_bytes(b"x")
+        response = NodeExecutionResponse.success(
+            execution_id="exec-1",
+            outputs={"buffers": [str(f)]},
+            duration_ms=100,
+        )
+        with pytest.raises(NodeIOError, match="not an array session"):
+            uploader.upload_outputs(response, {"buffers": _session()}, ["buffers"])
+
+    def test_upload_file_element_index_gated_on_array_flag(self, tmp_path: Path) -> None:
+        """element_index rides upload_via_session only for array targets."""
+        uploader = S3PresignedUploader()
+        f = tmp_path / "a.las"
+        f.write_bytes(b"x")
+        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+            uploader.upload_file(str(f), _session(array=True), element_index=4)
+            mock_session_upload.assert_called_once()
+            assert mock_session_upload.call_args.kwargs["element"] == {"index": 4, "suffix": ".las"}
+
+            uploader.upload_file(str(f), _session(), element_index=4)
+            # non-array target: element ignored (single-file redemption)
+            second = mock_session_upload.call_args_list[1]
+            assert "element" not in second.kwargs
+
     def test_upload_outputs_raises_on_non_string_value(self) -> None:
         """A present non-string file-output value fails the node (DA-2337)."""
         uploader = S3PresignedUploader()
