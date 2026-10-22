@@ -149,13 +149,22 @@ jobs:
         with:
           script: |
             // Find the merged PR for this commit and read its semver label.
-            // Falls back to "patch" when no label is present.
-            const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-            });
-            const labels = result.data[0]?.labels?.map((l) => l.name) || [];
+            // Falls back to "patch" when no label is present — and when the
+            // lookup itself fails (runner-pool proxy can 500 api.github.com
+            // with an empty body; release must not die on a best-effort
+            // label read. The merged promotion PR's label is the norm, so a
+            // fallback here only ever downgrades intent, never invents it).
+            let labels = [];
+            try {
+              const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+              });
+              labels = result.data[0]?.labels?.map((l) => l.name) || [];
+            } catch (e) {
+              core.warning(`PR label lookup failed (${e.message}); falling back to patch`);
+            }
             core.info(`PR labels: ${JSON.stringify(labels)}`);
             let type = "patch";
             if (labels.includes("major")) type = "major";
