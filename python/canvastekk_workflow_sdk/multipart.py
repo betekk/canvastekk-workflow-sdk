@@ -283,6 +283,7 @@ def upload_via_session(
     file_path: str,
     content_type: str = "application/octet-stream",
     *,
+    element: dict[str, object] | None = None,
     retry_attempts: int = _DEFAULT_RETRY_ATTEMPTS,
     retry_backoffs: tuple[float, ...] = _DEFAULT_RETRY_BACKOFFS,
     resume_attempts: int = _DEFAULT_RESUME_ATTEMPTS,
@@ -313,6 +314,10 @@ def upload_via_session(
         session: Engine-provided upload-session descriptor.
         file_path: Local filesystem path to the file.
         content_type: MIME type for the object and every part PUT.
+        element: tracker#3969 — ``{"index", "suffix"}`` element ref for
+            array-session redemption (one MPU per element; the engine
+            derives the element key server-side). ``None`` for
+            single-file sessions.
         retry_attempts: Max attempts per part PUT.
         retry_backoffs: Seconds between part retries.
         resume_attempts: Extra resume rounds after a post-retry part
@@ -330,7 +335,7 @@ def upload_via_session(
             ``fail``/``UPLOAD_FAILED``, DA-1711).
     """
     size = _file_size(file_path)
-    bundle = _initiate(session, size, content_type)
+    bundle = _initiate(session, size, content_type, element=element)
     upload_id: str = bundle["upload_id"]
     part_size: int = bundle["part_size"]
     part_urls: list[str] = bundle["part_urls"]
@@ -455,16 +460,28 @@ def _file_size(file_path: str) -> int:
         raise NodeIOError(f"cannot stat upload source: {exc}", path=file_path) from exc
 
 
-def _initiate(session: UploadSession, size: int, content_type: str) -> dict[str, Any]:
+def _initiate(
+    session: UploadSession,
+    size: int,
+    content_type: str,
+    element: dict[str, object] | None = None,
+) -> dict[str, Any]:
     """Redeem the session token lazily (POST initiate_url).
+
+    tracker#3969: array sessions carry the element ref
+    (``{"index", "suffix"}``) on the initiate body — the engine derives
+    the element key server-side.
 
     Raises:
         NodeExecutionError: On non-2xx or a malformed response bundle.
     """
+    body: dict[str, object] = {"size": size, "content_type": content_type}
+    if element is not None:
+        body["element"] = element
     with httpx.Client(timeout=_CONTROL_TIMEOUT) as client:
         res = client.post(
             session.initiate_url,
-            json={"size": size, "content_type": content_type},
+            json=body,
         )
         res.raise_for_status()
         try:
