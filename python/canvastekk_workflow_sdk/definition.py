@@ -63,6 +63,21 @@ nodes within the same category, in which case use ``-light`` or ``-dark``.
 # fmt: on
 
 
+def _is_file_schema(schema: dict[str, Any]) -> bool:
+    # S.1 (SDK#161): a file field is either a string with format "file"
+    # or an array whose items are. Shared by the input- and output-side
+    # field discovery (the output side missed the array case — live-run
+    # evidence: canvastekk-tracker#3971 follow-up, url-loader array runs
+    # uploaded nothing because 'buffers' was never enumerated).
+    if schema.get("format") == "file":
+        return True
+    return (
+        schema.get("type") == "array"
+        and isinstance(schema.get("items"), dict)
+        and schema["items"].get("format") == "file"
+    )
+
+
 class WorkflowNodeStyles(BaseModel):
     """Presentation metadata consumed by the frontend."""
 
@@ -525,19 +540,7 @@ class WorkflowNodeManifest(BaseModel):
         A field is considered a file input if it has `format: "file"` in the input_schema properties.
         """
         properties = self.input_schema.get("properties", {})
-
-        def _is_file(schema: dict[str, Any]) -> bool:
-            # S.1 (SDK#161): a file field is either a string with format
-            # "file" or an array whose items are.
-            if schema.get("format") == "file":
-                return True
-            return (
-                schema.get("type") == "array"
-                and isinstance(schema.get("items"), dict)
-                and schema["items"].get("format") == "file"
-            )
-
-        return [name for name, schema in properties.items() if _is_file(schema)]
+        return [name for name, schema in properties.items() if _is_file_schema(schema)]
 
     @property
     def has_file_inputs(self) -> bool:
@@ -551,7 +554,7 @@ class WorkflowNodeManifest(BaseModel):
         A field is considered a file output if it has `format: "file"` in the output_schema properties.
         """
         properties = self.output_schema.get("properties", {})
-        return [name for name, schema in properties.items() if schema.get("format") == "file"]
+        return [name for name, schema in properties.items() if _is_file_schema(schema)]
 
     def validate_file_input(self, field_name: str, file_path: Path) -> None:
         """Validate a downloaded file against x-* extensions on the schema.

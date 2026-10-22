@@ -194,6 +194,21 @@ describe("getFileOutputFields", () => {
     });
     expect(getFileOutputFields(def)).toEqual(["outputFile"]);
   });
+
+  it("enumerates array file outputs (items.format=file)", () => {
+    const def = WorkflowNodeManifestSchema.parse({
+      ...validDefinition,
+      output_schema: {
+        type: "object",
+        properties: {
+          buffer: { type: "string", format: "file" },
+          buffers: { type: "array", items: { type: "string", format: "file" } },
+          filenames: { type: "array", items: { type: "string" } },
+        },
+      },
+    });
+    expect(getFileOutputFields(def).sort()).toEqual(["buffer", "buffers"]);
+  });
 });
 
 describe("validateFileInput", () => {
