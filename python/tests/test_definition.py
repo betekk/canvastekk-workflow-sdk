@@ -272,6 +272,25 @@ class TestWorkflowNodeManifest:
         )
         assert sorted(definition.file_output_fields) == ["mask_path", "result_path"]
 
+    def test_file_output_fields_with_array_file(self) -> None:
+        """Array file outputs (items.format=file) are enumerated — S.1 mirror of the input side."""
+        definition = WorkflowNodeManifest(
+            slug="url-loader",
+            version="1.3.2",
+            name="URL Loader",
+            description="Produces single or array file outputs",
+            input_schema={"type": "object"},
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "buffer": {"type": "string", "format": "file"},
+                    "buffers": {"type": "array", "items": {"type": "string", "format": "file"}},
+                    "filenames": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        )
+        assert sorted(definition.file_output_fields) == ["buffer", "buffers"]
+
     def test_file_output_fields_no_file(self) -> None:
         """Test file_output_fields returns empty list when no file output fields."""
         definition = WorkflowNodeManifest(

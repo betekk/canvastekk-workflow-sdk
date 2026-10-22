@@ -426,8 +426,17 @@ export function getFileOutputFields(def: WorkflowNodeManifest): string[] {
     string,
     Record<string, unknown>
   >;
+  // Mirrors getFileInputFields (S.1, SDK#161): a file field is a string with
+  // format "file" OR an array whose items are. The output side missed the
+  // array case — url-loader array runs uploaded nothing (canvastekk-tracker
+  // #3971 follow-up, live-run evidence).
+  const isFileField = (schema: Record<string, unknown>): boolean => {
+    if (schema.format === "file") return true;
+    const items = schema.items as Record<string, unknown> | undefined;
+    return schema.type === "array" && items !== undefined && items.format === "file";
+  };
   return Object.entries(properties)
-    .filter(([, schema]) => schema.format === "file")
+    .filter(([, schema]) => isFileField(schema))
     .map(([name]) => name);
 }
 
