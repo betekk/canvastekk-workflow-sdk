@@ -49,12 +49,30 @@ class UploadSession(BaseModel):
     abort_url: str
     status_url: str
     expires_at: str | None = Field(default=None, description="ISO-8601 expiry (informational).")
+    array: bool | None = Field(
+        default=None,
+        description=(
+            "tracker#3969: prefix-scoped session for an array-declared file-output"
+            " field — redeem once per element (element {index, suffix} rides the"
+            " initiate body); absent on single-file sessions."
+        ),
+    )
 
 
 #: An upload target. Session-only since SDK 0.36.0 (DA-3340): the legacy
 #: presigned-PUT ``str`` member was removed; a string target reaching the
 #: upload seam raises :class:`NodeIOError`.
 UploadTarget = UploadSession
+
+
+def _element_suffix(file_path: str) -> str:
+    """tracker#3969: the element's extension — the engine validates it
+    against the same ^(.\\.[A-Za-z0-9_-]{1,15})?$ contract and stamps with
+    the identical derivation, so uploads and stamps cannot drift."""
+    ext = os.path.splitext(file_path)[1]
+    import re
+
+    return ext if re.fullmatch(r"(\.[A-Za-z0-9_-]{1,15})?", ext) else ""
 
 
 @runtime_checkable
@@ -66,7 +84,7 @@ class OutputUploader(Protocol):
     after a successful execution when upload URLs are available.
     """
 
-    def upload_file(self, file_path: str, target: UploadTarget) -> None:
+    def upload_file(self, file_path: str, target: UploadTarget, element_index: int | None = None) -> None:
         """Upload a single file to storage via an upload target.
 
         Since SDK 0.36.0 (DA-3340) the target is an :class:`UploadSession`
@@ -77,6 +95,9 @@ class OutputUploader(Protocol):
         Args:
             file_path: Local path to the file.
             target: Multipart upload-session descriptor.
+            element_index: tracker#3969 — position of this file within an
+                array-declared output field (``None`` for single-file
+                fields); rides the initiate body as the element ref.
         """
         ...
 
@@ -115,7 +136,7 @@ class S3PresignedUploader:
     strand downstream consumers (DA-1711 4.1).
     """
 
-    def upload_file(self, file_path: str, target: UploadTarget) -> None:
+    def upload_file(self, file_path: str, target: UploadTarget, element_index: int | None = None) -> None:
         """Upload a single file to an engine-provided upload target.
 
         Session-only since SDK 0.36.0 (DA-3340): an
@@ -141,6 +162,13 @@ class S3PresignedUploader:
         if isinstance(target, UploadSession):
             from canvastekk_workflow_sdk.multipart import upload_via_session
 
+            if element_index is not None and target.array:
+                upload_via_session(
+                    target,
+                    file_path,
+                    element={"index": element_index, "suffix": _element_suffix(file_path)},
+                )
+                return
             upload_via_session(target, file_path)
             return
 
@@ -187,6 +215,33 @@ class S3PresignedUploader:
                 continue
 
             value = response.outputs[field_name]
+            target = upload_urls[field_name]
+
+            if isinstance(value, list):
+                # tracker#3969: array file outputs — each element uploads
+                # against its indexed redemption of the prefix session.
+                if not getattr(target, "array", None):
+                    logger.error(
+                        "Output field '%s' value is a list but its target is not an array session",
+                        field_name,
+                    )
+                    raise NodeIOError(
+                        f"Output field '{field_name}' value is a list but its target is not an array session"
+                    )
+                for index, element in enumerate(value):
+                    if not isinstance(element, str):
+                        raise NodeIOError(
+                            f"Output field '{field_name}' element {index} is not a string: {type(element).__name__}"
+                        )
+                    if not os.path.isfile(element):
+                        raise NodeIOError(
+                            f"Output field '{field_name}' element {index} is not a local file: {element}",
+                            path=element,
+                        )
+                    self.upload_file(element, target, element_index=index)
+                    logger.info("Uploaded output '%s[%d]' to S3", field_name, index)
+                continue
+
             if not isinstance(value, str):
                 logger.error("Output field '%s' value is not a string: %s", field_name, type(value).__name__)
                 raise NodeIOError(f"Output field '{field_name}' value is not a string: {type(value).__name__}")
