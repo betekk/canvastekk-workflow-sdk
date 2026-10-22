@@ -47,6 +47,7 @@
 - [full-pytest-needs-fastapi-extra](conventions/full-pytest-needs-fastapi-extra.md) — fresh venv: poetry install -E fastapi (ci-python.yml:106) before pytest; fastapi collection errors are environmental (#144)
 
 ## anti-patterns
+- [mirror-schema-shape-fix-input-output-sides](anti-patterns/mirror-schema-shape-fix-input-output-sides.md) — an S.1-class shape rule fixed inputs-only leaves outputs blind; array-mode node passed with zero uploads, downstream 404 (#3971 follow-up)
 - [public-repo-cannot-call-private-reusable](anti-patterns/public-repo-cannot-call-private-reusable.md) — public repo + private reusable = "workflow was not found" at any ref; check .private on both sides FIRST; same-repo vendored copy is the escape hatch
 - [workflow-call-outputs-need-workflow-level-reexport](anti-patterns/workflow-call-outputs-need-workflow-level-reexport.md) — chained jobs on reusable outputs silently no-op unless the reusable re-exports them under workflow_call.outputs (fixed betekk-gha v1.7.2)
 - [urllib-httpexception-escapes-urlerror-catch](anti-patterns/urllib-httpexception-escapes-urlerror-catch.md) — http.client.HTTPException escapes a URLError-only catch as an unhandled 500; add it to any fail-closed urllib guard
