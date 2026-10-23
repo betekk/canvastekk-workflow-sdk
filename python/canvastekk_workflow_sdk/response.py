@@ -141,6 +141,51 @@ class NodeExecutionResponse(BaseModel):
         )
 
 
+class MultiNodeHealthResponse(BaseModel):
+    """Response from the multi-node application's root /health endpoint."""
+
+    status: Literal["healthy"] = Field(description="Aggregate health status")
+    nodes: list[str] = Field(
+        description="URL prefixes of the mounted node sub-applications"
+    )
+
+
+class LivenessResponse(BaseModel):
+    """Response from /live."""
+
+    status: Literal["alive"] = Field(description="Liveness marker")
+
+
+class ReadinessResponse(BaseModel):
+    """Response from /ready — 200 and 503 bodies share this shape."""
+
+    status: Literal["ready", "not_ready"] = Field(description="Readiness state")
+    node_id: str = Field(description="Node identifier")
+    checks: dict[str, bool] = Field(
+        default_factory=dict,
+        description="Individual health check results",
+    )
+
+
+class MetricsSummaryResponse(BaseModel):
+    """Response from /metrics — aggregated execution statistics.
+
+    Only ``total_executions`` is always present; the remaining fields
+    appear once at least one execution has been recorded.
+    """
+
+    total_executions: int = Field(description="Total executions recorded")
+    pass_count: int | None = Field(default=None, description="Successful executions")
+    fail_count: int | None = Field(default=None, description="Failed executions")
+    success_rate: float | None = Field(default=None, description="Pass fraction 0.0-1.0")
+    avg_duration_ms: float | None = Field(default=None, description="Mean execution duration")
+    min_duration_ms: float | None = Field(default=None, description="Fastest execution duration")
+    max_duration_ms: float | None = Field(default=None, description="Slowest execution duration")
+    total_token_usage: dict[str, int] | None = Field(
+        default=None, description="Token usage totals by kind"
+    )
+
+
 class HealthResponse(BaseModel):
     """Response from /health endpoint."""
 

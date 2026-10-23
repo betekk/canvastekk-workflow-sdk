@@ -32,7 +32,13 @@ from canvastekk_workflow_sdk.auth import NodeAuth, _AuthBackend
 from canvastekk_workflow_sdk.exceptions import NodeExecutionError, NodeTimeoutError, get_http_status_for_error
 from canvastekk_workflow_sdk.logging import configure_logging
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
-from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionResponse
+from canvastekk_workflow_sdk.response import (
+    HealthResponse,
+    LivenessResponse,
+    MetricsSummaryResponse,
+    NodeExecutionResponse,
+    ReadinessResponse,
+)
 from canvastekk_workflow_sdk.uploads import UploadTarget, get_default_uploader
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
@@ -588,6 +594,7 @@ def create_node_app(
         summary="Execution metrics",
         description="Aggregated execution statistics including success rate, average duration, and token usage.",
         tags=["Observability"],
+        responses={200: {"model": MetricsSummaryResponse}},
     )
     async def metrics() -> JSONResponse:
         """
@@ -603,6 +610,7 @@ def create_node_app(
         summary="Liveness probe",
         description="Returns 200 if the process is alive. Used by Kubernetes to decide whether to restart the pod.",
         tags=["Health"],
+         responses={200: {"model": LivenessResponse}},
     )
     async def liveness() -> JSONResponse:
         """Liveness probe — always returns 200 if the process is running."""
@@ -614,6 +622,8 @@ def create_node_app(
         description="Returns 200 when the node is ready to accept traffic. "
         "Calls node.health_check(); returns 503 if any check fails.",
         tags=["Health"],
+        response_model=ReadinessResponse,
+        responses={503: {"model": ReadinessResponse, "description": "Not ready — at least one health check fails"}},
     )
     async def readiness() -> JSONResponse:
         """Readiness probe — returns 200 when the node can accept traffic."""

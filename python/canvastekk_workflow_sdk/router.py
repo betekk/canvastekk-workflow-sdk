@@ -26,6 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from canvastekk_workflow_sdk.app import create_node_app
+from canvastekk_workflow_sdk.response import MultiNodeHealthResponse
 
 if TYPE_CHECKING:  # pragma: no cover - import-time only
     from fastapi import FastAPI
@@ -93,13 +94,19 @@ def create_multi_node_app(
     for prefix, node_app in node_apps:
         app.mount(f"/{prefix}", node_app)
 
-    @app.get("/health")
-    async def root_health() -> dict[str, Any]:
+    @app.get(
+        "/health",
+        response_model=MultiNodeHealthResponse,
+        summary="Multi-node application health",
+        description="Returns the aggregate health status and the URL prefixes of every mounted node application.",
+        tags=["Health"],
+    )
+    async def root_health() -> MultiNodeHealthResponse:
         """Root health endpoint for the multi-node application.
 
         Returns:
             Dict with ``status`` and list of mounted node prefixes.
         """
-        return {"status": "healthy", "nodes": list(nodes.keys())}
+        return MultiNodeHealthResponse(status="healthy", nodes=list(nodes.keys()))
 
     return app

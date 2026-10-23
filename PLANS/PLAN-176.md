@@ -8,9 +8,9 @@
 
 - [x] Every inline/non-docstring comment purged (ts/py/yaml); JSDoc/Javadoc-class docstrings kept and audited to current behavior
 - [x] Token-aware stripping; diff audit 0 offenders
-- [ ] The bare scaffold returns typed: `router.py` multi-node root health, `app.py` `/live`, `/ready` (+503), `/metrics` — Pydantic models aligned with existing `HealthResponse` style; no parallel mechanism to ContractSpec/to_openapi
-- [ ] Verification gates green (`tsc --noEmit` or repo build, py `compileall` + tests, exported openapi shows properties on these routes)
-- [ ] Squash `chore(comments): purge + typed scaffold responses (#176)`; base `origin/dev`
+- [x] The bare scaffold returns typed: `router.py` multi-node root health, `app.py` `/live`, `/ready` (+503), `/metrics` — Pydantic models aligned with existing `HealthResponse` style; no parallel mechanism to ContractSpec/to_openapi
+- [x] Verification gates green (`tsc --noEmit` or repo build, py `compileall` + tests, exported openapi shows properties on these routes)
+- [x] Squash `chore(comments): purge + typed scaffold responses (#176)`; base `origin/dev`
 
 ## Dependency & Consumer Map
 
@@ -39,17 +39,17 @@ Cross-module note: response_model additions change served openapi.json (that is 
     — **Consumers affected:** openapi descriptions, agents
 
 ### Phase 3: Typed scaffold responses
-- [ ] **3.1** Add `MultiNodeHealth` (status: Literal["healthy"], nodes: list[str]) in `response.py`; `router.py::root_health` returns it with `response_model`
+- [x] **3.1** Add `MultiNodeHealth` (status: Literal["healthy"], nodes: list[str]) in `response.py`; `router.py::root_health` returns it with `response_model`
     — **Why:** the one census-flagged bare-dict scaffold route
     — **Done when:** route decorated; openapi export shows typed properties
     — **Consumers affected:** multi-node gateway consumers (wire unchanged)
-- [ ] **3.2** Add `LivenessResponse` (status: Literal["alive"]), `ReadinessResponse` (status: Literal["ready","not_ready"], node_id, checks) + 503 `response_model`/`responses=`, `MetricsSummary` (total_executions, pass_count, fail_count, success_rate, avg/min/max_duration_ms, total_token_usage) in `response.py`; wire `/live` `/ready` `/metrics` to them preserving exact JSON keys
+- [x] **3.2** Add `LivenessResponse` (status: Literal["alive"]), `ReadinessResponse` (status: Literal["ready","not_ready"], node_id, checks) + 503 `response_model`/`responses=`, `MetricsSummary` (total_executions, pass_count, fail_count, success_rate, avg/min/max_duration_ms, total_token_usage) in `response.py`; wire `/live` `/ready` `/metrics` to them preserving exact JSON keys
     — **Why:** bare JSONResponse returns render as empty objects in openapi.json
     — **Done when:** conformance tests + unit tests green; exported openapi shows properties
     — **Consumers affected:** conformance probes (shape-tolerant), openapi readers
 
 ### Phase 4: Gates + exit
-- [ ] **4.1** Full gate: TS build/typecheck (`tsc --noEmit` or repo script), py `compileall` + pytest suite, openapi export assertion for the four routes; AC ticks; `GATE <sha> tier=full`
+- [x] **4.1** Full gate: TS build/typecheck (`tsc --noEmit` or repo script), py `compileall` + pytest suite, openapi export assertion for the four routes; AC ticks; `GATE <sha> tier=full`
     — **Why:** final SHA carries the full memo
     — **Done when:** all green, PLAN residue empty
     — **Consumers affected:** PR citation
