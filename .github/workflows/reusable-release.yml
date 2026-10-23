@@ -121,6 +121,9 @@ jobs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
       new_version: ${{ steps.tag_version.outputs.new_version }}
     steps:
+      # tracker#4017: heal #4001-class workspace poisoning before checkout
+      # (self-hosted local pool: sparse residue / partial clones).
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

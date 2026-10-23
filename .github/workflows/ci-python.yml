@@ -92,6 +92,9 @@ jobs:
         python-version: ['3.12', '3.13']
 
     steps:
+      # tracker#4017: heal #4001-class workspace poisoning before checkout
+      # (self-hosted local pool: sparse residue / partial clones).
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -147,6 +150,9 @@ jobs:
         if: steps.filter.outputs.schema_files != 'true'
         run: echo "No schema-relevant files changed — skipping stability check."
 
+      # tracker#4017: heal #4001-class workspace poisoning before checkout
+      # (self-hosted local pool: sparse residue / partial clones).
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - name: Checkout base
         if: steps.filter.outputs.schema_files == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -154,6 +160,9 @@ jobs:
           ref: ${{ github.base_ref }}
           path: base
 
+      # tracker#4017: heal #4001-class workspace poisoning before checkout
+      # (self-hosted local pool: sparse residue / partial clones).
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - name: Checkout PR
         if: steps.filter.outputs.schema_files == 'true'
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -223,6 +232,9 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
     steps:
+      # tracker#4017: heal #4001-class workspace poisoning before checkout
+      # (self-hosted local pool: sparse residue / partial clones).
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: diff -r .agents/skills vs python/canvastekk_workflow_sdk/data/skills
         run: diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills
