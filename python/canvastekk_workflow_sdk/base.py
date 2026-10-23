@@ -49,13 +49,8 @@ from canvastekk_workflow_sdk.response import NodeExecutionResponse
 
 logger = logging.getLogger(__name__)
 
-# Per-connect/read/write operation timeout for httpx. The TOTAL download
-# deadline (``_download_deadline``) is enforced separately in the chunk loop
-# because httpx timeouts are per-operation and never trip on slow-drip streams.
 _HTTPX_DOWNLOAD_TIMEOUT = 30.0
 
-# Fraction of the node's timeout_seconds reserved for execute() after all
-# file downloads complete; downloads share the remainder of the budget.
 _DOWNLOAD_BUDGET_FRACTION = 0.8
 
 
@@ -129,7 +124,6 @@ class BaseNode(ABC):
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Validate that subclasses define required attributes."""
         super().__init_subclass__(**kwargs)
-        # Skip validation for abstract classes
         if ABC in cls.__bases__:
             return
         if not hasattr(cls, "definition") or cls.definition is None:
@@ -399,11 +393,6 @@ class BaseNode(ABC):
                 value = inputs.get(field_name)
 
                 if isinstance(value, list):
-                    # S.1 (SDK#161): array file inputs — every URL element is
-                    # downloaded, validated, and replaced by its local path;
-                    # non-URL elements pass through untouched (mirrors the
-                    # single-value skip rule). Failure cleans every file of
-                    # the run via the shared ``downloaded`` registry.
                     entries: list[dict[str, Any]] = []
                     new_elements: list[Any] = []
                     for element in value:
@@ -491,9 +480,6 @@ class BaseNode(ABC):
             return
         replacement = dep.replacement_slug or "unspecified"
         if dep.sunset_date is not None and datetime.now(UTC).date() > dep.sunset_date:
-            # S.2 (SDK#161): sunset is structured, not message-only — the
-            # lifecycle category plus NODE_SUNSET code and machine-readable
-            # details let consumers react without parsing prose.
             raise NodeConfigurationError(
                 f"Node '{self.definition.slug}' was sunset on {dep.sunset_date.isoformat()} "
                 f"and refuses to run; migrate to '{replacement}' ({dep.notice})",
@@ -562,7 +548,6 @@ class BaseNode(ABC):
         Returns:
             NodeExecutionResponse with pass/fail status
         """
-        # DA-3359: entrypoint horizon gate (import stays log-only).
         from canvastekk_workflow_sdk._horizon import enforce_support_horizon
 
         enforce_support_horizon()
@@ -576,10 +561,6 @@ class BaseNode(ABC):
             self._validate_inputs(request.inputs)
 
             if request.dry_run:
-                # D10 (#111): validation-only execution. The branch position
-                # IS the zero-side-effect guarantee — after full input
-                # validation, before context/file-download/middleware/
-                # execute/output-upload. Do not move it.
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 if not self.definition.effective_contract.capabilities.dry_run:
                     logger.info(
@@ -613,10 +594,6 @@ class BaseNode(ABC):
                 execution_id=execution_id,
             )
 
-            # Ambient context for BaseNode.report_progress() during this run
-            # (DA-3230) — visible in this thread and inside asyncio.to_thread
-            # workers; the Token reset guarantees no leakage across reused
-            # executor threads even when execute() raises.
             token = execution_context_var.set(context)
             try:
                 inputs = dict(request.inputs)
@@ -633,7 +610,6 @@ class BaseNode(ABC):
 
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
 
-                # DA-3359: one structured execution line per run (local-dev story).
                 logger.info(
                     "execution slug=%s status=pass duration_ms=%d",
                     self.definition.slug,
@@ -741,8 +717,6 @@ class BaseNode(ABC):
             mw.on_error(request.inputs, error, context, duration_ms)
 
         error_code = getattr(error, "error_code", None)
-        # DA-3359: one structured execution line per run — failure chokepoint
-        # (every failure path funnels through _record_error).
         logger.info(
             "execution slug=%s status=fail duration_ms=%d error_type=%s",
             self.definition.slug,

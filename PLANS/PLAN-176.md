@@ -6,8 +6,8 @@
 
 ## Acceptance Criteria
 
-- [ ] Every inline/non-docstring comment purged (ts/py/yaml); JSDoc/Javadoc-class docstrings kept and audited to current behavior
-- [ ] Token-aware stripping; diff audit 0 offenders
+- [x] Every inline/non-docstring comment purged (ts/py/yaml); JSDoc/Javadoc-class docstrings kept and audited to current behavior
+- [x] Token-aware stripping; diff audit 0 offenders
 - [ ] The bare scaffold returns typed: `router.py` multi-node root health, `app.py` `/live`, `/ready` (+503), `/metrics` — Pydantic models aligned with existing `HealthResponse` style; no parallel mechanism to ContractSpec/to_openapi
 - [ ] Verification gates green (`tsc --noEmit` or repo build, py `compileall` + tests, exported openapi shows properties on these routes)
 - [ ] Squash `chore(comments): purge + typed scaffold responses (#176)`; base `origin/dev`
@@ -27,13 +27,13 @@ Cross-module note: response_model additions change served openapi.json (that is 
 ## Implementation Phases
 
 ### Phase 1: Strip
-- [ ] **1.1** TS strip (`c` mode; JSDoc `/** */` kept; `@ts-*`/eslint pragmas kept) over `typescript/src` + `typescript/test`; PY strip over `python/` (docstrings kept); HASH strip over yaml
+- [x] **1.1** TS strip (`c` mode; JSDoc `/** */` kept; `@ts-*`/eslint pragmas kept) over `typescript/src` + `typescript/test`; PY strip over `python/` (docstrings kept); HASH strip over yaml
     — **Why:** the purge core
     — **Done when:** audit 0 offenders; tsc/compileall green
     — **Consumers affected:** none (comment-only)
 
 ### Phase 2: Docstring audit
-- [ ] **2.1** Tells grep over kept docstrings (py + ts JSDoc); rewrite history narration to current behavior
+- [x] **2.1** Tells grep over kept docstrings (py + ts JSDoc); rewrite history narration to current behavior
     — **Why:** kept contracts must state current behavior
     — **Done when:** tells grep clean of history narration
     — **Consumers affected:** openapi descriptions, agents
@@ -68,3 +68,8 @@ None. Epic children 8-13 inherit scaffold typing at their next natural bump.
 
 - MetricsSummary optional-field mismatch → mirror get_summary exactly; conformance + unit tests
 - TS strip corrupts template literal → fixture-proven stripper + tsc gate
+
+## Trace
+
+- Phase 1: 877 comment lines stripped (ts 282, py 480, yaml 115; 87 files); stash mishap in baseline check recovered via stash pop, tree verified
+- Phase 2: only two history tells found — both were stripped inline comments describing their next line (no promotion needed); docstrings clean

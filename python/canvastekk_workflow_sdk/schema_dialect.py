@@ -12,7 +12,6 @@ from typing import Any
 
 __all__ = ["lint_schema_dialect"]
 
-# $schema URIs that predate 2020-12 (and the one 2019-09 holdover keyword).
 _PRE_2020_12_SCHEMAS = (
     "http://json-schema.org/draft-07/schema#",
     "http://json-schema.org/draft-04/schema#",
@@ -20,7 +19,6 @@ _PRE_2020_12_SCHEMAS = (
     "https://json-schema.org/draft/2019-09/schema",
 )
 
-# Traversal keys: containers to recurse into.
 _CONTAINER_KEYS = ("properties", "$defs", "definitions", "patternProperties")
 _LIST_CONTAINER_KEYS = ("prefixItems", "allOf", "anyOf", "oneOf")
 
@@ -86,7 +84,7 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
             for i, sub in enumerate(child):
                 _lint_node(sub, f"{path}.{key}[{i}]", violations)
     items = schema.get("items")
-    if isinstance(items, list):  # draft-07 array form: not valid 2020-12
+    if isinstance(items, list):
         violations.append(
             (f"{path}.items", "array-form 'items' is draft-07 — 2020-12 uses 'prefixItems'")
         )

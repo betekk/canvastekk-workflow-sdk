@@ -65,7 +65,6 @@ def test_verify_node_conforming(monkeypatch) -> None:
     _patch_client(monkeypatch)(_conforming_handler)
     report = verify_node("http://node.test")
     assert report.ok
-    # derived: /manifest + 6 remaining SDK-served routes + the dry-run skip line
     assert len(report.checks) == 8
     assert all(c.ok for c in report.checks)
 
@@ -141,7 +140,6 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
             api_key="k",
             verify=True,
         )
-    # /manifest 404s -> the probe set cannot be derived; the registry POST never fired
     assert probe_paths == ["/manifest"]
     assert post_urls == []
 
@@ -179,7 +177,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
         api_key="k",
         verify=True,
     )
-    assert "/health" in probe_calls  # probe ran first
+    assert "/health" in probe_calls
     assert result.action == "created"
     assert post_calls == ["https://engine.test/api/workflows/nodes/"]
 
@@ -229,7 +227,6 @@ def test_cli_verify_nonconforming_exits_nonzero(monkeypatch, capsys) -> None:
     assert "NON-CONFORMING" in capsys.readouterr().out
 
 
-# --- #113: manifest-derived probe set -------------------------------
 
 DERIVED_MANIFEST = {
     **MANIFEST,
@@ -276,7 +273,6 @@ def test_verify_node_broken_declared_route_fails_at_its_name(monkeypatch) -> Non
     assert not report.ok
 
 
-# --- #113: capability-gated dry-run positive probe -------------------
 
 DRY_RUN_MANIFEST = {
     **DERIVED_MANIFEST,
@@ -436,7 +432,7 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
         report = verify_node("http://node.test", api_key=token)
         assert report.ok, [c.route for c in report.checks if not c.ok]
         assert all(c.ok for c in report.checks)
-        assert len(report.checks) >= 6  # manifest + derived route probes
+        assert len(report.checks) >= 6
     finally:
         server.shutdown()
 

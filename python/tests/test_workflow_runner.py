@@ -625,7 +625,6 @@ class TestWorkflowRunnerOutputDir:
         assert result.status == "completed"
         assert captured_dir
         assert Path(captured_dir[0]).exists()
-        # Per-node subdirs: the node's output dir is a subdir of the run dir.
         assert Path(captured_dir[0]) == result.output_dir / "cap"
 
     def test_auto_temp_dir_cleaned_up_on_exception(self) -> None:
@@ -842,10 +841,8 @@ class TestPerNodeOutputSubdirs:
         assert result.status == "completed"
         assert len(captured) == 2
         assert captured[0] != captured[1]
-        # gather() completes in arbitrary order — map path->content by dir name.
         contents = {Path(p).parent.name: Path(p).read_text() for p in captured}
         assert contents == {"a": "a", "b": "b"}
-        # Tidy up the preserved temp dir (cleanup=False was only for asserts).
         import shutil
 
         shutil.rmtree(result.output_dir, ignore_errors=True)

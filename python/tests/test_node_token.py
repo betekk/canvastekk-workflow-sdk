@@ -72,7 +72,6 @@ class TestVerifyNodeToken:
     def test_tampered_payload_returns_none(self) -> None:
         token = mint_node_token("run-9", "node-z", KEY, ttl_seconds=100, now=1_000)
         payload_segment, signature_segment = token[len(NODE_TOKEN_PREFIX) :].split(".")
-        # Decode, mutate run_id, re-encode (signature now stale).
         import base64
         import json
 
@@ -101,7 +100,6 @@ class TestVerifyNodeToken:
         assert verify_node_token(f"{NODE_TOKEN_PREFIX}only-one-part", KEY) is None
 
     def test_valid_json_but_wrong_shape_returns_none(self) -> None:
-        # Self-signed with the right key but claims missing node_id.
         import base64
         import json
 

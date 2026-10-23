@@ -157,8 +157,6 @@ class TestErrorTaxonomySdk161:
         assert NodeConfigurationError("x").category == "lifecycle"
 
     def test_base_defaults_to_domain(self) -> None:
-        # Bare/unclassified errors (including the app's wrap of uncaught
-        # exceptions) are domain — the node's own logic failed.
         assert NodeExecutionError("boom").category == "domain"
 
     def test_to_dict_carries_category(self) -> None:

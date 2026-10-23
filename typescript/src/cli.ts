@@ -121,9 +121,6 @@ export function probeManifest(raw: unknown): {
   if (parsed.data.timeout_seconds > ENGINE_MAX_TIMEOUT_SECONDS) {
     errors.push(`timeout_seconds ${parsed.data.timeout_seconds} exceeds the engine ceiling 86400`);
   }
-  // DA-3499: host-ceiling probe — strictly stricter than registration. The
-  // engine would accept a budget above the node's own hard ceiling, so
-  // passing here implies passing registration (not biconditional).
   if (parsed.data.timeout_seconds > parsed.data.hard_max_runtime_seconds) {
     errors.push(
       `timeout_seconds ${parsed.data.timeout_seconds} exceeds the node's ` +
@@ -211,7 +208,6 @@ async function runRegister(args: string[]): Promise<number> {
     nameSuffix,
   });
   const base = engineUrl.replace(/\/+$/, "") + "/api/workflows/nodes/";
-  // #135: wire form follows credential type (ctk_ -> Authorization: Bearer).
   const [authName, authValue] = registryAuthHeader(token);
   const headers = { "Content-Type": "application/json", [authName]: authValue };
 
@@ -245,7 +241,7 @@ async function runRegister(args: string[]): Promise<number> {
 
 async function runProbe(args: string[]): Promise<number> {
   const manifestSource = flag(args, "--manifest");
-  if (!manifestSource || /^https?:\/\//.test(manifestSource)) return usage(); // offline by design
+  if (!manifestSource || /^https?:\/\//.test(manifestSource)) return usage();
 
   const useJson = args.includes("--json");
   let raw: unknown;

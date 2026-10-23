@@ -34,10 +34,10 @@ def _manifest(**overrides) -> WorkflowNodeManifest:
 class TestBuildEngineRequest:
     def test_vocabulary_adapter_mapping(self) -> None:
         payload = _build_engine_request(_manifest())
-        assert payload["name"] == "echo"  # manifest slug → engine name input
-        assert payload["label"] == "Echo"  # manifest display name → engine label
+        assert payload["name"] == "echo"
+        assert payload["label"] == "Echo"
         assert payload["description"] == "Echo node"
-        assert "slug" not in payload  # engine 422s on client-sent slug
+        assert "slug" not in payload
 
     def test_keys_within_engine_whitelist(self) -> None:
         manifest = _manifest(
@@ -52,8 +52,6 @@ class TestBuildEngineRequest:
             "constraints", "token_cost", "timeout_seconds", "deprecation",
         }
         assert set(payload) <= allowed
-        # #123: legacy manifest key stripped at parse; constraints carry the
-        # docs field + the stamped provenance (sole version key) only.
         assert payload["constraints"] == {
             "docs_url": "https://docs.example.com/echo",
             "sdk_version": manifest.sdk_version,
@@ -131,7 +129,7 @@ class TestRunRegister:
                 ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
             )
         assert code == 3
-        assert "t0ps3cret" not in out  # token never leaks
+        assert "t0ps3cret" not in out
 
     def test_client_error_exit_code(self) -> None:
         import urllib.request
@@ -153,7 +151,6 @@ class TestRunRegister:
         assert code == 6
 
 
-# Module-level definition for module:attribute path used by CLI tests above.
 _manifest_module_marker = _manifest()
 
 
@@ -161,8 +158,6 @@ class TestProbeValueDomain:
     """DA-2603 review: probe mirrors the engine's value domain, not just key shape."""
 
     def test_rejects_category_outside_engine_enum(self) -> None:
-        # "transform" is the SDK docstring example the ENGINE rejects (maps to
-        # "conversion" only via the nodes CI rewrite) — probe must catch it.
         report = _probe_definition(_manifest(category="transform"))
         assert not report["valid"]
         assert any("category" in e for e in report["errors"])
@@ -185,8 +180,6 @@ class TestRegisterManifestFileInput:
     def test_manifest_file_registers(self, tmp_path) -> None:
 
         path = tmp_path / "manifest.json"
-        # Realistic served-manifest shape: extra keys (id, sdk_version, mode,
-        # code_digest) must be ignored by the model.
         path.write_text(
             json.dumps(
                 {

@@ -116,8 +116,6 @@ class HttpExecutor(NodeExecutor):
         self._urls: dict[str, str] = {}
         self._timeout = timeout
         self._retries = retries
-        # Shared client: connection pooling + keep-alive instead of a new
-        # TCP+TLS handshake per node execution (DA-1711 4.3).
         self._client: httpx.AsyncClient | None = None
 
     def register_url(self, slug: str, url: str) -> HttpExecutor:

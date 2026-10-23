@@ -75,7 +75,6 @@ describe("Express endpoints", () => {
 
     it("enforces the effective runtime bound, not the raw timeout_seconds (DA-3609)", async () => {
       class SlowNode extends TestNode {
-        // Budget above the 1 s ceiling: the host must abort at 1 s, not 5 s.
         definition: WorkflowNodeManifest = {
           ...this.definition,
           slug: "slow-node",
@@ -97,7 +96,6 @@ describe("Express endpoints", () => {
         .send({ run_id: "run-1", node_id: "slow-1", inputs: {} });
 
       expect(resp.status).toBe(408);
-      // Aborted at the 1 s effective bound, not the 5 s declared budget.
       expect(Date.now() - started).toBeLessThan(2500);
       expect(resp.body.detail).toContain("after 1s");
     });
@@ -142,8 +140,6 @@ describe("Express endpoints", () => {
     });
 
     it("retains hard_max_runtime_seconds through parse and serve (DA-3609)", async () => {
-      // Part of the /manifest shape (mirrors python's registry_dict re-add);
-      // the default must survive the zod round-trip intact.
       const resp = await request(app).get("/manifest");
       expect(resp.body.hard_max_runtime_seconds).toBe(7200);
     });
@@ -310,8 +306,6 @@ describe("POST /execute upload failure (DA-1711 parity)", () => {
     const port = (server.address() as { port: number }).port;
 
     const originalFetch = globalThis.fetch;
-    // Only the upload PUT fails; other requests (the test's own POST to
-    // /execute) pass through to the real fetch.
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "PUT") {
         return new Response("boom", { status: 500 });

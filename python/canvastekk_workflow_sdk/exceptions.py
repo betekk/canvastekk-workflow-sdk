@@ -9,9 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-# S.2 error taxonomy (SDK#161): every SDK exception classifies into exactly
-# one category. Engine-minted codes join the same registry — the engine's
-# D.2 synthesized envelopes carry ``type`` values from this tuple.
 ERROR_CATEGORIES: tuple[str, ...] = (
     "transport",
     "validation",
@@ -20,14 +17,8 @@ ERROR_CATEGORIES: tuple[str, ...] = (
     "lifecycle",
 )
 
-# S.3 error envelope (SDK#161): the one error shape the engine synthesizes on
-# failed node results (D.2), frontend ERROR rows render (CFN#2080), and node
-# repos raise against (D.4). ``type`` = taxonomy category, ``code`` =
-# structured error code (IO_* sub-codes included).
 ERROR_ENVELOPE_KEYS: tuple[str, ...] = ("type", "message", "code")
 
-# S.6 transport sub-codes (SDK#161): machine-readable reasons carried in
-# ``details["sub_code"]`` by the SDK's download paths (both languages).
 IO_SUBCODE_DOWNLOAD_FAILED = "IO_DOWNLOAD_FAILED"
 IO_SUBCODE_URL_POLICY_BLOCKED = "IO_URL_POLICY_BLOCKED"
 IO_SUBCODE_SIZE_EXCEEDED = "IO_SIZE_EXCEEDED"

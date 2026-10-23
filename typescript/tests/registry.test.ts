@@ -103,8 +103,6 @@ describe("buildRegistryPayload", () => {
   it("merges manifest docs fields into constraints; version keys never emitted (#123)", () => {
     const def = {
       ...testDef,
-      // #123/D16: the removed range fields still parse (zod strips unknown)
-      // but never reach the payload constraints.
       minimum_sdk_version: "0.22.0",
       maximum_sdk_version: "1.0.0",
       docs_url: "https://example.com/docs",
@@ -127,7 +125,6 @@ describe("buildRegistryPayload", () => {
     const constraints = payload.constraints as Record<string, unknown>;
     expect(constraints.minimum_sdk_version).toBe("0.21.0");
     expect(constraints.gpu_required).toBe(true);
-    // DA-3359: the stamp rides along (the manifest's 0.22.0 loses to the caller)
     expect(constraints.sdk_version).toBe(VERSION);
   });
 
@@ -150,8 +147,6 @@ describe("buildRegistryPayload", () => {
       invokeConfig: { region: "us-east-1" },
       constraints: { gpu: true },
     });
-    // Mirrors fastapi_app/schemas/api/nodes.py RegisterWorkflowNodeRequest
-    // (extra='forbid') in canvastekk-workflow-engine.
     const engineRequestFields = new Set([
       "name", "version", "label", "description",
       "input_schema", "output_schema", "invoke_type", "invoke_url",
@@ -287,8 +282,6 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
       expect(exported["node_role"]).toBe("operation");
       expect(exported["retry"]).toEqual(testDef.default_retry);
       expect(exported["node_status"]).toBe("active");
-      // DA-2312: emission parses via DeprecationInfoSchema, so partial objects
-      // are normalized to the full 5-key dump (parity with Python model_dump).
       expect(exported["deprecation"]).toEqual({
         deprecated_at: "2026-08-24",
         sunset_date: null,
@@ -323,16 +316,12 @@ describe("stamped provenance — dual-write dead (#123)", () => {
   });
 
   it("caller constraints are caller data (passthrough); the stamp is forced", () => {
-    // #123: the SDK never WRITES minimum_sdk_version from manifest/stamp paths;
-    // an explicit caller constraint is arbitrary metadata and passes through.
     const payload = buildRegistryPayload(
       { ...testDef, sdk_version: "0.40.0" },
       { constraints: { minimum_sdk_version: "0.23.1" } },
     );
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.minimum_sdk_version).toBe("0.23.1");
-    // the stamp is ALWAYS the installed VERSION (python parity) — a manifest
-    // claiming 0.40.0 cannot masquerade as the registering SDK
     expect(constraints.sdk_version).toBe(VERSION);
   });
 });
@@ -374,7 +363,7 @@ describe("registerNode credential wire form (#135)", () => {
         { definition: testDef },
         "https://engine.example.com/api/workflows/nodes/",
         { serviceToken: CTK_KEY },
-      ).catch(() => undefined); // header capture is the assertion; post-response parsing may reject on a stub body
+      ).catch(() => undefined);
     } finally {
       cap.restore();
     }

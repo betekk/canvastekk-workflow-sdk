@@ -85,7 +85,6 @@ describe("createLogger", () => {
     configureLogging();
     const logger = createLogger("test-module");
     expect(logger).toBeDefined();
-    // Just ensure it doesn't throw
     const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     logger.info("test message");
     expect(spy).toHaveBeenCalled();

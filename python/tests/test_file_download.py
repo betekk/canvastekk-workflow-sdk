@@ -580,8 +580,6 @@ class TestAutoDownload:
         response = node.run(request)
 
         assert response.status == "fail"
-        # Mid-stream cap aborts the download itself (NodeIOError), and the
-        # partial file must not be left behind.
         assert response.error_type == "NodeIOError"
         assert "exceeds" in response.error.lower() or "size" in response.error.lower()
 
@@ -913,8 +911,6 @@ class TestIoSubcodesSdk161:
             NodeIOError,
         )
 
-        # The download path wraps HTTP >= 400 with the sub-code; assert the
-        # constant contract the engine/frontend consume.
         err = NodeIOError(
             "HTTP 404 downloading file for field 'x'",
             details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
@@ -1041,8 +1037,8 @@ class TestArrayFileInputsSdk161:
             )
         )
         parts = captured["parts"]
-        assert parts[0].startswith("/")  # downloaded to local path
-        assert parts[1] == "already-local.ply"  # non-URL passes through
+        assert parts[0].startswith("/")
+        assert parts[1] == "already-local.ply"
 
     @patch("canvastekk_workflow_sdk.base.httpx.get")
     def test_mid_list_failure_cleans_downloads(self, mock_stream):
@@ -1083,7 +1079,6 @@ class TestArrayFileInputsSdk161:
             )
         assert response.status == "fail"
         assert response.error_type == "NodeIOError"
-        # the first element's download was cleaned up with the failed run
         assert first_downloads, "element 1 must have downloaded before the failure"
         assert not first_downloads[0].exists(), (
             f"expected cleanup of {first_downloads[0]}"
@@ -1105,6 +1100,5 @@ class TestArrayFileInputsSdk161:
         assert captured["parts"] == []
 
     def test_manifest_accepts_array_of_file(self):
-        # constructing the node at all proves the manifest validator accepts
         # type: array + items.format: file (S.1)
         assert "parts" in ArrayFileInputNode().definition.file_input_fields

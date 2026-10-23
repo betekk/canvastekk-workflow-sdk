@@ -307,7 +307,6 @@ class TestBuildCheckOutputSchema:
         schema = build_check_output_schema(closed=True)
         assert schema["additionalProperties"] is False
         assert schema["properties"]["result"]["additionalProperties"] is False
-        # the error property survives the closure so ErrorOutputNode appends validate
         assert "error" in schema["properties"]
 
     def test_closed_schema_accepts_error_append(self) -> None:

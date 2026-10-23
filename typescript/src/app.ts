@@ -54,7 +54,6 @@ function handlerCodeDigest(): string | null {
   Error.prepareStackTrace = (_err: Error, sites: NodeJS.CallSite[]) => sites;
   try {
     const sites = new Error().stack as unknown as NodeJS.CallSite[];
-    // [0] handlerCodeDigest (Error constructed here) · [1] createNodeApp · [2] caller
     const file = sites[2]?.getFileName?.();
     if (!file) return null;
     const path = file.startsWith("file://") ? new URL(file).pathname : file;
@@ -74,9 +73,6 @@ export function createNodeApp(
 
   app.use(express.json({ limit: "50mb" }));
 
-  // DA-2603: code digest computed once at startup — sha256 over the source
-  // bytes of the module that called createNodeApp (the handler module).
-  // ponytail: single-file digest; walk the package if nodes grow multi-file.
   const codeDigest = handlerCodeDigest();
   if (codeDigest === null) {
     console.warn(
@@ -87,8 +83,6 @@ export function createNodeApp(
 
   configureLogging();
 
-  // Loud auth-posture warnings (DA-1711 3.3): surface misconfiguration at
-  // startup instead of failing silently in production.
   if (isDevMode()) {
     console.warn(
       "[canvastekk] CANVASTEKK_DEV_MODE is active: ALL authentication is bypassed " +
@@ -103,7 +97,7 @@ export function createNodeApp(
     );
   }
 
-  enforceSupportHorizon(); // DA-3359: entrypoint gate
+  enforceSupportHorizon();
   const sdkVersion = new SDKVersionMiddleware(VERSION, node.definition.slug);
   app.use(sdkVersion.handler());
 
@@ -131,9 +125,6 @@ export function createNodeApp(
       return;
     }
     const execRequest = parsed.data;
-    // S.4 (SDK#161): the capability is engine-controlled — the
-    // X-Node-Capability header is the EXCLUSIVE source; body-supplied
-    // values are stripped so no caller can forge one.
     const capabilityHeader = req.headers["x-node-capability"];
     execRequest.capability =
       typeof capabilityHeader === "string" && capabilityHeader.trim()
@@ -141,8 +132,6 @@ export function createNodeApp(
         : null;
 
     const def = node.nodeDefinition;
-    // DA-3499: hosts enforce the effective bound (budget capped by the hard
-    // ceiling), never the raw timeout_seconds.
     const timeout = effectiveRuntimeSeconds(def);
 
     try {
@@ -151,8 +140,6 @@ export function createNodeApp(
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeout * 1000);
         try {
-          // Thread the abort signal into the node so in-flight file
-          // downloads stop cooperatively when the deadline expires.
           node.setCancelSignal(controller.signal);
           response = await Promise.race([
             node.run(execRequest),
@@ -170,24 +157,16 @@ export function createNodeApp(
         response = await node.run(execRequest);
       }
 
-      // D10 (#111): a dry-run pass carries no outputs — never upload.
       if (execRequest.output_upload_url && response.status === "pass" && !response.dry_run) {
         const fileOutputFields = getFileOutputFields(def);
         if (fileOutputFields.length > 0) {
           try {
-            // The parse union still admits legacy string targets (request.ts);
-            // uploadFile rejects them at runtime with NodeIOError (DA-3340),
-            // so the cast only re-widens the type for this call — a string
-            // value surfaces as UPLOAD_FAILED below, never a silent fallback.
             await getDefaultUploader().uploadOutputs(
               response,
               execRequest.output_upload_url as Record<string, UploadTarget>,
               fileOutputFields,
             );
           } catch (err) {
-            // A declared file output that could not be uploaded means the
-            // engine would receive a local path it cannot fetch — fail the
-            // execution instead of silently passing (DA-1711 4.1).
             console.error("[canvastekk] Output upload failed:", err);
             response = {
               ...response,
@@ -243,8 +222,6 @@ export function createNodeApp(
       content.sdk_version = VERSION;
       if (codeDigest !== null) content.code_digest = codeDigest;
 
-      // DA-1955: parity with python drop-when-none serialization — omit null
-      // optional keys instead of leaking them as explicit nulls.
       for (const key of [
         "deprecation",
         "docs_url",
@@ -256,8 +233,6 @@ export function createNodeApp(
         }
       }
 
-      // D8/#110: the adapter stamps the effective contract — declared subset
-      // wins, else the SDK-served default (exactly what this app mounts).
       content.contract = effectiveContract(def);
 
       const rawEnv = (process.env.CANVASTEKK_NODE_ENV ?? "dev").toLowerCase();
@@ -335,8 +310,6 @@ export function createNodeApp(
       });
       return;
     }
-    // Unexpected exceptions: log full detail server-side; the client gets a
-    // generic message (no internals/paths/URLs leak to callers).
     console.error("[canvastekk] Unhandled exception:", err);
     res.status(500).json({
       detail: "Internal server error",
@@ -376,7 +349,7 @@ export function createMultiNodeApp(
   const app = express();
   app.use(express.json({ limit: "50mb" }));
 
-  enforceSupportHorizon(); // DA-3359: entrypoint gate
+  enforceSupportHorizon();
   const sdkVersion = new SDKVersionMiddleware(VERSION);
   app.use(sdkVersion.handler());
 

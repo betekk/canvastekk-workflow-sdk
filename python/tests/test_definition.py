@@ -534,9 +534,6 @@ class TestExportDefinition:
             output_schema={"type": "object"},
         )
 
-        # #131: "lambda" is a rejected platform surface — export_definition
-        # routes through build_registry_payload, so the choke guard fires
-        # BEFORE any file is written.
         import pytest as _pytest
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -640,7 +637,6 @@ class TestExportDefinition:
             data = json.loads(output_path.read_text())
             assert data["constraints"]["gpu_required"] is True
             assert data["constraints"]["memory_gb"] == 8
-            # DA-3359: the stamp always rides along
             assert data["constraints"].get("sdk_version") == definition.sdk_version
 
     def test_export_definition_with_node_status(self) -> None:
@@ -736,10 +732,6 @@ class TestValidateFileInput:
             definition.validate_file_input("file", f)
 
     def test_extensionless_file_passes(self, tmp_path) -> None:
-        # DA-3429: extension-less artifacts (e.g. DA-3339 emission keys named
-        # by field, Content-Disposition filenames without an extension) must
-        # not hard-fail the x-accept check — the handler's own content
-        # handling stays responsible for correctness.
         definition = self._make_definition()
         f = tmp_path / "pcd_path_buffer"
         f.write_text("binary-ish content")
@@ -1341,7 +1333,7 @@ class TestStampedSdkVersion:
 
     def test_dump_includes_stamp(self) -> None:
         dump = self._manifest().model_dump()
-        assert dump["sdk_version"]  # non-empty stamp present in serialization
+        assert dump["sdk_version"]
 
 
 class TestHardMaxRuntimeSeconds:
@@ -1394,8 +1386,6 @@ class TestHardMaxRuntimeSeconds:
         export_definition(m, out)
         data = json.loads(out.read_text())
         assert data["hard_max_runtime_seconds"] == 14400
-        # Reload (identity key supplied — the export is registry-shaped, name=slug):
-        # the override must survive the export file, not silently drop to 7200.
         reloaded = WorkflowNodeManifest.model_validate({**data, "slug": "echo"})
         assert reloaded.hard_max_runtime_seconds == 14400
         assert reloaded.effective_runtime_seconds == 9000
@@ -1430,7 +1420,6 @@ class TestNodeContract:
         """#113: /openapi joins the vocabulary as an OPTIONAL (non-minimum) route."""
         contract = NodeContract(routes=["/execute", "/health", "/manifest", "/openapi"])
         assert "/openapi" in contract.routes
-        # optional: the minimum set does not include it
         assert NodeContract(routes=["/execute", "/health", "/manifest"]).routes == [
             "/execute",
             "/health",

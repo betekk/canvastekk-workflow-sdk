@@ -36,10 +36,7 @@ from canvastekk_workflow_sdk.uploads import UploadSession
 
 logger = logging.getLogger(__name__)
 
-#: Per-S3-part-PUT timeout (read/write) — separate from the short
-#: control-plane timeout. Generous: a 5 GB part on a slow link is legal.
 _S3_PUT_TIMEOUT = httpx.Timeout(connect=10.0, read=600.0, write=600.0, pool=10.0)
-#: Control-plane (initiate/complete/abort/status) timeout.
 _CONTROL_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
 
 _DEFAULT_RETRY_ATTEMPTS = 3
@@ -141,18 +138,9 @@ def _put_one_part(
         NodeIOError: If all attempts fail (S3 error body surfaced).
         NodeExecutionError: If the response carries no usable ETag.
     """
-    # No Content-MD5 on part PUTs (DA-2891 verdict superseded by DA-3341
-    # evidence): the engine presigns part URLs with SignedHeaders=host only
-    # and the MD5 is unknowable at mint time, so an unsigned Content-MD5
-    # header makes S3 reject the PUT with AccessDenied "There were headers
-    # present in the request which were not signed". Integrity rides TLS
-    # in transit plus S3's MPU etag consistency; reintroduce per-part
-    # checksums only via a mint-time per-part signing protocol change.
 
     last_exc: Exception | None = None
     for attempt in range(1, retry_attempts + 1):
-        # S3 requires explicit Content-Length on presigned PUTs — it
-        # rejects plain Transfer-Encoding: chunked.
         headers = {
             "Content-Type": content_type,
             "Content-Length": str(len(chunk)),
@@ -174,8 +162,6 @@ def _put_one_part(
                 )
                 time.sleep(backoff)
                 continue
-            # Surface the S3 error body (BadDigest/InvalidDigest XML names
-            # the condition) so digest failures are diagnosable, not opaque.
             detail = ""
             if isinstance(exc, httpx.HTTPStatusError):
                 body = exc.response.text[:200].strip()
@@ -196,7 +182,6 @@ def _put_one_part(
         )
         return {"part_number": part_number, "etag": etag}
 
-    # Defensive — unreachable (loop returns or raises above).
     raise NodeIOError(
         f"S3 part {part_number} upload exhausted retries without raising",
         path=file_path,
@@ -381,19 +366,10 @@ def upload_via_session(
                 part_failure: Exception | None = None
                 for start in range(0, len(remaining), batch_size):
                     batch = remaining[start : start + batch_size]
-                    # Pre-read sequentially on the orchestrator thread —
-                    # the only place fh is touched. A local read failure
-                    # (file shrank) is NOT resumable; it propagates to the
-                    # abort path below.
                     chunks = [_read_part_chunk(fh, n, part_size, file_path) for n in batch]
                     try:
-                        # Executor.map preserves input order; the memory
-                        # ceiling is batch_size × part_size buffered.
                         etags.extend(pool.map(_put, batch, chunks))
                     except (NodeIOError, NodeExecutionError) as exc:
-                        # The failed part may still have landed in S3, and
-                        # a mid-batch sibling's PUT may complete after this
-                        # raise — attempt a resume round before giving up.
                         part_failure = exc
                         break
                 if part_failure is None:
@@ -414,15 +390,10 @@ def upload_via_session(
                     part_numbers=set(part_numbers),
                     failure=part_failure,
                 )
-                # Server truth supersedes local etag bookkeeping.
                 etags = confirmed
                 if not remaining:
                     break
     except Exception:
-        # Resume exhausted/impossible, part-PUT failure, or local I/O
-        # failure — abort to release orphaned S3 multipart state. Best
-        # effort: _abort_session never raises, so the original exception
-        # always propagates cleanly.
         logger.exception(
             "multipart session upload failed (upload_id=%s) — aborting",
             upload_id,
@@ -430,11 +401,6 @@ def upload_via_session(
         _abort_session(session.abort_url, upload_id)
         raise
 
-    # Complete — NOT inside the try/except above. If complete fails, the
-    # parts are already valid in S3; aborting would destroy them. Complete
-    # is idempotent, so a retry of the whole flow can call it again.
-    # S3 CompleteMultipartUpload requires parts ordered by part number;
-    # after a resume round etags arrive from two sources.
     etags = sorted(
         ({part["part_number"]: part for part in etags}).values(),
         key=lambda part: part["part_number"],

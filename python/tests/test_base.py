@@ -214,9 +214,6 @@ class TestBaseNode:
         node = EchoNode()
         app = node.create_app()
         assert app is not None
-        # Check that routes exist. fastapi >=0.143 nests the router under an
-        # _IncludedRouter in app.routes, so introspect via the public
-        # openapi paths instead of iterating app.routes.
         paths = set(app.openapi()["paths"])
         assert "/execute" in paths
         assert "/health" in paths
@@ -808,7 +805,7 @@ class TestBaseNodeReportProgress:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
         node = ProgressNode()
-        node.report_progress(50, "orphan")  # must not raise or send
+        node.report_progress(50, "orphan")
         assert calls == []
 
     def test_sends_run_execution_id_inside_execute(
@@ -918,4 +915,4 @@ class TestBaseNodeReportProgress:
         a = node.run(req.model_copy())
         b = node.run(req.model_copy())
         assert a.execution_id != b.execution_id
-        assert len(a.execution_id) == 36  # uuid4 shape
+        assert len(a.execution_id) == 36

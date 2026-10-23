@@ -164,7 +164,6 @@ def assert_staged(
     }
     missing = [s for s in staged if s not in owned]
     if missing:
-        # GitHub parses workflow commands (::error::) from STDOUT only.
         print(
             "::error::convergence assert FAILED — staged slugs missing from registry:"
         )
@@ -189,7 +188,7 @@ def _delete(url: str, token: str) -> None:
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()
     except urllib.error.HTTPError as exc:
-        if exc.code != 404:  # concurrent delete is idempotently fine
+        if exc.code != 404:
             raise
 
 
@@ -215,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))  # tracker#3911: old name dies at #3838
+    token = args.token or (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))
     if not token:
         print("::error::no service token (pass --token or set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return 2
@@ -233,9 +232,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     drain(args.registry_base, token, candidates, args.dry_run)
 
-    # Assert against the POST-drain snapshot: feeding the pre-drain list
-    # would let a self-drained staged slug (the exact wrong-state the assert
-    # exists to catch) pass green.
     drained_names = {node.get("name") for node in candidates}
     assert_staged(
         staged,

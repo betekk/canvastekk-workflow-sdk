@@ -27,11 +27,8 @@ from collections.abc import Callable
 from urllib.parse import urlsplit
 
 MAX_REDIRECT_HOPS = 5
-DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024**3  # 10 GiB — domain uses multi-GB point clouds
+DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024**3
 
-# NOTE: IPv4 literals are constructed from fragments (not written as full
-# dotted-quads) deliberately — transport-layer secret masking garbles full
-# IPv4 literals in agent-generated writes. Do not "simplify" these back.
 _LINK_LOCAL = "169" + ".254"
 _METADATA_HOSTS = frozenset(
     {
@@ -58,8 +55,6 @@ def is_dev_mode() -> bool:
     return os.environ.get("CANVASTEKK_DEV_MODE", "").lower() in ("true", "1", "yes")
 
 
-# Constructed from a fragment: vibeguard masks full IPv4 literals in agent
-# output and does not restore them — do not "simplify" this concatenation.
 _CGNAT_NETWORK = ipaddress.ip_network("100" + ".64.0.0/10")
 
 
@@ -72,7 +67,6 @@ def _ip_is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
     if isinstance(ip, ipaddress.IPv4Address):
-        # CGNAT shared space is not covered by is_private on all versions
         if ip in _CGNAT_NETWORK:
             return True
     return bool(
@@ -117,9 +111,6 @@ def validate_external_url(
         raise UrlPolicyError("URL has no host")
     hostname = host.lower().rstrip(".")
 
-    # Dev mode is an explicit "local development" switch (it already bypasses
-    # auth): it also lifts the network-IP restrictions so LocalFileServer
-    # (http://127.0.0.1) and internal dev endpoints work.
     if dev:
         return url
 
@@ -145,8 +136,6 @@ def validate_external_url(
     try:
         addresses = resolve(hostname)
     except (socket.gaierror, OSError):
-        # Unresolvable now — the request itself would fail identically,
-        # so there is no amplification risk in allowing it through.
         return url
 
     for address in addresses:

@@ -511,7 +511,6 @@ class TestCentralAuth:
         assert result["auth_mode"] == "central"
         assert result["run_id"] == "run-7"
         assert result["node_id"] == "node-a"
-        # Second call must hit the cache — stub sees exactly one call.
         auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert counter["calls"] == 1
 
@@ -545,8 +544,6 @@ class TestCentralAuth:
         with pytest.raises(HTTPException) as first:
             auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert first.value.status_code == 503
-        # Not cached: a retry after recovery re-queries (stub would be
-        # exhausted otherwise — provide a good verdict next).
         monkeypatch.setattr(
             type(auth),
             "_remote_verify",
@@ -643,7 +640,7 @@ class TestCentralAuth:
             second = auth.authenticate(self._request_with_key("cwnt_v1.real.http"))
             assert first["auth_mode"] == "central"
             assert second["run_id"] == "run-7"
-            assert calls["count"] == 1  # cache honored over real urllib path
+            assert calls["count"] == 1
         finally:
             server.shutdown()
 
@@ -653,7 +650,7 @@ class TestCentralAuth:
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
-        sock.close()  # nothing listens here
+        sock.close()
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{port}")
         auth = self._auth(timeout=0.5)
         with pytest.raises(HTTPException) as exc:
@@ -700,7 +697,6 @@ class TestCentralAuth:
 
     def test_cache_clears_on_overflow(self, monkeypatch: pytest.MonkeyPatch) -> None:
         auth = self._auth()
-        # Fill the cache to capacity with expired junk entries.
         auth._verdict_cache.update(
             {f"k{i}": (False, None, 0.0) for i in range(auth._CACHE_MAX_ENTRIES)}
         )

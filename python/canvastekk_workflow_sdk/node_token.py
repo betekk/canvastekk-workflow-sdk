@@ -36,7 +36,6 @@ __all__ = [
     "verify_node_token",
 ]
 
-#: Scheme prefix shared by every node token (version-tagged for upgrades).
 NODE_TOKEN_PREFIX = "cwnt_v1."
 
 

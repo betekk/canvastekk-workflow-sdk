@@ -15,7 +15,6 @@ from canvastekk_workflow_sdk.uploads import (
     get_default_uploader,
 )
 
-#: Exact fail-loud message for a legacy presigned-PUT string target (DA-3340).
 LEGACY_TARGET_MESSAGE = "engine sent deprecated presigned target — upgrade the engine"
 
 
@@ -208,7 +207,6 @@ class TestS3PresignedUploader:
             assert mock_session_upload.call_args.kwargs["element"] == {"index": 4, "suffix": ".las"}
 
             uploader.upload_file(str(f), _session(), element_index=4)
-            # non-array target: element ignored (single-file redemption)
             second = mock_session_upload.call_args_list[1]
             assert "element" not in second.kwargs
 

@@ -35,16 +35,10 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# =============================================================================
-# Contract Version
-# =============================================================================
 
 CONTRACT_VERSION = "1.0.0"
 
 
-# =============================================================================
-# Base Contract
-# =============================================================================
 
 
 class NodeExecutionStatus(StrEnum):
@@ -134,9 +128,6 @@ class BaseContract(BaseModel):
         return cls.model_validate(data)
 
 
-# =============================================================================
-# Geometry Primitives
-# =============================================================================
 
 
 class Point3D(BaseModel):
@@ -213,9 +204,6 @@ class Plane(BaseModel):
     label: str | None = Field(default=None, description="Optional label (e.g., 'floor', 'ceiling')")
 
 
-# =============================================================================
-# Instance Data (Generic - not tied to segmentation)
-# =============================================================================
 
 
 class Instance(BaseModel):
@@ -325,9 +313,6 @@ class InstanceSet(BaseContract):
         return [i for i in self.instances if i.class_id == class_id]
 
 
-# =============================================================================
-# Measurement Results
-# =============================================================================
 
 
 class Measurement(BaseModel):
@@ -385,9 +370,6 @@ class MeasurementSet(BaseContract):
         return m.value if m else default
 
 
-# =============================================================================
-# Plane Detection Results
-# =============================================================================
 
 
 class PlaneSet(BaseContract):
@@ -410,12 +392,7 @@ class PlaneSet(BaseContract):
         return None
 
 
-# =============================================================================
-# Standard Class Definitions (Reference)
-# =============================================================================
 
-# Standard class IDs for BCA inspection
-# These are conventions, not enforced by the contracts
 STANDARD_CLASSES = {
     0: "floor",
     1: "ceiling",
@@ -427,12 +404,6 @@ STANDARD_CLASSES = {
 STANDARD_CLASS_NAMES = list(STANDARD_CLASSES.values())
 
 
-# ---------------------------------------------------------------------------
-# Check-node output-contract builder (DA-3359)
-# ---------------------------------------------------------------------------
-# Opt-in module surface for compliance-check nodes. `app.py` / `base.py` never
-# import this module (pinned by tests/test_contracts.py::TestImportGraph) —
-# nothing here is on the core execution path.
 
 DEFAULT_CHECK_VERDICTS: tuple[str, ...] = ("PASS", "FAIL", "NOT_EVALUABLE")
 

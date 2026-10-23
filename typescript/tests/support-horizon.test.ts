@@ -40,7 +40,7 @@ describe("support horizon (DA-3359)", () => {
       new Date(release.getTime() + (SUPPORT_HORIZON_DAYS + 1) * 86_400_000),
     );
     expect(checkSupportHorizon()).toBe("expired");
-    expect(() => warnSupportHorizon()).not.toThrow(); // import path: log only
+    expect(() => warnSupportHorizon()).not.toThrow();
     expect(() => enforceSupportHorizon()).toThrow(SupportHorizonError);
   });
 

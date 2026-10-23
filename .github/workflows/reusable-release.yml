@@ -1,28 +1,4 @@
 name: reusable-release
-# Vendored same-repo copy of betekk-gha/reusable-release@v1.7.2 (2026-10-19).
-# This repo is public; public repos cannot call reusable workflows from
-# private repositories, so the fleet mechanism rides in-tree here.
-# ponytail: vendored mirror — swap `uses:` back to
-# betekk/betekk-gha/.github/workflows/reusable-release.yml once the
-# cross-visibility story is settled (public actions repo or SDK going private).
-# Lane semantics: dev -> vX.Y.Z-dev.N tag only; uat -> -uat.N tag only;
-# beta -> -beta.N tag + PRERELEASE; prod -> vX.Y.Z final, PR semver label
-# (major/minor/patch) drives the base bump, changelog + Release (makeLatest).
-# The same commit sha promotes through all lanes; deploys key on immutable
-# artifacts, never on version tags.
-#
-# Caller contract (consumer repos):
-#   jobs:
-#     release:
-#       uses: ./.github/workflows/reusable-release.yml
-#       permissions:
-#         contents: write
-#         pull-requests: read
-#         issues: write          # notify-failure opens an issue on release failure
-#       with:
-#         runner_pool: ubuntu-24.04   # optional; default auto (org runner probe)
-#   Chained jobs gate on the outputs (new_tag / new_version) — re-exported at
-#   this workflow's workflow_call.outputs since v1.7.2.
 
 on:
   workflow_call:
@@ -56,10 +32,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Runner selection: prefer an org self-hosted "local" runner when one is
-  # online+idle, else GitHub-hosted. Probe/API failures degrade to
-  # GitHub-hosted with a ::warning::; missing GH App credentials fail the
-  # token-mint step loudly (by design — managed credentials).
   pick-runner:
     if: inputs.runner_pool == 'auto'
     runs-on: ubuntu-24.04
@@ -112,17 +84,13 @@ jobs:
   release:
     name: Release
     needs: [pick-runner]
-    # pick-runner is skipped when the caller passes a literal runner_pool.
     if: ${{ always() && (needs.pick-runner.result == 'success' || needs.pick-runner.result == 'skipped') }}
     runs-on: ${{ inputs.runner_pool == 'auto' && fromJSON(needs.pick-runner.outputs.labels) || inputs.runner_pool }}
-    # caps runner-alive hangs; tag action + git-cliff are sub-minute.
     timeout-minutes: 15
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
       new_version: ${{ steps.tag_version.outputs.new_version }}
     steps:
-      # tracker#4017: heal #4001-class workspace poisoning before checkout
-      # (self-hosted local pool: sparse residue / partial clones).
       - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -179,24 +147,10 @@ jobs:
         uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Default is false: without tags the action assumes previous
-          # version 0.0.0 and proposes an already-taken tag ("Reference
-          # already exists"). fetch-depth 0 on checkout does not fetch tags.
           fetch_all_tags: true
           # v6.2 renamed the inputs: `pre_release_suffix` no longer exists
-          # (it was silently IGNORED — the warning is buried in the Release
-          # job log — so prod fell out of the default release_branches
-          # (master,main), was treated as a PRE-RELEASE branch, and got
-          # `-prod.0` counter tags; poetry then rejected the version stamp,
-          # killing the finals publish). The correct spelling:
-          # release_branches names the final-cutting lanes; every other
-          # branch is a prerelease lane whose suffix IS its branch name
-          # (dev -> -dev.N, uat -> -uat.N, beta -> -beta.N — same counters
-          # as before, now by design).
           release_branches: prod
           tag_prefix: ${{ inputs.tag_prefix }}
-          # On prod the PR label drives the bump; on dev/uat/beta we only
-          # ever increment the prerelease counter, so patch is a safe no-op base.
           default_bump: ${{ steps.bump_type.outputs.type || 'patch' }}
 
       - name: Generate changelog (prod only)
@@ -221,10 +175,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Beta is the customer-visible preview channel: the tag alone is not
-      # discoverable enough, so publish a GitHub prerelease. makeLatest stays
-      # false — prod remains the latest stable. Full changelog ships with
-      # the next prod release.
       - name: Create GitHub prerelease (beta only)
         if: steps.prerelease.outputs.branch == 'beta' && steps.tag_version.outputs.new_tag != ''
         uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174 # v1.16.0
@@ -237,8 +187,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # A Release failure starves downstream Deploy silently (Deploy never runs,
-  # so no failure() fires downstream). Surface it at the source.
   notify-failure:
     name: Notify on failure
     needs: [pick-runner, release]

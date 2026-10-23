@@ -41,26 +41,14 @@ if TYPE_CHECKING:  # pragma: no cover - import-time only
 
 
 
-# Registry of cancel events for in-flight timed executions (cooperative
-# cancellation — see BaseNode._set_cancel_event / context.cancel_event).
 _ACTIVE_CANCELS: dict[str, threading.Event] = {}
 
-# DA-2242: canonical X-Account-Id values (the engine sends str(int)).
-# ASCII-only: canonical str(int) never contains non-ASCII digits.
 _ACCOUNT_ID_RE = re.compile(r"^[0-9]+$")
 
-# 2**63 - 1 is 19 digits — longer strings are provably out of range and are
-# rejected before int() so absurdly long headers can't trip CPython's
-# CVE-2020-10735 digit-conversion limit (ValueError → unhandled 500).
 _ACCOUNT_ID_MAX_DIGITS = 19
 
-# Default request body limit — parity with the TypeScript SDK's 50 MB
-# express.json limit. Override with CANVASTEKK_MAX_BODY_BYTES.
 DEFAULT_MAX_BODY_BYTES = 50 * 1024 * 1024
 
-# DA-3009: memoized glibc handle for the post-execution heap trim. None is
-# cached after the first resolve on platforms without malloc_trim (musl,
-# non-linux) so the lookup cost is paid at most once per process.
 _LIBC_HANDLE: Any = None
 _LIBC_RESOLVED = False
 
@@ -96,7 +84,7 @@ def _release_freed_heap() -> None:
             handle: Any = ctypes.CDLL(name)
             if not hasattr(handle, "malloc_trim"):
                 handle = None
-        except Exception:  # defensive — exotic platforms must never 500
+        except Exception:
             handle = None
         _LIBC_HANDLE = handle
     if _LIBC_HANDLE is None:
@@ -108,7 +96,7 @@ def _release_freed_heap() -> None:
         logging.getLogger(__name__).debug("Post-execution heap trim skipped", exc_info=True)
 
 
-class _BodySizeLimitMiddleware:  # ASGI middleware (Starlette style)
+class _BodySizeLimitMiddleware:
     """Reject request bodies larger than CANVASTEKK_MAX_BODY_BYTES (413).
 
     Applies to every JSON endpoint (``/execute``, ``/hook``) — mirrors the
@@ -233,20 +221,15 @@ def create_node_app(
 
         # Run with: uvicorn handler:app --port 8001
     """
-    # DA-3359: entrypoint horizon gate (import stays log-only).
     from canvastekk_workflow_sdk._horizon import enforce_support_horizon
 
     enforce_support_horizon()
 
-    # Lazy fastapi imports: the core package installs without fastapi (#104).
     from fastapi import APIRouter, Depends, FastAPI, Request
     from fastapi.responses import JSONResponse
 
     from canvastekk_workflow_sdk._server_middleware import SDKVersionMiddleware
 
-    # Route handlers and options carry fastapi names as string annotations
-    # (PEP 563); fastapi/pydantic resolve hints against this module's
-    # globals at registration — publish the lazily-imported names there.
     globals().update(
         APIRouter=APIRouter,
         Depends=Depends,
@@ -283,14 +266,11 @@ def create_node_app(
     }
     default_kwargs.update(fastapi_kwargs)
 
-    # Merge node lifespan hooks with any user-provided lifespan
     base_lifespan = default_kwargs.pop("lifespan", None)
 
     @asynccontextmanager
     async def _node_lifespan(app: Any) -> Any:
         configure_logging()
-        # Loud auth-posture warnings (DA-1711 3.3): surface misconfiguration
-        # at startup instead of failing silently in production.
         if _is_dev_mode():
             logging.getLogger(__name__).warning(
                 "CANVASTEKK_DEV_MODE is active: ALL authentication is bypassed "
@@ -314,9 +294,6 @@ def create_node_app(
     app.add_middleware(SDKVersionMiddleware, node_slug=getattr(getattr(node, "definition", None), "slug", None))
     app.add_middleware(_BodySizeLimitMiddleware)
 
-    # DA-2603: code digest computed once at startup — sha256 over the source
-    # bytes of the module defining the node class. ponytail: single-module
-    # digest; walk the package if nodes grow multi-file.
     handler_module = inspect.getmodule(type(node))
     handler_source = inspect.getsourcefile(handler_module) if handler_module is not None else None
     try:
@@ -379,14 +356,7 @@ def create_node_app(
                 content={"detail": "Request body must be a JSON object"},
             )
 
-        # DA-2242: account_id is engine-controlled — the X-Account-Id header
-        # is the EXCLUSIVE source. Body-supplied values are stripped so no
-        # caller can forge account identity. Absent/empty → None (local runs).
         body.pop("account_id", None)
-        # S.4 (SDK#161): the #833 capability is engine-controlled the same
-        # way — X-Node-Capability is the exclusive source; body-supplied
-        # values are stripped. Opaque string: strip whitespace only, never
-        # parse (CDS-side verification is the auth library's).
         body.pop("capability", None)
         capability: str | None = None
         capability_header = request.headers.get("x-node-capability")
@@ -431,8 +401,6 @@ def create_node_app(
                 cancel_key = id(exec_request)
 
                 def _run_with_cancel() -> Any:
-                    # Publish the cancel event on a module-level registry so the
-                    # BaseNode run() inside the worker thread can pick it up.
                     _ACTIVE_CANCELS[cancel_key] = cancel_event
                     try:
                         node._set_cancel_event(cancel_event)
@@ -466,7 +434,6 @@ def create_node_app(
                 response = await asyncio.to_thread(node.run, exec_request)
 
             if exec_request.output_upload_url and response.status == "pass" and not response.dry_run:
-                # D10 (#111): a dry-run pass carries no outputs — never upload.
                 file_output_fields = node.definition.file_output_fields
                 if file_output_fields:
                     try:
@@ -477,9 +444,6 @@ def create_node_app(
                             file_output_fields,
                         )
                     except Exception as exc:
-                        # A declared file output that could not be uploaded means
-                        # the engine would receive a local path it cannot fetch —
-                        # fail the execution instead of silently passing (4.1).
                         logging.getLogger(__name__).error("Output upload failed: %s", exc)
                         response = response.model_copy(
                             update={
@@ -489,9 +453,6 @@ def create_node_app(
                             }
                         )
 
-            # Clean up the per-execution temp dir AFTER uploads have completed —
-            # long-running node servers otherwise accumulate downloads/outputs
-            # in /tmp until disk exhaustion (DA-1711 4.4).
             try:
                 output_dir = Path("/tmp") / exec_request.run_id / exec_request.node_id
                 if output_dir.is_dir() and output_dir.exists():
@@ -502,8 +463,6 @@ def create_node_app(
             return response
 
         finally:
-            # DA-3009: return freed glibc heap to the OS — both success and
-            # exception paths trim exactly once, after the response is built.
             _release_freed_heap()
 
     @router.get(
@@ -522,7 +481,6 @@ def create_node_app(
         """
         checks = node.health_check()
 
-        # Determine overall status from checks
         if not checks:
             status: Literal["healthy", "unhealthy", "degraded"] = "healthy"
         elif all(checks.values()):
@@ -578,17 +536,7 @@ def create_node_app(
         else:
             mode = "production"
         content["mode"] = mode
-        # D8/#110: the adapter stamps the effective contract — a declared
-        # subset wins, else the SDK-served default (exactly the routes this
-        # app mounts: SDK_SERVED_CONTRACT_ROUTES).
         effective = node.definition.effective_contract
-        # #138 / engine #658: the adapter mounts POST /hook unconditionally
-        # and stubs it 501 when hook() is not overridden, while the engine's
-        # registration presence bar rejects >= 500. Declaring /hook for a
-        # node that cannot answer it fails registration by construction.
-        # Nodes riding the default contract AND the BaseNode.hook default
-        # serve the default WITHOUT /hook; declared contracts and
-        # hook-implementing nodes are untouched.
         from canvastekk_workflow_sdk.base import BaseNode as _BaseNode
 
         if node.definition.contract is None and type(node).hook is _BaseNode.hook:

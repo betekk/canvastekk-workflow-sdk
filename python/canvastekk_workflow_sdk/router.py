@@ -70,7 +70,7 @@ def create_multi_node_app(
         # POST /segment/execute, GET /segment/health, ...
         # POST /measure/execute, GET /measure/health, ...
     """
-    from fastapi import FastAPI  # lazy: core installs without fastapi (#104)
+    from fastapi import FastAPI
 
     app = FastAPI(**fastapi_kwargs)
 

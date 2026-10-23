@@ -41,8 +41,8 @@ def test_definitions_flagged_with_path() -> None:
 def test_dependencies_split_by_shape() -> None:
     schema = {
         "dependencies": {
-            "credit_card": ["billing_address"],  # array form -> dependentRequired
-            "status": {"type": "object"},  # schema form -> dependentSchemas
+            "credit_card": ["billing_address"],
+            "status": {"type": "object"},
         },
     }
     messages = dict(lint_schema_dialect(schema))

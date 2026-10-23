@@ -114,8 +114,6 @@ export class HttpExecutor extends NodeExecutor {
       throw new Error(`Node '${slug}' returned HTTP ${resp.status}`);
     }
 
-    // Validate the remote response against the wire schema — a null/array
-    // body previously crashed with a TypeError instead of a clean error.
     const parsed = NodeExecutionResponseSchema.safeParse(await resp.json());
     if (!parsed.success) {
       throw new Error(`Node '${slug}' returned malformed response: ${parsed.error.issues[0]?.message ?? "schema mismatch"}`);

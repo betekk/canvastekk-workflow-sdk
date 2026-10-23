@@ -73,7 +73,6 @@ class FileProcessingNode(BaseNode):
     def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
         result: dict[str, Any] = {}
         if "point_cloud" in inputs:
-            # Read the file content to verify it was saved correctly
             file_path = Path(inputs["point_cloud"])
             result["file_content"] = file_path.read_text() if file_path.exists() else ""
             result["file_name"] = file_path.name
@@ -194,7 +193,7 @@ class TestExecuteEndpoint:
                 "inputs": {},
             },
         )
-        assert response.status_code == 200  # Error is in response body, not HTTP status
+        assert response.status_code == 200
         data = response.json()
         assert data["status"] == "fail"
         assert data["outputs"] is None
@@ -292,7 +291,6 @@ class FileOutputNode(BaseNode):
     )
 
     def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
-        # Create a real temp file to simulate binary output
         fd, path = tempfile.mkstemp(suffix=".ply")
         os.close(fd)
         Path(path).write_bytes(b"fake binary output data")
@@ -412,7 +410,6 @@ class TestOutputUploadToS3:
             data = response.json()
             assert data["status"] == "fail"
 
-            # Upload should NOT have been called
             mock_upload.assert_not_called()
 
     def test_missing_file_output_fails_with_upload_failed(self, bogus_path_output_client: TestClient) -> None:
@@ -456,7 +453,6 @@ class TestOutputUploadToS3:
             data = response.json()
             assert data["status"] == "pass"
 
-            # No upload should happen
             mock_upload.assert_not_called()
 
     def test_legacy_string_target_fails_with_upload_failed(self, file_output_client: TestClient) -> None:
@@ -1245,8 +1241,7 @@ class TestManifestCodeDigest:
     def test_manifest_serves_code_digest(self, echo_client: TestClient) -> None:
         data = echo_client.get("/manifest").json()
         assert len(data["code_digest"]) == 64
-        int(data["code_digest"], 16)  # 64-char hex
-        # Stable across calls (computed once at startup)
+        int(data["code_digest"], 16)
         assert echo_client.get("/manifest").json()["code_digest"] == data["code_digest"]
 
     def test_manifest_still_serves_sdk_version_and_mode(self, echo_client: TestClient) -> None:
@@ -1325,12 +1320,11 @@ class TestInlineTimeoutDetails:
 
     def test_timeout_details_canonical_null_execution_id(self) -> None:
         resp = self._client().post("/execute", json={"run_id": "r-hang", "node_id": "n-hang", "inputs": {}})
-        assert resp.status_code == 408  # TIMEOUT → 408 (ERROR_CODE_TO_HTTP_STATUS)
+        assert resp.status_code == 408
         body = resp.json()
         assert body["error_code"] == "TIMEOUT"
-        # the handler spreads details flat into the body (app.py node_error_handler)
         assert body["slug"] == "hang"
-        assert body["execution_id"] is None  # key present, value null
+        assert body["execution_id"] is None
         assert body["declared_budget_s"] == 1
         assert body["hard_ceiling_s"] == 7200
         assert body["enforced_at_s"] == 1
@@ -1382,8 +1376,6 @@ class TestDryRunExecution:
         return body
 
     def _declaring_client(self) -> TestClient:
-        # EchoNode.definition is a CLASS attribute — deep-copy per test so the
-        # capability mutation never leaks into sibling tests.
         class DryEchoNode(EchoNode):
             definition = EchoNode.definition.model_copy(deep=True)
 
@@ -1418,7 +1410,7 @@ class TestDryRunExecution:
         """AC2: full validation — invalid input fails BEFORE the dry-run branch."""
         resp = self._declaring_client().post(
             "/execute",
-            json=self._dry_run_body(inputs={"message": 12345}),  # wrong type
+            json=self._dry_run_body(inputs={"message": 12345}),
         )
         data = resp.json()
         assert data["status"] == "fail"
@@ -1459,8 +1451,6 @@ class TestDryRunExecution:
 class HookedEchoNode(EchoNode):
     """EchoNode that overrides hook() — the webhook contract is real."""
 
-    # Independent definition instance — EchoNode.definition is shared
-    # class-level state that sibling tests may stamp; a copy isolates us.
     definition = EchoNode.definition.model_copy()
 
     def hook(self, payload: dict[str, Any]) -> dict[str, Any]:

@@ -16,33 +16,14 @@ const slugField = z
 export const NodeExecutionRequestSchema = z.object({
   run_id: slugField,
   node_id: slugField,
-  // #3498: dispatcher-minted execution id (e.g. 'ecs-<uuid>'). When present,
-  // progress pings carry it so the engine's forgery guard matches the id it
-  // parked at dispatch time; when absent BaseNode.run() invents a uuid4
-  // (inline behavior, echoed back via the response). Nullish so a null
-  // value parses instead of 400ing (python `str | None` parity).
   execution_id: slugField.nullish(),
   inputs: z.record(z.string(), z.unknown()).default({}),
   callback_url: z.string().nullable().optional(),
-  // DA-3314 widened targets to `string | multipart-session descriptor`
-  // (DA-2886) so a descriptor value must not 400 at this parse. Since
-  // DA-3340 the string member exists at this parse ONLY — the upload seam
-  // (uploads.ts uploadFile) throws NodeIOError for it, so a legacy engine
-  // payload fails loudly instead of as an opaque 400 (python
-  // request.py `dict[str, str | UploadSession]` parity).
   output_upload_url: z
     .union([z.record(z.string(), z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
     .optional()
     .default(null),
-  // D10 (#111): request a validation-only execution — full input validation,
-  // then a synthetic pass: no handler, no file I/O, token_usage 0, execution_id
-  // namespaced 'dryrun-'. Honored only when the node declares
-  // contract.capabilities.dry_run (docs/dry-run-contract.md).
   dry_run: z.boolean().default(false),
-  // S.4 (SDK#161): run-scoped CDS capability token (#833) — opaque HMAC
-  // string minted by the engine at dispatch. Engine-controlled: /execute
-  // sets this exclusively from the X-Node-Capability header — body-supplied
-  // values are stripped at the route. Transported, never parsed.
   capability: z.string().nullable().optional(),
 });
 

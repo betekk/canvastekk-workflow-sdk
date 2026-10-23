@@ -430,7 +430,7 @@ class TestBuildRegistryPayload:
             "capabilities": {"dry_run": False},
             "openapi": "3.2",
         }
-        assert "contract" not in payload  # never top-level on the wire
+        assert "contract" not in payload
 
     def test_contract_absent_when_undeclared(self) -> None:
         definition = self._make_definition()
@@ -530,7 +530,6 @@ class TestBuildRegistryPayload:
         definition = self._make_definition()
         payload = build_registry_payload(definition, constraints={"gpu": True})
         assert payload["constraints"]["gpu"] is True
-        # DA-3359: the stamp always rides along
         assert payload["constraints"].get("sdk_version") == definition.sdk_version
 
     def test_constraints_always_carry_stamp(self) -> None:
@@ -544,7 +543,7 @@ class TestBuildRegistryPayload:
     def test_constraints_merges_manifest_docs_fields(self) -> None:
         """DA-1955/#123: docs fields land in constraints; legacy version keys never do."""
         definition = self._make_definition(
-            minimum_sdk_version="0.22.0",  # legacy manifest key — ignored at construction
+            minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
             changelog_url="https://example.com/changelog",
         )
@@ -800,8 +799,6 @@ class TestRegisterNodeNewFeatures:
         assert "node_status" not in payload
 
     def test_accepts_valid_invoke_types(self) -> None:
-        # "lambda" deliberately absent: rejected platform surface (#131) —
-        # its rejection is pinned below.
         for invoke_type in ("http", "sagemaker", "in-process"):
             node = DummyNode()
             mock_response = MagicMock()

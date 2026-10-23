@@ -65,10 +65,8 @@ class _AuthBackend(ABC):
 
     def as_dependency(self) -> Any:
         """Return a FastAPI ``Depends()`` callable for this backend."""
-        from fastapi import Depends, Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Depends, Request
 
-        # `authenticate(request: Request)` is a string annotation (PEP 563);
-        # fastapi resolves hints against this module's globals at wiring time.
         globals().setdefault("Request", Request)
         return Depends(self.authenticate)
 
@@ -99,7 +97,7 @@ class _ApiKeyAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``X-API-Key`` header against the configured env var."""
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
         if _is_dev_mode():
             logger.debug("Dev mode: skipping API key authentication")
             return {"auth_mode": "dev_bypass"}
@@ -164,7 +162,6 @@ class _CentralAuth(_AuthBackend):
         self._cache_ttl = cache_ttl
         self._timeout = timeout
         self._legacy_key_env_var = legacy_key_env_var
-        # sha256(token) -> (valid, claims_or_none, monotonic_expiry)
         self._verdict_cache: dict[str, tuple[bool, dict[str, Any] | None, float]] = {}
 
     def _legacy_matches(self, provided: str) -> bool:
@@ -210,7 +207,7 @@ class _CentralAuth(_AuthBackend):
                 payload = json.loads(response.read())
         except (
             urllib.error.URLError,
-            http.client.HTTPException,  # malformed status line / truncated body
+            http.client.HTTPException,
             TimeoutError,
             OSError,
             ValueError,
@@ -323,7 +320,7 @@ class _JwtAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``Authorization: Bearer`` JWT token."""
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
         if _is_dev_mode():
             logger.debug("Dev mode: skipping JWT authentication")
             return {"auth_mode": "dev_bypass"}
@@ -444,7 +441,7 @@ class _KeycloakAuth(_AuthBackend):
         Raises:
             HTTPException: 401 if authentication fails, 503 if JWKS fetch fails
         """
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
         if _is_dev_mode():
             logger.debug("Dev mode: skipping Keycloak authentication")
             return {"auth_mode": "dev_bypass"}
@@ -546,7 +543,7 @@ class NodeAuth:
 
     @staticmethod
     def api_key(key_env_var: str = "CANVASTEKK_API_KEY") -> _ApiKeyAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
         globals().setdefault("Request", Request)
         """Create an API key authentication backend.
 
@@ -566,7 +563,7 @@ class NodeAuth:
         timeout: float = 5.0,
         legacy_key_env_var: str | None = "CANVASTEKK_API_KEY",
     ) -> _CentralAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
         globals().setdefault("Request", Request)
         """Create a central-validation auth backend (engine-issued tokens).
 
@@ -600,7 +597,7 @@ class NodeAuth:
         algorithm: str = "HS256",
         audience: str | None = None,
     ) -> _JwtAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
         globals().setdefault("Request", Request)
         """Create a JWT (HMAC-SHA256) authentication backend.
 
@@ -623,7 +620,7 @@ class NodeAuth:
         audience: str | None = None,
         algorithm: str = "RS256",
     ) -> _KeycloakAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
         globals().setdefault("Request", Request)
         """Create a Keycloak RS256 JWT authentication backend.
 

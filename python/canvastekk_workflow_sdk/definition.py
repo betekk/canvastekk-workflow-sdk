@@ -27,8 +27,6 @@ def _stamped_sdk_version() -> str:
     return _sdk_version_stamp
 
 
-# DA-2627: DeprecationWarning is hidden by default outside __main__; surface the
-# legacy-construction warning to node authors explicitly (scoped to this module).
 warnings.filterwarnings("default", category=DeprecationWarning, module=r"canvastekk_workflow_sdk\.definition")
 
 if TYPE_CHECKING:
@@ -45,13 +43,10 @@ _LEGACY_DEPRECATION_MSG = (
 
 # fmt: off
 ColorPreset = Literal[
-    # Standard (500→600)
     "purple", "red", "gray", "cyan", "emerald", "orange", "amber",
     "sky", "violet", "teal", "indigo", "slate", "blue", "green",
     "pink", "yellow", "rose", "lime", "fuchsia",
-    # Light variants (400→500)
     "emerald-light", "indigo-light", "slate-light",
-    # Dark variants (600→700)
     "red-dark", "sky-dark", "teal-dark", "emerald-dark",
 ]
 """Color preset for the node header gradient.
@@ -64,11 +59,6 @@ nodes within the same category, in which case use ``-light`` or ``-dark``.
 
 
 def _is_file_schema(schema: dict[str, Any]) -> bool:
-    # S.1 (SDK#161): a file field is either a string with format "file"
-    # or an array whose items are. Shared by the input- and output-side
-    # field discovery (the output side missed the array case — live-run
-    # evidence: canvastekk-tracker#3971 follow-up, url-loader array runs
-    # uploaded nothing because 'buffers' was never enumerated).
     if schema.get("format") == "file":
         return True
     return (
@@ -184,19 +174,13 @@ class DeprecationInfo(BaseModel):
         return self
 
 
-# ---------------------------------------------------------------------------
-# Serving contract (D8, #110): the manifest declares HOW a node serves.
-# ---------------------------------------------------------------------------
 
-#: Closed route vocabulary — exactly the routes the SDK adapters mount.
 CONTRACT_ROUTE_VOCABULARY: frozenset[str] = frozenset(
     {"/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready", "/openapi"}
 )
 
-#: Minimum route set every conforming node must serve (D8).
 MINIMUM_CONTRACT_ROUTES: frozenset[str] = frozenset({"/execute", "/health", "/manifest"})
 
-#: What the SDK-served adapters actually mount (ordered for stable output).
 SDK_SERVED_CONTRACT_ROUTES: tuple[str, ...] = (
     "/execute",
     "/health",
@@ -293,7 +277,6 @@ class WorkflowNodeManifest(BaseModel):
         is rejected — node authors must bump the version for schema changes.
     """
 
-    # Identity
     slug: str = Field(description="Slug for routing and identity (e.g., 'segmentation')")
     version: str = Field(
         description="Semantic version string (e.g., '1.2.0'). Must follow X.Y.Z format. "
@@ -303,7 +286,6 @@ class WorkflowNodeManifest(BaseModel):
     name: str = Field(description="Human-readable display name (e.g., 'Point Cloud Segmentation')")
     description: str = Field(description="What this node does")
 
-    # Schema (JSON Schema - language agnostic)
     input_schema: dict[str, Any] = Field(
         description="JSON Schema for expected inputs",
     )
@@ -311,20 +293,17 @@ class WorkflowNodeManifest(BaseModel):
         description="JSON Schema for expected outputs",
     )
 
-    # Cost
     token_cost: float = Field(
         default=0.0,
         ge=0.0,
         description="Cost per execution (0.0 for free nodes)",
     )
 
-    # Retry defaults
     default_retry: RetryConfig = Field(
         default_factory=RetryConfig,
         description="Default retry policy for this node type",
     )
 
-    # Metadata
     category: str = Field(
         default="utility",
         description="Category (e.g., 'transform', 'inference', 'utility', 'control-flow')",
@@ -350,13 +329,11 @@ class WorkflowNodeManifest(BaseModel):
         description="Node role in the workflow system",
     )
 
-    # Styles (optional — frontend presentation)
     styles: WorkflowNodeStyles | None = Field(
         default=None,
         description="Icon and color for the workflow builder UI",
     )
 
-    # Deprecation (optional — advisory migration signal; NOT node_status)
     deprecation: DeprecationInfo | None = Field(
         default=None,
         description="If set, this node is deprecated. Surfaced to workflow-definition "
@@ -364,10 +341,6 @@ class WorkflowNodeManifest(BaseModel):
         "stays active until retired).",
     )
 
-    # DA-3359: SDK provenance is STAMPED, not declared. The stamp is computed
-    # from the installed SDK version at instantiation; it is not a constructor
-    # field (kwargs rejected) and the property is read-only (assignment
-    # rejected) — manual overrides are impossible by construction.
     _sdk_version: str = PrivateAttr(default_factory=lambda: _stamped_sdk_version())
 
     @computed_field  # type: ignore[prop-decorator]
@@ -405,7 +378,6 @@ class WorkflowNodeManifest(BaseModel):
             return self.contract
         return NodeContract(routes=list(SDK_SERVED_CONTRACT_ROUTES))
 
-    # Documentation links (optional — DA-1937 preview surface)
     docs_url: str | None = Field(
         default=None,
         description="HTTP(S) URL to this node's documentation.",
@@ -415,9 +387,6 @@ class WorkflowNodeManifest(BaseModel):
         description="HTTP(S) URL to this node's changelog.",
     )
 
-    # Serving contract (optional — D8, #110). Self-hosted authors declare what
-    # they serve; SDK-served nodes serialize the adapter-stamped default via
-    # effective_contract (the ADAPTERS mount the routes — see app.py).
     contract: NodeContract | None = Field(
         default=None,
         description="Serving contract: transport, routes (closed vocabulary, "
@@ -570,18 +539,11 @@ class WorkflowNodeManifest(BaseModel):
         """
         properties = self.input_schema.get("properties", {})
         schema = properties.get(field_name, {})
-        # S.1 (SDK#161): array file fields carry their constraints on items.
         if schema.get("type") == "array":
             schema = schema.get("items", {})
 
         x_accept = schema.get("x-accept")
         if x_accept and file_path.suffix:
-            # DA-3429: an empty suffix means the artifact carries no declarable
-            # extension (e.g. DA-3339 emission keys named by field, or
-            # Content-Disposition filenames without one). Skipping the check
-            # here restores the pre-0.35 tolerance — the handler's own content
-            # handling (e.g. ensure_las conversion) stays responsible for
-            # correctness. Files with a real extension are still validated.
             if file_path.suffix.lower() not in [ext.lower() for ext in x_accept]:
                 raise NodeValidationError(
                     f"File extension '{file_path.suffix}' is not allowed for field '{field_name}'. "
@@ -618,8 +580,6 @@ class WorkflowNodeManifest(BaseModel):
 
                 items = prop_schema.get("items")
                 if field_type == "array" and isinstance(items, dict) and items.get("format") == "file":
-                    # S.1 (SDK#161): array-of-file fields are valid; items
-                    # must be strings (a file element is a presigned URL).
                     if items.get("type") not in (None, "string"):
                         raise ValueError(
                             f"Field '{name}' is an array whose items have format 'file' "
@@ -762,12 +722,6 @@ def export_definition(
         node_status=node_status,
     )
 
-    # DA-1955: full manifest shape. The exported file targets the node's
-    # /manifest endpoint format (SDKNodeDefinition, extra-tolerant), not the
-    # engine's extra="forbid" registration request — re-add registry-only keys.
-    # hard_max_runtime_seconds is host-side (excluded from the engine payload)
-    # but part of the /manifest shape — re-add or export round-trips drop
-    # a node's ceiling override (#3499).
     registry_dict["node_role"] = definition.role.value
     registry_dict["retry"] = definition.default_retry.model_dump(mode="json")
     registry_dict["node_status"] = node_status

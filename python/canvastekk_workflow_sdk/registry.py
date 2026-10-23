@@ -20,12 +20,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# #131: "lambda" (direct AWS Lambda API invoke) is NOT platform policy — every
-# CanvasTekk node is an HTTP-contract node; Lambda-hosted nodes surface via
-# Function URL / the gateway and register as "http". The Literal member is
-# deliberately KEPT so the rejection is a clear, actionable ValueError (a
-# typed key removed from the Literal would turn into a bare typing error).
-# Engine-side vocabulary removal rides the #699 sweep wave.
 InvokeType = Literal["http", "lambda", "sagemaker", "in-process"]
 VALID_INVOKE_TYPES: set[str] = set(get_args(InvokeType))
 UNSUPPORTED_INVOKE_TYPES: dict[str, str] = {
@@ -327,18 +321,8 @@ def build_registry_payload(
     ):
         if value is not None and key not in resolved_constraints:
             resolved_constraints[key] = value
-    # D8/#110: the DECLARED serving contract rides constraints — the engine's
-    # RegisterWorkflowNodeRequest is extra="forbid" and has no top-level
-    # contract field yet, but ``constraints`` is a declared free-form dict.
-    # The engine's registration gate reads it from here (engine #658) and may
-    # promote it to a top-level field engine-side. Caller-supplied wins.
     if definition.contract is not None and "contract" not in resolved_constraints:
         resolved_constraints["contract"] = definition.contract.model_dump(mode="json")
-    # DA-3359 stamped provenance — the ONLY version key on the wire. The
-    # legacy minimum_sdk_version dual-write was removed in #123 (D16:
-    # versions are provenance, never admission gates; the engine's gate is
-    # advisory since engine#671 and behavioral in #658).
-    # Explicit caller constraints always win over the merge.
     resolved_constraints.setdefault("sdk_version", definition.sdk_version)
 
     payload: dict[str, Any] = {

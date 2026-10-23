@@ -27,11 +27,6 @@ import os
 import sys
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Model registry — the canonical set of public models whose schema stability
-# we enforce. Adding a model here means its schema becomes part of the
-# stability contract.
-# ---------------------------------------------------------------------------
 
 MODEL_IMPORTS = """
 from canvastekk_workflow_sdk import (
@@ -61,10 +56,6 @@ MODELS_TO_CHECK: list[tuple[str, str]] = [
     ("WorkflowDefinitionSpec", "WorkflowDefinitionSpec"),
 ]
 
-# JSON-schema keys that affect validation semantics (type + constraints).
-# Changes to these keys on an existing field are classified as breaking.
-# Non-type keys (description, title, examples, default) are intentionally
-# excluded — doc-only changes are not breaking.
 TYPE_RELEVANT_KEYS: frozenset[str] = frozenset(
     {
         "type",
@@ -100,9 +91,6 @@ TYPE_RELEVANT_KEYS: frozenset[str] = frozenset(
 )
 
 
-# ---------------------------------------------------------------------------
-# Dump mode
-# ---------------------------------------------------------------------------
 
 
 def dump_schemas() -> None:
@@ -134,17 +122,11 @@ def _serialize_model(model: Any) -> dict[str, Any]:
             "values": sorted(member.value for member in model),
         }
     schema: dict[str, Any] = model.model_json_schema()
-    # Strip $defs to avoid double-counting nested models that are compared
-    # independently at the top level.
     schema.pop("$defs", None)
     return schema
 
 
-# ---------------------------------------------------------------------------
-# Diff mode
-# ---------------------------------------------------------------------------
 
-# Change classifications
 BREAKING = "BREAKING"
 ADDITIVE = "ADDITIVE"
 
@@ -176,21 +158,17 @@ def diff_schemas(base_path: str, pr_path: str) -> int:
     with open(pr_path) as f:
         pr = json.load(f)
 
-    changes: list[tuple[str, str, str]] = []  # (severity, model, description)
-    # (severity, model_name, human_description)
+    changes: list[tuple[str, str, str]] = []
 
     base_models = set(base.keys())
     pr_models = set(pr.keys())
 
-    # --- Removed models (breaking) ---
     for model in sorted(base_models - pr_models):
         changes.append((BREAKING, model, "model removed"))
 
-    # --- Added models (additive) ---
     for model in sorted(pr_models - base_models):
         changes.append((ADDITIVE, model, "model added"))
 
-    # --- Per-model field-level comparison ---
     for model in sorted(base_models & pr_models):
         changes.extend(_diff_single_model(model, base[model], pr[model]))
 
@@ -198,7 +176,6 @@ def diff_schemas(base_path: str, pr_path: str) -> int:
     additive_changes = [c for c in changes if c[0] == ADDITIVE]
     breaking_changes = [c for c in changes if c[0] == BREAKING]
 
-    # --- Report ---
     print("=" * 60)
     print("Schema Stability Check")
     print(f"  Base: {base_path}")
@@ -229,7 +206,6 @@ def diff_schemas(base_path: str, pr_path: str) -> int:
         else:
             print()
 
-    # Set GITHUB_OUTPUT for workflow
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a") as f:
@@ -255,7 +231,6 @@ def _diff_single_model(
     """
     changes: list[tuple[str, str, str]] = []
 
-    # --- Enum models ---
     if base_schema.get("_kind") == "enum" or pr_schema.get("_kind") == "enum":
         base_vals = set(base_schema.get("values", []))
         pr_vals = set(pr_schema.get("values", []))
@@ -265,7 +240,6 @@ def _diff_single_model(
             changes.append((ADDITIVE, name, f"enum value added: '{val}'"))
         return changes
 
-    # --- Pydantic BaseModel schemas ---
     base_props: dict[str, Any] = base_schema.get("properties", {})
     pr_props: dict[str, Any] = pr_schema.get("properties", {})
     base_required: set[str] = set(base_schema.get("required", []))
@@ -274,18 +248,15 @@ def _diff_single_model(
     base_fields = set(base_props.keys())
     pr_fields = set(pr_props.keys())
 
-    # Removed fields (breaking — any field removal breaks serialization contract)
     for field in sorted(base_fields - pr_fields):
         changes.append((BREAKING, name, f"field '{field}' removed"))
 
-    # Added fields
     for field in sorted(pr_fields - base_fields):
         if field in pr_required:
             changes.append((BREAKING, name, f"required field '{field}' added"))
         else:
             changes.append((ADDITIVE, name, f"optional field '{field}' added"))
 
-    # Common fields: required-status changes
     common_fields = base_fields & pr_fields
     for field in sorted(common_fields):
         was_required = field in base_required
@@ -295,7 +266,6 @@ def _diff_single_model(
         elif was_required and not is_required:
             changes.append((ADDITIVE, name, f"field '{field}' became optional"))
 
-    # Common fields: type changes
     for field in sorted(common_fields):
         base_type = extract_type_info(base_props[field])
         pr_type = extract_type_info(pr_props[field])
@@ -324,9 +294,6 @@ def _summarize_type(type_info: dict[str, Any]) -> str:
     return "{" + ", ".join(parts) + "}"
 
 
-# ---------------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------------
 
 
 def main() -> int:
