@@ -73,3 +73,5 @@ None. Epic children 8-13 inherit scaffold typing at their next natural bump.
 
 - Phase 1: 877 comment lines stripped (ts 282, py 480, yaml 115; 87 files); stash mishap in baseline check recovered via stash pop, tree verified
 - Phase 2: only two history tells found — both were stripped inline comments describing their next line (no promotion needed); docstrings clean
+GATE 5747c0c tier=full lint=t typecheck=t build=t unit=t e2e=-
+  (pytest 14 failures identical at origin/dev baseline — environmental deps, zero NEW; tsc clean; audit 0)
