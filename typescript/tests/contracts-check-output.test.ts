@@ -31,12 +31,10 @@ describe("buildCheckOutputSchema (DA-3359)", () => {
   });
 
   it("closed schema still validates the ErrorOutputNode error append", () => {
-    // minimal JSON-Schema validation without a dependency: structural check
     const schema = buildCheckOutputSchema(undefined, undefined, { closed: true });
     const props = schema.properties as Record<string, Record<string, unknown>>;
     expect(props.error.type).toContain("object");
     const payload = { verdict: "FAIL", result: { verdict: "FAIL" }, error: { message: "boom" } };
-    // every top-level payload key must be declared (closed contract)
     for (const key of Object.keys(payload)) {
       expect(props).toHaveProperty(key);
     }

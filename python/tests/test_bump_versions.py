@@ -56,8 +56,6 @@ def test_leaf_gets_version_and_release_date(tmp_path: Path) -> None:
     assert '__version__ = "9.9.9"' in leaf
     assert 'RELEASE_DATE = "2030-05-06"' in leaf
 
-    # The summary line must name the leaf entry — fails if anyone drops
-    # python_version_leaf from VERSION_FILES again.
     assert "python_version_leaf" in result.stdout
 
 

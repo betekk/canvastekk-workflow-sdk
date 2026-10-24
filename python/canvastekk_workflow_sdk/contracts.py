@@ -35,16 +35,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# =============================================================================
-# Contract Version
-# =============================================================================
-
 CONTRACT_VERSION = "1.0.0"
-
-
-# =============================================================================
-# Base Contract
-# =============================================================================
 
 
 class NodeExecutionStatus(StrEnum):
@@ -90,8 +81,7 @@ def parse_node_execution_status(value: Any) -> NodeExecutionStatus:
     from canvastekk_workflow_sdk.exceptions import NodeValidationError
 
     raise NodeValidationError(
-        f"Unknown node execution status {value!r}; expected one of "
-        f"{[s.value for s in NodeExecutionStatus]}",
+        f"Unknown node execution status {value!r}; expected one of {[s.value for s in NodeExecutionStatus]}",
         details={"received": repr(value), "expected": [s.value for s in NodeExecutionStatus]},
     )
 
@@ -132,11 +122,6 @@ class BaseContract(BaseModel):
         with open(path) as f:
             data = json.load(f)
         return cls.model_validate(data)
-
-
-# =============================================================================
-# Geometry Primitives
-# =============================================================================
 
 
 class Point3D(BaseModel):
@@ -181,9 +166,7 @@ class BoundingBox3D(BaseModel):
             min_val = getattr(self.min_point, axis)
             max_val = getattr(self.max_point, axis)
             if min_val > max_val:
-                raise ValueError(
-                    f"BoundingBox3D min_point.{axis} ({min_val}) > max_point.{axis} ({max_val})"
-                )
+                raise ValueError(f"BoundingBox3D min_point.{axis} ({min_val}) > max_point.{axis} ({max_val})")
         return self
 
     @property
@@ -211,11 +194,6 @@ class Plane(BaseModel):
     point: Point3D = Field(description="A point on the plane")
     normal: Point3D = Field(description="Unit normal vector (nx, ny, nz)")
     label: str | None = Field(default=None, description="Optional label (e.g., 'floor', 'ceiling')")
-
-
-# =============================================================================
-# Instance Data (Generic - not tied to segmentation)
-# =============================================================================
 
 
 class Instance(BaseModel):
@@ -325,11 +303,6 @@ class InstanceSet(BaseContract):
         return [i for i in self.instances if i.class_id == class_id]
 
 
-# =============================================================================
-# Measurement Results
-# =============================================================================
-
-
 class Measurement(BaseModel):
     """
     A single measurement result.
@@ -385,11 +358,6 @@ class MeasurementSet(BaseContract):
         return m.value if m else default
 
 
-# =============================================================================
-# Plane Detection Results
-# =============================================================================
-
-
 class PlaneSet(BaseContract):
     """
     A collection of detected planes.
@@ -410,12 +378,6 @@ class PlaneSet(BaseContract):
         return None
 
 
-# =============================================================================
-# Standard Class Definitions (Reference)
-# =============================================================================
-
-# Standard class IDs for BCA inspection
-# These are conventions, not enforced by the contracts
 STANDARD_CLASSES = {
     0: "floor",
     1: "ceiling",
@@ -426,13 +388,6 @@ STANDARD_CLASSES = {
 
 STANDARD_CLASS_NAMES = list(STANDARD_CLASSES.values())
 
-
-# ---------------------------------------------------------------------------
-# Check-node output-contract builder (DA-3359)
-# ---------------------------------------------------------------------------
-# Opt-in module surface for compliance-check nodes. `app.py` / `base.py` never
-# import this module (pinned by tests/test_contracts.py::TestImportGraph) —
-# nothing here is on the core execution path.
 
 DEFAULT_CHECK_VERDICTS: tuple[str, ...] = ("PASS", "FAIL", "NOT_EVALUABLE")
 
@@ -479,10 +434,7 @@ def build_check_output_schema(
             "verdict": {
                 "type": "string",
                 "enum": vocab,
-                "description": (
-                    "Headline verdict for the subject, emitted verbatim from "
-                    "the check."
-                ),
+                "description": ("Headline verdict for the subject, emitted verbatim from the check."),
                 "examples": [vocab[-2] if len(vocab) > 1 else vocab[0]],
             },
             "verdict_counts": {
@@ -494,8 +446,7 @@ def build_check_output_schema(
             "error": {
                 "type": ["object", "null"],
                 "description": (
-                    "Error detail when the node failed before producing a "
-                    "verdict; null (or absent) on a normal run."
+                    "Error detail when the node failed before producing a verdict; null (or absent) on a normal run."
                 ),
             },
         },
@@ -516,14 +467,10 @@ def validate_verdict_fields(payload: dict[str, Any], verdicts: Sequence[str] = D
     vocab = set(verdicts)
     headline = payload.get("verdict")
     if headline not in vocab:
-        raise ValueError(
-            f"verdict {headline!r} is not in the check vocabulary {sorted(vocab)}"
-        )
+        raise ValueError(f"verdict {headline!r} is not in the check vocabulary {sorted(vocab)}")
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("check payload must carry a 'result' object")
     result_verdict = result.get("verdict")
     if result_verdict not in vocab:
-        raise ValueError(
-            f"result.verdict {result_verdict!r} is not in the check vocabulary {sorted(vocab)}"
-        )
+        raise ValueError(f"result.verdict {result_verdict!r} is not in the check vocabulary {sorted(vocab)}")

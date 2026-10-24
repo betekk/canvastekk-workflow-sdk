@@ -243,7 +243,7 @@ class TestNodeSlugHeader:
         from canvastekk_workflow_sdk._server_middleware import SDKVersionMiddleware
 
         app = Starlette()
-        app.add_middleware(SDKVersionMiddleware)  # multi-node: no slug to stamp
+        app.add_middleware(SDKVersionMiddleware)
 
         async def _home(request):  # type: ignore[no-untyped-def]
             return PlainTextResponse("ok")

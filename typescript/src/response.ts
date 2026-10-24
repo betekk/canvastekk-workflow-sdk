@@ -49,9 +49,6 @@ export const NodeExecutionResponseSchema = z.object({
   error: z.string().nullable().default(null),
   error_type: z.string().nullable().default(null),
   error_code: z.string().nullable().default(null),
-  // D10 (#111): true when this response is a validation-only dry run —
-  // nothing executed, token_usage 0, execution_id carries the 'dryrun-'
-  // namespace.
   dry_run: z.boolean().default(false),
 });
 

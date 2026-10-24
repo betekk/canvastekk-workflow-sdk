@@ -116,7 +116,6 @@ class NodeExecutionRequest(BaseModel):
     )
 
     model_config = ConfigDict(
-        # Tolerate unknown body keys both directions (old engine ↔ new SDK).
         extra="ignore",
         json_schema_extra={
             "examples": [

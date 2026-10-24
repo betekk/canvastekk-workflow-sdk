@@ -108,8 +108,6 @@ export class WorkflowRunner {
     let result_output_dir: string | null = null;
 
     try {
-      // Seed run inputs for the start node; merged (not clobbered) with the
-      // start node's static inputs in the level loop below.
       const startNodes = spec.nodes.filter((n) => n.slug === "__start__");
       if (startNodes.length > 0) {
         seededOutputs.set(startNodes[0].id, { ...(inputs ?? {}) });
@@ -148,14 +146,9 @@ export class WorkflowRunner {
             });
             continue;
           }
-          // MERGE semantics: seeded run inputs win over the start node's
-          // static inputs — static inputs are preserved and the __start__
-          // NodeResult is still recorded.
           if (slug === "__start__" && seededOutputs.has(nid)) {
             resolved = { ...resolved, ...seededOutputs.get(nid) };
           }
-          // Per-node subdir prevents same-filename collisions between
-          // parallel nodes; absolute-path hand-off via edge outputs preserved.
           const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           const t0 = performance.now();
           try {
@@ -230,8 +223,6 @@ export class WorkflowRunner {
             if (this._errorPolicy === "fail_fast") break;
             continue;
           }
-          // Per-node subdir prevents same-filename collisions between
-          // parallel nodes; absolute-path hand-off via edge outputs preserved.
           const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           tasks.push(this._executor.execute(slug, resolved, context));
           taskNodeIds.push(nid);

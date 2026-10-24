@@ -59,9 +59,6 @@ class UploadSession(BaseModel):
     )
 
 
-#: An upload target. Session-only since SDK 0.36.0 (DA-3340): the legacy
-#: presigned-PUT ``str`` member was removed; a string target reaching the
-#: upload seam raises :class:`NodeIOError`.
 UploadTarget = UploadSession
 
 
@@ -210,16 +207,12 @@ class S3PresignedUploader:
                 continue
 
             if field_name not in response.outputs:
-                # Omitted output: the engine stamps s3:// URIs only for
-                # fields present in the response, so omission is legal.
                 continue
 
             value = response.outputs[field_name]
             target = upload_urls[field_name]
 
             if isinstance(value, list):
-                # tracker#3969: array file outputs — each element uploads
-                # against its indexed redemption of the prefix session.
                 if not getattr(target, "array", None):
                     logger.error(
                         "Output field '%s' value is a list but its target is not an array session",

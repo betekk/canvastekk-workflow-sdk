@@ -95,14 +95,30 @@ class StructuredJsonFormatter(logging.Formatter):
         if hasattr(record, "node_id"):
             entry["node_id"] = record.node_id
 
-        # Merge extra={...} fields: stdlib logging sets them directly as
-        # attributes on the record — copy any non-standard ones. Also honor
-        # records constructed with an explicit `_extra` dict (legacy path).
         _standard = {
-            "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-            "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-            "created", "msecs", "relativeCreated", "thread", "threadName",
-            "processName", "process", "taskName", "message", "asctime",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "taskName",
+            "message",
+            "asctime",
         }
         for key, value in record.__dict__.items():
             if key == "_extra" and isinstance(value, dict):

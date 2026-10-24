@@ -157,8 +157,6 @@ class TestErrorTaxonomySdk161:
         assert NodeConfigurationError("x").category == "lifecycle"
 
     def test_base_defaults_to_domain(self) -> None:
-        # Bare/unclassified errors (including the app's wrap of uncaught
-        # exceptions) are domain — the node's own logic failed.
         assert NodeExecutionError("boom").category == "domain"
 
     def test_to_dict_carries_category(self) -> None:
@@ -198,8 +196,6 @@ class TestErrorEnvelopeSdk161:
         from canvastekk_workflow_sdk import error_envelope
         from canvastekk_workflow_sdk.exceptions import IO_SUBCODE_DOWNLOAD_FAILED
 
-        err = NodeIOError(
-            "download failed", details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED}
-        )
+        err = NodeIOError("download failed", details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED})
         assert error_envelope(err)["code"] == "IO_ERROR"
         assert err.details["sub_code"] == "IO_DOWNLOAD_FAILED"

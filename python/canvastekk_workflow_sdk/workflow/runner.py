@@ -208,8 +208,6 @@ class WorkflowRunner:
             if inputs:
                 start_nodes = [n for n in spec.nodes if n.slug == "__start__"]
                 if start_nodes:
-                    # Seed outputs for downstream resolution; merged (not
-                    # clobbered) with static start inputs in the level loop.
                     seeded_outputs[start_nodes[0].id] = dict(inputs)
 
             levels = compute_levels(spec)
@@ -241,20 +239,11 @@ class WorkflowRunner:
                             )
                         )
                         continue
-                    # MERGE semantics: seeded run inputs (``run(spec, inputs)``)
-                    # win over the start node's static inputs — but static
-                    # inputs are preserved, and the __start__ NodeResult is
-                    # still recorded.
                     if node.slug == "__start__" and nid in seeded_outputs:
                         resolved = {**resolved, **seeded_outputs[nid]}
                     context = ExecutionContext(
                         run_id="local",
                         node_id=nid,
-                        # Per-node subdir prevents same-filename collisions
-                        # between parallel nodes. Inter-node file hand-off
-                        # works via absolute-path strings passed through edge
-                        # output values (context.output_path() returns an
-                        # absolute path), which per-node subdirs preserve.
                         output_dir=run_output_dir / nid,
                     )
                     t0 = time.perf_counter()
@@ -286,11 +275,7 @@ class WorkflowRunner:
                 task_node_ids: list[str] = []
 
                 for nid in user_ids:
-                    upstream_failed = any(
-                        e.from_node in failed_nodes
-                        for e in spec.edges
-                        if e.to_node == nid
-                    )
+                    upstream_failed = any(e.from_node in failed_nodes for e in spec.edges if e.to_node == nid)
                     if upstream_failed or nid in failed_nodes:
                         node = node_map[nid]
                         node_results.append(
@@ -337,16 +322,9 @@ class WorkflowRunner:
                     context = ExecutionContext(
                         run_id="local",
                         node_id=nid,
-                        # Per-node subdir prevents same-filename collisions
-                        # between parallel nodes. Inter-node file hand-off
-                        # works via absolute-path strings passed through edge
-                        # output values (context.output_path() returns an
-                        # absolute path), which per-node subdirs preserve.
                         output_dir=run_output_dir / nid,
                     )
-                    tasks.append(
-                        self._execute_with_sem(node.slug, resolved, context)
-                    )
+                    tasks.append(self._execute_with_sem(node.slug, resolved, context))
                     task_node_ids.append(nid)
 
                 if tasks:

@@ -30,7 +30,6 @@ def _cli_env() -> dict[str, str]:
 def test_validate_valid_definition():
     """Test validating a valid WorkflowNodeManifest."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a temporary Python file with a valid WorkflowNodeManifest
         test_file = Path(tmpdir) / "test_node.py"
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
@@ -45,7 +44,6 @@ definition = WorkflowNodeManifest(
 )
 """)
 
-        # Run the CLI validate command
         result = subprocess.run(
             [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition"],
             cwd=tmpdir,
@@ -62,7 +60,6 @@ definition = WorkflowNodeManifest(
 def test_validate_with_json_flag():
     """Test validating with --json flag returns valid JSON with valid: true."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a temporary Python file with a valid WorkflowNodeManifest
         test_file = Path(tmpdir) / "test_node.py"
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
@@ -77,7 +74,6 @@ definition = WorkflowNodeManifest(
 )
 """)
 
-        # Run the CLI validate command with --json flag
         result = subprocess.run(
             [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition", "--json"],
             cwd=tmpdir,
@@ -89,7 +85,6 @@ definition = WorkflowNodeManifest(
             f"Expected exit 0, got {result.returncode}. stdout: {result.stdout}, stderr: {result.stderr}"
         )
 
-        # Parse the JSON output
         output = json.loads(result.stdout)
         assert output["valid"] is True, f"Expected valid: true, got {output}"
 
@@ -97,7 +92,6 @@ definition = WorkflowNodeManifest(
 def test_validate_invalid_path_format():
     """Test validating with invalid path format (missing colon) fails with exit 1."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a temporary Python file with a valid WorkflowNodeManifest
         test_file = Path(tmpdir) / "test_node.py"
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
@@ -112,7 +106,6 @@ definition = WorkflowNodeManifest(
 )
 """)
 
-        # Run the CLI validate command with invalid path (missing colon)
         result = subprocess.run(
             [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node-definition"],
             cwd=tmpdir,

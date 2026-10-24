@@ -8,6 +8,4 @@ imported the version from the root risked a cycle.
 
 __version__ = "0.54.0"
 
-#: Release date of this version (UTC) — the support-horizon sunset is
-#: computed from this date (+ SUPPORT_HORIZON_DAYS).
 RELEASE_DATE = "2026-10-17"

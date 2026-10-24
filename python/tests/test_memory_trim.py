@@ -102,8 +102,8 @@ class TestReleaseFreedHeap:
             app_module._release_freed_heap()
             app_module._release_freed_heap()
         gc_collect.assert_called()
-        fake_cdll.assert_called_once()  # loader memoized — dlopen cost paid once
-        assert fake.calls == 2  # each call trims
+        fake_cdll.assert_called_once()
+        assert fake.calls == 2
 
     def test_missing_malloc_trim_symbol_disables_trim(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CANVASTEKK_SDK_MEMORY_TRIM", raising=False)
@@ -117,13 +117,13 @@ class TestReleaseFreedHeap:
             app_module._release_freed_heap()
             app_module._release_freed_heap()
         gc_collect.assert_not_called()
-        assert app_module._LIBC_HANDLE is None  # memoized negative — no retry
+        assert app_module._LIBC_HANDLE is None
 
     def test_cdll_failure_is_swallowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CANVASTEKK_SDK_MEMORY_TRIM", raising=False)
         _reset_libc_cache(monkeypatch)
         with patch("ctypes.CDLL", side_effect=OSError("no libc")):
-            app_module._release_freed_heap()  # must not raise
+            app_module._release_freed_heap()
         assert app_module._LIBC_HANDLE is None
 
     def test_find_library_fallback_uses_libc_so_6(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -165,7 +165,6 @@ class TestExecuteTrimsExactlyOnce:
             "/execute",
             json={"run_id": "test-run", "node_id": "test-node", "inputs": {}},
         )
-        # The SDK converts node errors to a fail response (HTTP 200, status="fail")
         assert response.status_code == 200
         assert response.json()["status"] == "fail"
         assert calls == [1]
@@ -217,4 +216,4 @@ def test_real_glibc_trim_returns_memory_when_available() -> None:
         pytest.skip("linux-only")
     blob = bytearray(50 * 1024 * 1024)
     del blob
-    app_module._release_freed_heap()  # must not raise on glibc
+    app_module._release_freed_heap()

@@ -1,6 +1,5 @@
 """Tests for workflow validation."""
 
-
 from canvastekk_workflow_sdk.workflow.models import (
     EdgeType,
     WorkflowDefinitionNode,
@@ -377,8 +376,12 @@ class TestComplexGraphs:
             ],
             edges=[
                 WorkflowEdgeDefinition(from_node="start", to_node="node1"),
-                WorkflowEdgeDefinition(from_node="node1", to_node="node2", edge_type=EdgeType.CONDITIONAL, condition="value > 10"),
-                WorkflowEdgeDefinition(from_node="node1", to_node="node3", edge_type=EdgeType.CONDITIONAL, condition="value <= 10"),
+                WorkflowEdgeDefinition(
+                    from_node="node1", to_node="node2", edge_type=EdgeType.CONDITIONAL, condition="value > 10"
+                ),
+                WorkflowEdgeDefinition(
+                    from_node="node1", to_node="node3", edge_type=EdgeType.CONDITIONAL, condition="value <= 10"
+                ),
                 WorkflowEdgeDefinition(from_node="node2", to_node="end"),
                 WorkflowEdgeDefinition(from_node="node3", to_node="end"),
             ],

@@ -59,7 +59,6 @@ class TestSessionHandshake:
                 run_id="r1",
                 node_id="n1",
                 node_inputs={},
-                # Missing every session field — not a valid target shape.
                 output_upload_url={"out": {"kind": "multipart-upload-session"}},
             )
 
@@ -131,7 +130,7 @@ class TestMachinery:
 
     def test_happy_path_no_unsigned_headers_and_sorted_complete(self, tmp_path, monkeypatch):
         f = tmp_path / "big.bin"
-        payload = bytes(range(256)) * 2  # 512 bytes → 2 parts of 256
+        payload = bytes(range(256)) * 2
         f.write_bytes(payload)
         part_puts: list[tuple[str, dict[str, str]]] = []
         complete_bodies: list[dict] = []
@@ -151,9 +150,6 @@ class TestMachinery:
                 body = request.read()
                 part_puts.append((str(request.url), dict(request.headers)))
                 assert request.headers["Content-Length"] == str(len(body))
-                # The engine presigns part URLs with SignedHeaders=host — any
-                # header outside that set (e.g. Content-MD5) makes S3 reject
-                # the PUT with AccessDenied (DA-3341).
                 assert "Content-MD5" not in request.headers
                 return httpx.Response(200, headers={"ETag": f'"etag-{len(body)}"'})
             if path.endswith("/complete"):
@@ -234,8 +230,6 @@ class TestMachinery:
                     },
                 )
             if str(request.url) == "https://s3/r1":
-                # Part 1 fails once post-retry, but the server already
-                # stored it — status reports it confirmed.
                 bad_part_attempts["n"] += 1
                 if bad_part_attempts["n"] <= 1:
                     return httpx.Response(500, text="transient")
@@ -266,7 +260,6 @@ class TestMachinery:
             resume_attempts=1,
         )
         parts = complete_bodies[0]["parts"]
-        # Server-truth etag for part 1, local etag for part 2.
         assert parts == [
             {"part_number": 1, "etag": "server-e1"},
             {"part_number": 2, "etag": "e2"},
@@ -291,7 +284,6 @@ class TestMachinery:
             if request.url.host == "s3":
                 return httpx.Response(500, text="part boom")
             if path.endswith("/status"):
-                # Mismatched upload_id — resume impossible.
                 return httpx.Response(200, json={"upload_id": "uid-OTHER", "uploaded_parts": []})
             if path.endswith("/abort"):
                 aborted.append("called")
@@ -307,7 +299,6 @@ class TestMachinery:
                 retry_attempts=1,
                 resume_attempts=1,
             )
-        # The ORIGINAL part failure is re-raised, not the mismatch error.
         assert "S3 PUT failed for part 1" in str(exc_info.value)
         assert "upload_id mismatch" not in str(exc_info.value)
         assert aborted == ["called"]

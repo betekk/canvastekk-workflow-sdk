@@ -155,6 +155,5 @@ export type {
   ValidationResult,
 } from "./workflow/index.js";
 
-// DA-3359: package import warns (log only) once the support horizon nears/passes.
 import { warnSupportHorizon } from "./support-horizon.js";
 warnSupportHorizon();

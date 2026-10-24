@@ -92,7 +92,7 @@ describe("BaseNode", () => {
       const resp = await node.run({
         run_id: "run-2",
         node_id: "v-1",
-        inputs: {}, // missing required "count"
+        inputs: {},
       });
       expect(resp.status).toBe("fail");
       expect(resp.error_code).toBe("VALIDATION_ERROR");
@@ -180,10 +180,6 @@ describe("BaseNode", () => {
     });
   });
 });
-
-// ---- Download policy tests (Phase 1 hardening — PLAN-DA-1711) ----
-// NOTE: IPv4 literals are constructed from fragments because the vibeguard
-// secret-masking layer rewrites full dotted-quad literals in agent output.
 
 import { readdirSync, readFileSync, rmSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -420,14 +416,10 @@ class SlowProgressNode extends ProgressNode {
 
 describe("download deadline (#3515 effective-bound clamp)", () => {
   it("aborts a download whose budget is already spent at the chunk check", async () => {
-    // Mirror python's `monkeypatch base._download_deadline` (test_file_download.py):
-    // force the deadline handed to the chunk loop into the past. The expiry path
-    // is the mechanism under test; the budget VALUE (effective bound) is pinned
-    // by the composition test below.
     const inner = BaseNode.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
     const origInner = inner.downloadOneInner;
     vi.spyOn(inner, "downloadOneInner").mockImplementation(function (this: unknown, ...args: unknown[]) {
-      args[4] = Date.now() - 1; // deadline is the 5th parameter
+      args[4] = Date.now() - 1;
       return origInner.apply(this, args);
     });
     vi.stubGlobal(
@@ -453,8 +445,6 @@ describe("download deadline (#3515 effective-bound clamp)", () => {
     const deadline = downloadDeadline(effectiveRuntimeSeconds(capped));
     const after = Date.now();
     const budgetSeconds = (deadline - before) / 1000;
-    // 7200 × 0.8 = 5760 s — a raw-timeout derivation would budget 7200 s.
-    // Two-sided bracket: the producer's inner Date.now() can tick past `before`.
     expect(budgetSeconds).toBeGreaterThanOrEqual(5760);
     expect(budgetSeconds).toBeLessThanOrEqual(5760 + (after - before) / 1000);
   });
@@ -615,7 +605,7 @@ describe("run() dry-run (D10 #111)", () => {
     const resp = await node.run({
       run_id: "run-dry-3",
       node_id: "n1",
-      inputs: { message: 12345 }, // wrong type
+      inputs: { message: 12345 },
       dry_run: true,
     });
     expect(resp.status).toBe("fail");

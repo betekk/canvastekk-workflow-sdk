@@ -12,9 +12,6 @@ interface SessionCall {
   body?: unknown;
 }
 
-// Local HTTP server speaking the multipart session wire contract
-// (initiate → part PUTs → complete) so the routing tests assert real
-// requests, not mocks.
 async function startSessionServer() {
   const calls: SessionCall[] = [];
   const server: Server = createServer((req, res) => {
@@ -73,8 +70,6 @@ async function startSessionServer() {
   };
 }
 
-// A descriptor that must never be reached — for tests where the SDK is
-// expected to fail before any upload attempt.
 const untouchedTarget = {
   kind: "multipart-upload-session",
   session_token: "t",

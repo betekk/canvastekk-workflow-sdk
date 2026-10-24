@@ -420,9 +420,7 @@ class TestBuildRegistryPayload:
 
     def test_contract_rides_constraints_when_declared(self) -> None:
         """D8/#110: declared contract lands in constraints (engine extra=forbid wire-compat)."""
-        definition = self._make_definition(
-            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
-        )
+        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
         payload = build_registry_payload(definition)
         assert payload["constraints"]["contract"] == {
             "transport": "http",
@@ -430,7 +428,7 @@ class TestBuildRegistryPayload:
             "capabilities": {"dry_run": False},
             "openapi": "3.2",
         }
-        assert "contract" not in payload  # never top-level on the wire
+        assert "contract" not in payload
 
     def test_contract_absent_when_undeclared(self) -> None:
         definition = self._make_definition()
@@ -438,12 +436,8 @@ class TestBuildRegistryPayload:
         assert "contract" not in payload.get("constraints", {})
 
     def test_caller_contract_wins(self) -> None:
-        definition = self._make_definition(
-            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
-        )
-        payload = build_registry_payload(
-            definition, constraints={"contract": {"caller": True}}
-        )
+        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_registry_payload(definition, constraints={"contract": {"caller": True}})
         assert payload["constraints"]["contract"] == {"caller": True}
 
     def test_maps_title_to_label(self) -> None:
@@ -530,7 +524,6 @@ class TestBuildRegistryPayload:
         definition = self._make_definition()
         payload = build_registry_payload(definition, constraints={"gpu": True})
         assert payload["constraints"]["gpu"] is True
-        # DA-3359: the stamp always rides along
         assert payload["constraints"].get("sdk_version") == definition.sdk_version
 
     def test_constraints_always_carry_stamp(self) -> None:
@@ -544,7 +537,7 @@ class TestBuildRegistryPayload:
     def test_constraints_merges_manifest_docs_fields(self) -> None:
         """DA-1955/#123: docs fields land in constraints; legacy version keys never do."""
         definition = self._make_definition(
-            minimum_sdk_version="0.22.0",  # legacy manifest key — ignored at construction
+            minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
             changelog_url="https://example.com/changelog",
         )
@@ -714,9 +707,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
         ctk = "ctk_" + "b" * 43
-        with patch(
-            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
-        ) as mock_post:
+        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
             register_node(
                 node,
                 "https://registry.example.com/api/nodes",
@@ -733,9 +724,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.status_code = 200
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
-        with patch(
-            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
-        ) as mock_post:
+        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
             register_node(
                 node,
                 "https://registry.example.com/api/nodes",
@@ -800,8 +789,6 @@ class TestRegisterNodeNewFeatures:
         assert "node_status" not in payload
 
     def test_accepts_valid_invoke_types(self) -> None:
-        # "lambda" deliberately absent: rejected platform surface (#131) —
-        # its rejection is pinned below.
         for invoke_type in ("http", "sagemaker", "in-process"):
             node = DummyNode()
             mock_response = MagicMock()

@@ -110,8 +110,6 @@ describe("deprecation pipeline (DA-2312, parity with Python v0.25.0)", () => {
     });
 
     it("rejects non-ISO date formats (strict YYYY-MM-DD)", () => {
-      // Lexicographic ordering in the ordering check and the runtime sunset
-      // guard only holds for strict YYYY-MM-DD — enforce the format.
       expect(() =>
         WorkflowNodeManifestSchema.parse(
           baseManifest({

@@ -12,7 +12,6 @@ from typing import Any
 
 __all__ = ["lint_schema_dialect"]
 
-# $schema URIs that predate 2020-12 (and the one 2019-09 holdover keyword).
 _PRE_2020_12_SCHEMAS = (
     "http://json-schema.org/draft-07/schema#",
     "http://json-schema.org/draft-04/schema#",
@@ -20,7 +19,6 @@ _PRE_2020_12_SCHEMAS = (
     "https://json-schema.org/draft/2019-09/schema",
 )
 
-# Traversal keys: containers to recurse into.
 _CONTAINER_KEYS = ("properties", "$defs", "definitions", "patternProperties")
 _LIST_CONTAINER_KEYS = ("prefixItems", "allOf", "anyOf", "oneOf")
 
@@ -45,12 +43,16 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
         violations.append((f"{path}.$schema", f"pre-2020-12 dialect URI: {uri}"))
 
     _flag_keyword(
-        schema, path, "definitions",
+        schema,
+        path,
+        "definitions",
         "draft-07 'definitions' is not 2020-12 — use '$defs'",
         violations,
     )
     _flag_keyword(
-        schema, path, "recursiveAnchor",
+        schema,
+        path,
+        "recursiveAnchor",
         "'recursiveAnchor' is 2019-09 — not part of 2020-12",
         violations,
     )
@@ -63,11 +65,7 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
     deps = schema.get("dependencies")
     if isinstance(deps, dict):
         for dep_key, dep_value in deps.items():
-            kind = (
-                "dependentRequired"
-                if isinstance(dep_value, list)
-                else "dependentSchemas"
-            )
+            kind = "dependentRequired" if isinstance(dep_value, list) else "dependentSchemas"
             violations.append(
                 (
                     f"{path}.dependencies.{dep_key}",
@@ -86,10 +84,8 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
             for i, sub in enumerate(child):
                 _lint_node(sub, f"{path}.{key}[{i}]", violations)
     items = schema.get("items")
-    if isinstance(items, list):  # draft-07 array form: not valid 2020-12
-        violations.append(
-            (f"{path}.items", "array-form 'items' is draft-07 — 2020-12 uses 'prefixItems'")
-        )
+    if isinstance(items, list):
+        violations.append((f"{path}.items", "array-form 'items' is draft-07 — 2020-12 uses 'prefixItems'"))
         for i, sub in enumerate(items):
             _lint_node(sub, f"{path}.items[{i}]", violations)
     else:

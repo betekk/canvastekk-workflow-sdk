@@ -625,7 +625,6 @@ class TestWorkflowRunnerOutputDir:
         assert result.status == "completed"
         assert captured_dir
         assert Path(captured_dir[0]).exists()
-        # Per-node subdirs: the node's output dir is a subdir of the run dir.
         assert Path(captured_dir[0]) == result.output_dir / "cap"
 
     def test_auto_temp_dir_cleaned_up_on_exception(self) -> None:
@@ -725,7 +724,9 @@ class TestStartInputSeeding:
                 WorkflowDefinitionNode(id="end", slug="__end__"),
             ],
             edges=[
-                WorkflowEdgeDefinition(from_node="start", to_node="echo", from_output="point_cloud", to_input="message"),
+                WorkflowEdgeDefinition(
+                    from_node="start", to_node="echo", from_output="point_cloud", to_input="message"
+                ),
                 WorkflowEdgeDefinition(from_node="echo", to_node="end", from_output="message", to_input="result"),
             ],
         )
@@ -742,9 +743,7 @@ class TestStartInputSeeding:
     def test_seeded_inputs_merge_with_static_start_inputs(self) -> None:
         spec = WorkflowDefinitionSpec(
             nodes=[
-                WorkflowDefinitionNode(
-                    id="start", slug="__start__", inputs={"static_key": "static"}
-                ),
+                WorkflowDefinitionNode(id="start", slug="__start__", inputs={"static_key": "static"}),
                 WorkflowDefinitionNode(id="echo", slug="echo-v1.0.0"),
                 WorkflowDefinitionNode(id="end", slug="__end__"),
             ],
@@ -778,7 +777,9 @@ class TestResolverErrorIsolation:
                 WorkflowDefinitionNode(id="end", slug="__end__"),
             ],
             edges=[
-                WorkflowEdgeDefinition(from_node="start", to_node="echo", from_output="missing_key", to_input="message"),
+                WorkflowEdgeDefinition(
+                    from_node="start", to_node="echo", from_output="missing_key", to_input="message"
+                ),
                 WorkflowEdgeDefinition(from_node="echo", to_node="end", from_output="message", to_input="result"),
             ],
         )
@@ -842,10 +843,8 @@ class TestPerNodeOutputSubdirs:
         assert result.status == "completed"
         assert len(captured) == 2
         assert captured[0] != captured[1]
-        # gather() completes in arbitrary order — map path->content by dir name.
         contents = {Path(p).parent.name: Path(p).read_text() for p in captured}
         assert contents == {"a": "a", "b": "b"}
-        # Tidy up the preserved temp dir (cleanup=False was only for asserts).
         import shutil
 
         shutil.rmtree(result.output_dir, ignore_errors=True)

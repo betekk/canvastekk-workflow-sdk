@@ -145,7 +145,7 @@ class TestConfigureLogging:
         monkeypatch.setenv("CANVASTEKK_LOG_FORMAT", "text")
         from canvastekk_workflow_sdk import logging as logging_mod
 
-        assert logging_mod._get_env_log_format() == "console"  # text is the console alias
+        assert logging_mod._get_env_log_format() == "console"
 
     def test_env_format_default_is_console(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """DA-3359: console output is the default; json is opt-in."""

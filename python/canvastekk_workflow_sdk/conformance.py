@@ -29,7 +29,6 @@ from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 
 __all__ = ["RouteCheck", "VerifyReport", "verify_node"]
 
-# The closed route vocabulary's POST-family members (D8); everything else is GET.
 _POST_ROUTES = frozenset({"/execute", "/hook"})
 
 
@@ -96,37 +95,28 @@ def verify_node(
     checks: list[RouteCheck] = []
 
     with httpx.Client(base_url=base, timeout=timeout, headers=headers) as client:
-        # GET /manifest first — its body derives the rest of the probe set.
         manifest: WorkflowNodeManifest | None = None
         try:
             r = client.get("/manifest")
             if r.status_code != 200:
-                checks.append(
-                    RouteCheck("GET /manifest", False, f"status {r.status_code}")
-                )
+                checks.append(RouteCheck("GET /manifest", False, f"status {r.status_code}"))
             else:
                 try:
                     manifest = WorkflowNodeManifest.model_validate(r.json())
-                    checks.append(
-                        RouteCheck("GET /manifest", True, "valid WorkflowNodeManifest")
-                    )
-                except Exception as e:  # pydantic ValidationError or bad JSON
-                    checks.append(
-                        RouteCheck("GET /manifest", False, f"invalid manifest: {e}")
-                    )
+                    checks.append(RouteCheck("GET /manifest", True, "valid WorkflowNodeManifest"))
+                except Exception as e:
+                    checks.append(RouteCheck("GET /manifest", False, f"invalid manifest: {e}"))
         except httpx.HTTPError as e:
             checks.append(RouteCheck("GET /manifest", False, f"unreachable: {e}"))
 
         if manifest is None:
-            # Without a served manifest the probe set cannot be derived.
             return VerifyReport(base_url=base, checks=checks)
 
         for route in manifest.effective_contract.routes:
             if route == "/manifest":
-                continue  # already probed — it produced this list
+                continue
 
             if route == "/execute":
-                # Negative probe: a malformed payload must be rejected (4xx).
                 try:
                     r = client.post("/execute", json={"unexpected": "probe"})
                     ok = 400 <= r.status_code < 500
@@ -135,8 +125,6 @@ def verify_node(
                 except httpx.HTTPError as e:
                     checks.append(RouteCheck("POST /execute", False, f"unreachable: {e}"))
 
-                # Positive probe: flag AND declared capability (#113 — grilled:
-                # registration-time verifies stay passive).
                 name = "POST /execute (dry-run)"
                 capability = manifest.effective_contract.capabilities.dry_run
                 if not dry_run or not capability:
