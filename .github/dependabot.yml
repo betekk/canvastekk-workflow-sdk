@@ -17,7 +17,8 @@ updates:
       minor-and-patch:
         update-types:
           - "minor"
-          - "patch"  - package-ecosystem: "pip"
+          - "patch"
+  - package-ecosystem: "pip"
     directory: "/python"
     schedule:
       interval: "weekly"
@@ -31,7 +32,8 @@ updates:
       minor-and-patch:
         update-types:
           - "minor"
-          - "patch"  - package-ecosystem: "github-actions"
+          - "patch"
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
