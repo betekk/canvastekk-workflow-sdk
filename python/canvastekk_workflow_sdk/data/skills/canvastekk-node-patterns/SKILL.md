@@ -460,7 +460,6 @@ class InferenceNode(BaseNode):
     def _check_gpu(self) -> bool:
         try:
             import torch
-
             return torch.cuda.is_available()
         except ImportError:
             return False
@@ -495,7 +494,6 @@ class InferenceNode(BaseNode):
     def _run_inference(self, file_path: Path) -> str:
         """Replace with actual model inference."""
         import json
-
         return json.dumps({"status": "ok", "predictions": []})
 
     @staticmethod
@@ -587,7 +585,9 @@ from canvastekk_workflow_sdk.middleware import NodeMiddleware
 class AuditMiddleware:
     """Logs execution details for auditing purposes."""
 
-    def on_before_execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def on_before_execute(
+        self, inputs: dict[str, Any], context: ExecutionContext
+    ) -> dict[str, Any]:
         context.logger.info(
             "Audit: execution started",
             extra={"run_id": context.run_id, "node_id": context.node_id, "input_count": len(inputs)},
@@ -657,12 +657,10 @@ from canvastekk_workflow_sdk import create_multi_node_app
 # Each node gets its own URL prefix:
 # POST /segment/execute, GET /segment/health, ...
 # POST /measure/execute, GET /measure/health, ...
-app = create_multi_node_app(
-    {
-        "segment": SegmentNode(),
-        "measure": MeasureNode(),
-    }
-)
+app = create_multi_node_app({
+    "segment": SegmentNode(),
+    "measure": MeasureNode(),
+})
 ```
 
 ## Pattern 10: Format Conversion Node
@@ -944,7 +942,7 @@ the SDK records facts per field in `context.metadata` (see `base.py`):
 
 ```python
 context.metadata[field_name] = {
-    "original_url": value,  # the input URL string
+    "original_url": value,       # the input URL string
     "local_path": str(local_path),
     "size_bytes": file_size,
 }
@@ -965,7 +963,7 @@ Your node never constructs one:
 def execute(self, inputs: dict, context: ExecutionContext) -> dict:
     out = context.output_path("result.parquet")
     # ... write the file ...
-    return {"output_file": str(out)}  # SDK uploads via the engine's session
+    return {"output_file": str(out)}   # SDK uploads via the engine's session
 ```
 
 Rules: pass targets through untouched — no string slicing, concatenation, or
