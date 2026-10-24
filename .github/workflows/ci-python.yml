@@ -19,7 +19,7 @@ defaults:
     working-directory: python
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
   actions: read
 
