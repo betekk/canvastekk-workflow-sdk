@@ -1,0 +1,49 @@
+# Dependabot version updates — betekk/canvastekk-tracker#4039 phase 3
+# Alerts + security updates are org-enabled separately (security_and_analysis);
+# this file adds scheduled version-update PRs.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Singapore"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "pip"
+    directory: "/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Singapore"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Singapore"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
