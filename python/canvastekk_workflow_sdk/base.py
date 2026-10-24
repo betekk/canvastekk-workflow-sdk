@@ -303,15 +303,15 @@ class BaseNode(ABC):
                     hops += 1
                     if hops > MAX_REDIRECT_HOPS:
                         raise NodeIOError(
-                        f"Too many redirects downloading file for field '{field_name}'",
-                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
-                    )
+                            f"Too many redirects downloading file for field '{field_name}'",
+                            details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                        )
                     next_url = resp.headers.get("location")
                     if not next_url:
                         raise NodeIOError(
-                        f"Redirect without Location header downloading file for field '{field_name}'",
-                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
-                    )
+                            f"Redirect without Location header downloading file for field '{field_name}'",
+                            details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                        )
                     current_url = validate_external_url(
                         next_url if "://" in next_url else str(urljoin(current_url, next_url))
                     )
@@ -396,11 +396,7 @@ class BaseNode(ABC):
                     entries: list[dict[str, Any]] = []
                     new_elements: list[Any] = []
                     for element in value:
-                        if (
-                            isinstance(element, str)
-                            and element.strip()
-                            and element.startswith(("http://", "https://"))
-                        ):
+                        if isinstance(element, str) and element.strip() and element.startswith(("http://", "https://")):
                             context.report_progress(0.05, f"Downloading {field_name}")
                             local_path = self._download_one(field_name, element, context)
                             downloaded.append(local_path)

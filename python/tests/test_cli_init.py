@@ -57,6 +57,4 @@ def test_init_does_not_create_legacy_opencode_skills(tmp_path):
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
-    assert not (tmp_path / ".opencode" / "skills").exists(), (
-        "init recreated the legacy .opencode/skills destination"
-    )
+    assert not (tmp_path / ".opencode" / "skills").exists(), "init recreated the legacy .opencode/skills destination"

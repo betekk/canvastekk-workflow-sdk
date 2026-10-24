@@ -27,9 +27,7 @@ PROGRESS_MESSAGE_MAX_CHARS = 1000
 
 PROGRESS_PING_TIMEOUT_S = 5.0
 
-execution_context_var: ContextVar[ExecutionContext | None] = ContextVar(
-    "canvastekk_execution_context", default=None
-)
+execution_context_var: ContextVar[ExecutionContext | None] = ContextVar("canvastekk_execution_context", default=None)
 
 
 def _deliver_progress_ping(url: str, payload: dict[str, Any]) -> None:
@@ -194,9 +192,7 @@ class ExecutionContext:
         """
         candidate = (self._output_dir / filename).resolve()
         if not candidate.is_relative_to(self._output_dir.resolve()):
-            raise ValueError(
-                f"Output filename '{filename}' escapes the output directory"
-            )
+            raise ValueError(f"Output filename '{filename}' escapes the output directory")
         return candidate
 
     @property

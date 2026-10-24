@@ -63,7 +63,6 @@ def _validate_definition(definition) -> dict:
         "id": definition.id,
     }
 
-
     for name in definition.file_input_fields:
         schema = definition.input_schema.get("properties", {}).get(name, {})
         field_report = {"name": name, "format": schema.get("format"), "type": schema.get("type")}
@@ -174,9 +173,7 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
         report["errors"].append(f"Engine request carries keys outside the engine whitelist: {extra}")
     if definition.category not in _ENGINE_CATEGORIES:
         report["valid"] = False
-        report["errors"].append(
-            f"category {definition.category!r} is outside the engine's enum {_ENGINE_CATEGORIES}"
-        )
+        report["errors"].append(f"category {definition.category!r} is outside the engine's enum {_ENGINE_CATEGORIES}")
     if definition.timeout_seconds > _ENGINE_MAX_TIMEOUT_SECONDS:
         report["valid"] = False
         report["errors"].append(f"timeout_seconds {definition.timeout_seconds} exceeds the engine ceiling 86400")
@@ -257,7 +254,7 @@ def _run_register(args: list[str]) -> int:
     if (not module_path and not manifest_source) or not engine_url:
         return _usage()
 
-    token = (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))
+    token = os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
     if not token:
         print("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)", file=sys.stderr)
         return 2
@@ -534,14 +531,12 @@ def main() -> None:
         print("Commands:")
         print("  validate <module:attribute> [--json]  Validate a node manifest definition")
         print("  probe <module:attribute> [--json]     Offline registration probes (validate + engine mirror)")
-        print(
-            "  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]"
-        )
+        print("  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]")
         print("                                        Publish the manifest to the engine registry")
+        print("  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH")
         print(
-            "  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH"
+            "                                        [--staged S] [--dry-run] — drain retired slugs and assert staged presence"
         )
-        print("                                        [--staged S] [--dry-run] — drain retired slugs and assert staged presence")
         print("  diff <old.json> <new.json> [--json]   Classify breaking changes between manifests")
         print("  init [--agents-md] [--force]          Scaffold AI agent skills into your project")
         print(

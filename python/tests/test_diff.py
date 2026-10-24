@@ -212,9 +212,7 @@ class TestVersionDowngradeAndParseGating:
         new = {"slug": "n", "version": "1.0.0", "input_schema": {}}
         diff = diff_manifests(old, new)
 
-        assert diff.errors == [
-            "version downgrade: '2.0.0' -> '1.0.0' (publish a higher semver)"
-        ]
+        assert diff.errors == ["version downgrade: '2.0.0' -> '1.0.0' (publish a higher semver)"]
 
     def test_unparsable_version_no_same_version_error(self) -> None:
         old = {"slug": "n", "version": "1.0", "input_schema": {}}

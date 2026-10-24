@@ -53,8 +53,10 @@ def _conforming_handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=MANIFEST)
     if request.url.path == "/execute":
         body = request.read()
-        return httpx.Response(200, json={"ok": True}) if b"dry_run" in body else httpx.Response(
-            422, json={"detail": "validation failed"}
+        return (
+            httpx.Response(200, json={"ok": True})
+            if b"dry_run" in body
+            else httpx.Response(422, json={"detail": "validation failed"})
         )
     if request.url.path in ("/hook", "/metrics", "/live", "/ready"):
         return httpx.Response(200, json={})
@@ -156,10 +158,13 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "Client", lambda **kw: client)
     monkeypatch.setattr(
         "canvastekk_workflow_sdk.registry.httpx.post",
-        lambda url, **kw: post_calls.append(url) or httpx.Response(
-            201,
-            json={**MANIFEST, "action": "created", "revision_id": "rev-1"},
-            request=httpx.Request("POST", url),
+        lambda url, **kw: (
+            post_calls.append(url)
+            or httpx.Response(
+                201,
+                json={**MANIFEST, "action": "created", "revision_id": "rev-1"},
+                request=httpx.Request("POST", url),
+            )
         ),
     )
 
@@ -227,7 +232,6 @@ def test_cli_verify_nonconforming_exits_nonzero(monkeypatch, capsys) -> None:
     assert "NON-CONFORMING" in capsys.readouterr().out
 
 
-
 DERIVED_MANIFEST = {
     **MANIFEST,
     "contract": {
@@ -271,7 +275,6 @@ def test_verify_node_broken_declared_route_fails_at_its_name(monkeypatch) -> Non
     metrics = next(c for c in report.checks if c.route == "GET /metrics")
     assert not metrics.ok
     assert not report.ok
-
 
 
 DRY_RUN_MANIFEST = {
@@ -346,9 +349,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
     monkeypatch.setattr(conf, "verify_node", fake_verify)
     from canvastekk_workflow_sdk.__main__ import main
 
-    monkeypatch.setattr(
-        "sys.argv", ["canvastekk_workflow_sdk", "verify", "http://node.test", "--dry-run"]
-    )
+    monkeypatch.setattr("sys.argv", ["canvastekk_workflow_sdk", "verify", "http://node.test", "--dry-run"])
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0

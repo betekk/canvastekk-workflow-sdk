@@ -69,21 +69,15 @@ class TestHostPolicy:
 
     def test_hostname_resolving_to_private_blocked(self) -> None:
         with pytest.raises(UrlPolicyError, match="resolves to blocked IP"):
-            validate_external_url(
-                "https://evil.example.com/file.ply", resolver=_resolver(PRIVATE_IP)
-            )
+            validate_external_url("https://evil.example.com/file.ply", resolver=_resolver(PRIVATE_IP))
 
     def test_hostname_resolving_to_cgnat_blocked(self) -> None:
         with pytest.raises(UrlPolicyError, match="resolves to blocked IP"):
-            validate_external_url(
-                "https://evil.example.com/file.ply", resolver=_resolver(CGNAT_IP)
-            )
+            validate_external_url("https://evil.example.com/file.ply", resolver=_resolver(CGNAT_IP))
 
     def test_hostname_resolving_to_link_local_blocked(self) -> None:
         with pytest.raises(UrlPolicyError, match="resolves to blocked IP"):
-            validate_external_url(
-                "https://evil.example.com/file.ply", resolver=_resolver(LINK_LOCAL_IP)
-            )
+            validate_external_url("https://evil.example.com/file.ply", resolver=_resolver(LINK_LOCAL_IP))
 
     def test_ipv4_mapped_ipv6_blocked(self) -> None:
         with pytest.raises(UrlPolicyError, match="resolves to blocked IP"):
@@ -118,14 +112,10 @@ class TestAllowlist:
         url = "https://internal.example.com/bucket/scan.ply"
         assert validate_external_url(url, resolver=_resolver(PRIVATE_IP)) == url
 
-    def test_allowlist_does_not_cover_sibling_domains(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_allowlist_does_not_cover_sibling_domains(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "internal.example.com")
         with pytest.raises(UrlPolicyError, match="resolves to blocked IP"):
-            validate_external_url(
-                "https://notinternal.example.com/f.ply", resolver=_resolver(PRIVATE_IP)
-            )
+            validate_external_url("https://notinternal.example.com/f.ply", resolver=_resolver(PRIVATE_IP))
 
     def test_no_url_host_rejected(self) -> None:
         with pytest.raises(UrlPolicyError, match="no host"):

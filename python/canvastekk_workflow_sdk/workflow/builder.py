@@ -157,9 +157,7 @@ class WorkflowBuilder:
             ValueError: If ID is duplicate or reserved slug used.
         """
         if slug in ("__start__", "__end__"):
-            raise ValueError(
-                f"Cannot use reserved slug '{slug}'. Use add_start() or add_end() instead."
-            )
+            raise ValueError(f"Cannot use reserved slug '{slug}'. Use add_start() or add_end() instead.")
         self._check_duplicate(node_id)
         self._nodes.append(
             WorkflowDefinitionNode(
@@ -206,9 +204,7 @@ class WorkflowBuilder:
         if to_node not in self._node_ids:
             raise ValueError(f"Unknown target node: '{to_node}'")
         if from_node == to_node:
-            raise ValueError(
-                f"Self-loop detected: cannot connect '{from_node}' to itself"
-            )
+            raise ValueError(f"Self-loop detected: cannot connect '{from_node}' to itself")
 
         self._edges.append(
             WorkflowEdgeDefinition(
@@ -245,8 +241,7 @@ class WorkflowBuilder:
             result = validate_graph(spec)
             if not result.is_valid:
                 from canvastekk_workflow_sdk.exceptions import WorkflowValidationError
-                raise WorkflowValidationError(
-                    f"Workflow validation failed: {'; '.join(result.errors)}"
-                )
+
+                raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(result.errors)}")
 
         return spec

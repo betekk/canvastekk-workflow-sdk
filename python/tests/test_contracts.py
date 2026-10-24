@@ -385,9 +385,7 @@ class TestNodeExecutionStatusSdk161:
         assert parse_node_execution_status("fail") is NodeExecutionStatus.FAIL
         assert parse_node_execution_status("skipped") is NodeExecutionStatus.SKIPPED
         assert parse_node_execution_status("timeout") is NodeExecutionStatus.TIMEOUT
-        assert (
-            parse_node_execution_status(NodeExecutionStatus.PASS) is NodeExecutionStatus.PASS
-        )
+        assert parse_node_execution_status(NodeExecutionStatus.PASS) is NodeExecutionStatus.PASS
 
     def test_parse_strict_missing_and_unknown(self) -> None:
         from canvastekk_workflow_sdk.contracts import parse_node_execution_status

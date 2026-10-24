@@ -35,10 +35,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 CONTRACT_VERSION = "1.0.0"
-
-
 
 
 class NodeExecutionStatus(StrEnum):
@@ -84,8 +81,7 @@ def parse_node_execution_status(value: Any) -> NodeExecutionStatus:
     from canvastekk_workflow_sdk.exceptions import NodeValidationError
 
     raise NodeValidationError(
-        f"Unknown node execution status {value!r}; expected one of "
-        f"{[s.value for s in NodeExecutionStatus]}",
+        f"Unknown node execution status {value!r}; expected one of {[s.value for s in NodeExecutionStatus]}",
         details={"received": repr(value), "expected": [s.value for s in NodeExecutionStatus]},
     )
 
@@ -126,8 +122,6 @@ class BaseContract(BaseModel):
         with open(path) as f:
             data = json.load(f)
         return cls.model_validate(data)
-
-
 
 
 class Point3D(BaseModel):
@@ -172,9 +166,7 @@ class BoundingBox3D(BaseModel):
             min_val = getattr(self.min_point, axis)
             max_val = getattr(self.max_point, axis)
             if min_val > max_val:
-                raise ValueError(
-                    f"BoundingBox3D min_point.{axis} ({min_val}) > max_point.{axis} ({max_val})"
-                )
+                raise ValueError(f"BoundingBox3D min_point.{axis} ({min_val}) > max_point.{axis} ({max_val})")
         return self
 
     @property
@@ -202,8 +194,6 @@ class Plane(BaseModel):
     point: Point3D = Field(description="A point on the plane")
     normal: Point3D = Field(description="Unit normal vector (nx, ny, nz)")
     label: str | None = Field(default=None, description="Optional label (e.g., 'floor', 'ceiling')")
-
-
 
 
 class Instance(BaseModel):
@@ -313,8 +303,6 @@ class InstanceSet(BaseContract):
         return [i for i in self.instances if i.class_id == class_id]
 
 
-
-
 class Measurement(BaseModel):
     """
     A single measurement result.
@@ -370,8 +358,6 @@ class MeasurementSet(BaseContract):
         return m.value if m else default
 
 
-
-
 class PlaneSet(BaseContract):
     """
     A collection of detected planes.
@@ -392,7 +378,6 @@ class PlaneSet(BaseContract):
         return None
 
 
-
 STANDARD_CLASSES = {
     0: "floor",
     1: "ceiling",
@@ -402,7 +387,6 @@ STANDARD_CLASSES = {
 }
 
 STANDARD_CLASS_NAMES = list(STANDARD_CLASSES.values())
-
 
 
 DEFAULT_CHECK_VERDICTS: tuple[str, ...] = ("PASS", "FAIL", "NOT_EVALUABLE")
@@ -450,10 +434,7 @@ def build_check_output_schema(
             "verdict": {
                 "type": "string",
                 "enum": vocab,
-                "description": (
-                    "Headline verdict for the subject, emitted verbatim from "
-                    "the check."
-                ),
+                "description": ("Headline verdict for the subject, emitted verbatim from the check."),
                 "examples": [vocab[-2] if len(vocab) > 1 else vocab[0]],
             },
             "verdict_counts": {
@@ -465,8 +446,7 @@ def build_check_output_schema(
             "error": {
                 "type": ["object", "null"],
                 "description": (
-                    "Error detail when the node failed before producing a "
-                    "verdict; null (or absent) on a normal run."
+                    "Error detail when the node failed before producing a verdict; null (or absent) on a normal run."
                 ),
             },
         },
@@ -487,14 +467,10 @@ def validate_verdict_fields(payload: dict[str, Any], verdicts: Sequence[str] = D
     vocab = set(verdicts)
     headline = payload.get("verdict")
     if headline not in vocab:
-        raise ValueError(
-            f"verdict {headline!r} is not in the check vocabulary {sorted(vocab)}"
-        )
+        raise ValueError(f"verdict {headline!r} is not in the check vocabulary {sorted(vocab)}")
     result = payload.get("result")
     if not isinstance(result, dict):
         raise ValueError("check payload must carry a 'result' object")
     result_verdict = result.get("verdict")
     if result_verdict not in vocab:
-        raise ValueError(
-            f"result.verdict {result_verdict!r} is not in the check vocabulary {sorted(vocab)}"
-        )
+        raise ValueError(f"result.verdict {result_verdict!r} is not in the check vocabulary {sorted(vocab)}")

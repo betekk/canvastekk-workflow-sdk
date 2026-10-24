@@ -173,21 +173,15 @@ class TestProgressPing:
     def test_noop_without_execution_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
-        req = NodeExecutionRequest(
-            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
-        )
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb")
         ctx = ExecutionContext(req)
         ctx.report_progress(0.5)
         assert calls == []
 
-    def test_happy_path_posts_execution_id_percent_message(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_happy_path_posts_execution_id_percent_message(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
-        req = NodeExecutionRequest(
-            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
-        )
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb")
         ctx = ExecutionContext(req, execution_id="exec-42")
         ctx.report_progress(0.5, "halfway")
         assert calls == [
@@ -200,21 +194,15 @@ class TestProgressPing:
     def test_message_key_omitted_when_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
-        req = NodeExecutionRequest(
-            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
-        )
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb")
         ctx = ExecutionContext(req, execution_id="exec-43")
         ctx.report_progress(0.25)
         assert calls == [("http://engine/cb/progress", {"execution_id": "exec-43", "percent": 25})]
 
-    def test_percent_clamped_and_message_truncated(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_percent_clamped_and_message_truncated(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
-        req = NodeExecutionRequest(
-            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb"
-        )
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb")
         ctx = ExecutionContext(req, execution_id="exec-44")
         ctx.report_progress(1.5, "x" * 1500)
         assert len(calls) == 1
@@ -226,9 +214,7 @@ class TestProgressPing:
     def test_trailing_slash_normalized(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", self._recorder(calls))
-        req = NodeExecutionRequest(
-            run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb/"
-        )
+        req = NodeExecutionRequest(run_id="r", node_id="n", inputs={}, callback_url="http://engine/cb/")
         ctx = ExecutionContext(req, execution_id="exec-46")
         ctx.report_progress(1.0)
         assert calls[0][0] == "http://engine/cb/progress"

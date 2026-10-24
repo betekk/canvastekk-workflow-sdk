@@ -39,6 +39,7 @@ _METADATA_HOSTS = frozenset(
     }
 )
 
+
 def _default_resolver(host: str) -> list[str]:
     return [info[4][0] for info in socket.getaddrinfo(host, None)]
 
@@ -70,12 +71,7 @@ def _ip_is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         if ip in _CGNAT_NETWORK:
             return True
     return bool(
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_reserved
-        or ip.is_multicast
-        or ip.is_unspecified
+        ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified
     )
 
 
@@ -118,9 +114,7 @@ def validate_external_url(
         raise UrlPolicyError(f"Blocked metadata host '{hostname}'")
 
     allowlist = _allowlist_suffixes()
-    if allowlist and any(
-        hostname == s or hostname.endswith("." + s) for s in allowlist
-    ):
+    if allowlist and any(hostname == s or hostname.endswith("." + s) for s in allowlist):
         return url
 
     try:

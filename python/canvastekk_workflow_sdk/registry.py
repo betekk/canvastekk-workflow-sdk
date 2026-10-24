@@ -479,10 +479,7 @@ def register_node(
             raise ValueError("verify=True requires invoke_url (no probe target).")
         report = verify_node(invoke_url, timeout=verify_timeout, api_key=api_key)
         if not report.ok:
-            raise RegistrationError(
-                "Node failed conformance verification; refusing to register.\n"
-                + report.summary()
-            )
+            raise RegistrationError("Node failed conformance verification; refusing to register.\n" + report.summary())
 
     manifest = build_registry_payload(
         node.definition,

@@ -47,9 +47,22 @@ class TestBuildEngineRequest:
         )
         payload = _build_engine_request(manifest)
         allowed = {
-            "name", "version", "label", "description", "input_schema", "output_schema",
-            "invoke_type", "invoke_url", "invoke_config", "category", "tags", "styles",
-            "constraints", "token_cost", "timeout_seconds", "deprecation",
+            "name",
+            "version",
+            "label",
+            "description",
+            "input_schema",
+            "output_schema",
+            "invoke_type",
+            "invoke_url",
+            "invoke_config",
+            "category",
+            "tags",
+            "styles",
+            "constraints",
+            "token_cost",
+            "timeout_seconds",
+            "deprecation",
         }
         assert set(payload) <= allowed
         assert payload["constraints"] == {
@@ -125,9 +138,7 @@ class TestRunRegister:
 
         err = urllib.error.HTTPError("u", 401, "Unauthorized", hdrs=None, fp=io.BytesIO(b"{}"))
         with patch("urllib.request.urlopen", side_effect=err):
-            code, _, out = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, out = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 3
         assert "t0ps3cret" not in out
 
@@ -136,18 +147,14 @@ class TestRunRegister:
 
         err = urllib.error.HTTPError("u", 422, "Unprocessable", hdrs=None, fp=io.BytesIO(b'{"detail": "slug"}'))
         with patch("urllib.request.urlopen", side_effect=err):
-            code, _, _ = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, _ = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 4
 
     def test_network_error_exit_code(self) -> None:
         import urllib.request
 
         with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("refused")):
-            code, _, _ = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, _ = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 6
 
 
@@ -207,8 +214,9 @@ class TestRegisterManifestFileInput:
                 response.status = 200
             return response
 
-        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}), patch(
-            "urllib.request.urlopen", side_effect=fake_urlopen
+        with (
+            patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}),
+            patch("urllib.request.urlopen", side_effect=fake_urlopen),
         ):
             code = _run_register(["--manifest", str(path), "--engine-url", "https://eng", "--json"])
         assert code == 0

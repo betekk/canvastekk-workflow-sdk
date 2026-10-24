@@ -158,15 +158,10 @@ def assert_staged(
     invoke_base: str,
 ) -> None:
     """Presence-only: every staged canonical slug must own an active registration."""
-    owned = {
-        canonical_from_invoke_url(node.get("invoke_url"), invoke_base)
-        for node in actives
-    }
+    owned = {canonical_from_invoke_url(node.get("invoke_url"), invoke_base) for node in actives}
     missing = [s for s in staged if s not in owned]
     if missing:
-        print(
-            "::error::convergence assert FAILED — staged slugs missing from registry:"
-        )
+        print("::error::convergence assert FAILED — staged slugs missing from registry:")
         for s in missing:
             print(f"  missing: {s}")
         print(f"staged({len(staged)}): {' '.join(sorted(staged))}")
@@ -181,9 +176,7 @@ def _get_json(url: str, token: str) -> dict:
 
 
 def _delete(url: str, token: str) -> None:
-    req = urllib.request.Request(
-        url, method="DELETE", headers={"X-Service-Token": token}
-    )
+    req = urllib.request.Request(url, method="DELETE", headers={"X-Service-Token": token})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()
@@ -214,7 +207,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))
+    token = args.token or (
+        os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
+    )
     if not token:
         print("::error::no service token (pass --token or set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return 2

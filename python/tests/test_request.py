@@ -83,7 +83,9 @@ class TestExecutionIdField:
         from canvastekk_workflow_sdk.request import NodeExecutionRequest
 
         req = NodeExecutionRequest(
-            run_id="r1", node_id="n1", inputs={},
+            run_id="r1",
+            node_id="n1",
+            inputs={},
             execution_id="ecs-0f2c6a1e-0000-4000-8000-000000000000",
         )
         assert req.execution_id.startswith("ecs-")

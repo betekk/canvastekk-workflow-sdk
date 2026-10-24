@@ -420,9 +420,7 @@ class TestBuildRegistryPayload:
 
     def test_contract_rides_constraints_when_declared(self) -> None:
         """D8/#110: declared contract lands in constraints (engine extra=forbid wire-compat)."""
-        definition = self._make_definition(
-            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
-        )
+        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
         payload = build_registry_payload(definition)
         assert payload["constraints"]["contract"] == {
             "transport": "http",
@@ -438,12 +436,8 @@ class TestBuildRegistryPayload:
         assert "contract" not in payload.get("constraints", {})
 
     def test_caller_contract_wins(self) -> None:
-        definition = self._make_definition(
-            contract=NodeContract(routes=["/execute", "/health", "/manifest"])
-        )
-        payload = build_registry_payload(
-            definition, constraints={"contract": {"caller": True}}
-        )
+        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_registry_payload(definition, constraints={"contract": {"caller": True}})
         assert payload["constraints"]["contract"] == {"caller": True}
 
     def test_maps_title_to_label(self) -> None:
@@ -713,9 +707,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
         ctk = "ctk_" + "b" * 43
-        with patch(
-            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
-        ) as mock_post:
+        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
             register_node(
                 node,
                 "https://registry.example.com/api/nodes",
@@ -732,9 +724,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.status_code = 200
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
-        with patch(
-            "canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response
-        ) as mock_post:
+        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
             register_node(
                 node,
                 "https://registry.example.com/api/nodes",

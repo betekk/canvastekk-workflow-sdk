@@ -46,12 +46,7 @@ def _node(slug: str, invoke_base: str | None = INVOKE_BASE) -> dict:
 
 class TestCanonicalFromInvokeUrl:
     def test_matches_this_deploy(self):
-        assert (
-            canonical_from_invoke_url(
-                f"{INVOKE_BASE}/nodes/cds-file/execute", INVOKE_BASE
-            )
-            == "cds-file"
-        )
+        assert canonical_from_invoke_url(f"{INVOKE_BASE}/nodes/cds-file/execute", INVOKE_BASE) == "cds-file"
 
     def test_rejects_other_invoke_base(self):
         assert (
@@ -63,12 +58,7 @@ class TestCanonicalFromInvokeUrl:
         )
 
     def test_rejects_non_execute_path(self):
-        assert (
-            canonical_from_invoke_url(
-                f"{INVOKE_BASE}/nodes/cds-file/manifest", INVOKE_BASE
-            )
-            is None
-        )
+        assert canonical_from_invoke_url(f"{INVOKE_BASE}/nodes/cds-file/manifest", INVOKE_BASE) is None
 
     def test_rejects_none(self):
         assert canonical_from_invoke_url(None, INVOKE_BASE) is None
@@ -219,9 +209,7 @@ class TestFetchActives:
         monkeypatch.setattr(
             urllib.request,
             "urlopen",
-            lambda req, timeout: _FakeResponse(
-                {"content": [{"name": "x"}], "page": {}}
-            ),
+            lambda req, timeout: _FakeResponse({"content": [{"name": "x"}], "page": {}}),
         )
         assert [n["name"] for n in fetch_actives("https://cwe.example", "tok")] == ["x"]
 
@@ -229,18 +217,14 @@ class TestFetchActives:
 class TestDeleteIdempotency:
     def test_404_swallowed(self, monkeypatch):
         def fake_urlopen(req, timeout):
-            raise urllib.error.HTTPError(
-                req.full_url, 404, "not found", None, io.BytesIO(b"")
-            )
+            raise urllib.error.HTTPError(req.full_url, 404, "not found", None, io.BytesIO(b""))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
         _delete("https://cwe.example/api/workflows/nodes/by-name/gone", "tok")
 
     def test_500_raises(self, monkeypatch):
         def fake_urlopen(req, timeout):
-            raise urllib.error.HTTPError(
-                req.full_url, 500, "boom", None, io.BytesIO(b"")
-            )
+            raise urllib.error.HTTPError(req.full_url, 500, "boom", None, io.BytesIO(b""))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
         with pytest.raises(urllib.error.HTTPError):
@@ -268,7 +252,5 @@ class TestDrain:
             raise AssertionError("dry-run must not hit the API")
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        drain(
-            "https://cwe.example", "tok", [{"name": "legacy-old-lambda"}], dry_run=True
-        )
+        drain("https://cwe.example", "tok", [{"name": "legacy-old-lambda"}], dry_run=True)
         assert "would soft-retire" in capsys.readouterr().out

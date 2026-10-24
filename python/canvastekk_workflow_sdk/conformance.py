@@ -99,19 +99,13 @@ def verify_node(
         try:
             r = client.get("/manifest")
             if r.status_code != 200:
-                checks.append(
-                    RouteCheck("GET /manifest", False, f"status {r.status_code}")
-                )
+                checks.append(RouteCheck("GET /manifest", False, f"status {r.status_code}"))
             else:
                 try:
                     manifest = WorkflowNodeManifest.model_validate(r.json())
-                    checks.append(
-                        RouteCheck("GET /manifest", True, "valid WorkflowNodeManifest")
-                    )
+                    checks.append(RouteCheck("GET /manifest", True, "valid WorkflowNodeManifest"))
                 except Exception as e:
-                    checks.append(
-                        RouteCheck("GET /manifest", False, f"invalid manifest: {e}")
-                    )
+                    checks.append(RouteCheck("GET /manifest", False, f"invalid manifest: {e}"))
         except httpx.HTTPError as e:
             checks.append(RouteCheck("GET /manifest", False, f"unreachable: {e}"))
 

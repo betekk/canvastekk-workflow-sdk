@@ -86,12 +86,7 @@ class TestWorkflowBuilder:
         assert any("no path to __end__" in error.lower() for error in result.errors)
 
     def test_build_skip_validation(self) -> None:
-        spec = (
-            WorkflowBuilder()
-            .add_start("start")
-            .add_end("end")
-            .build(validate=False)
-        )
+        spec = WorkflowBuilder().add_start("start").add_end("end").build(validate=False)
 
         assert len(spec.nodes) == 2
 
@@ -223,12 +218,7 @@ class TestWorkflowBuilder:
         assert node.config_schema == {"type": "object", "properties": {"param": {"type": "string"}}}
 
     def test_add_node_with_optional_slug(self) -> None:
-        spec = (
-            WorkflowBuilder()
-            .add_node("node1")
-            .add_end("end")
-            .build(validate=False)
-        )
+        spec = WorkflowBuilder().add_node("node1").add_end("end").build(validate=False)
 
         node = next(n for n in spec.nodes if n.id == "node1")
         assert node.slug is None

@@ -46,7 +46,6 @@ if TYPE_CHECKING:  # pragma: no cover - import-time only
     from fastapi.responses import JSONResponse  # noqa: F401
 
 
-
 _ACTIVE_CANCELS: dict[str, threading.Event] = {}
 
 _ACCOUNT_ID_RE = re.compile(r"^[0-9]+$")
@@ -391,9 +390,7 @@ def create_node_app(
             account_id = parsed
 
         try:
-            exec_request = NodeExecutionRequest(
-                **body, account_id=account_id, capability=capability
-            )
+            exec_request = NodeExecutionRequest(**body, account_id=account_id, capability=capability)
         except ValidationError:
             return JSONResponse(
                 status_code=422,
@@ -546,9 +543,7 @@ def create_node_app(
         from canvastekk_workflow_sdk.base import BaseNode as _BaseNode
 
         if node.definition.contract is None and type(node).hook is _BaseNode.hook:
-            effective = effective.model_copy(
-                update={"routes": [r for r in effective.routes if r != "/hook"]}
-            )
+            effective = effective.model_copy(update={"routes": [r for r in effective.routes if r != "/hook"]})
         content["contract"] = effective.model_dump(mode="json")
         return JSONResponse(content=content)
 
@@ -610,7 +605,7 @@ def create_node_app(
         summary="Liveness probe",
         description="Returns 200 if the process is alive. Used by Kubernetes to decide whether to restart the pod.",
         tags=["Health"],
-         responses={200: {"model": LivenessResponse}},
+        responses={200: {"model": LivenessResponse}},
     )
     async def liveness() -> JSONResponse:
         """Liveness probe — always returns 200 if the process is running."""

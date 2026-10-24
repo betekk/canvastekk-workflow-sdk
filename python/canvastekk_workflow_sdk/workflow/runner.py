@@ -275,11 +275,7 @@ class WorkflowRunner:
                 task_node_ids: list[str] = []
 
                 for nid in user_ids:
-                    upstream_failed = any(
-                        e.from_node in failed_nodes
-                        for e in spec.edges
-                        if e.to_node == nid
-                    )
+                    upstream_failed = any(e.from_node in failed_nodes for e in spec.edges if e.to_node == nid)
                     if upstream_failed or nid in failed_nodes:
                         node = node_map[nid]
                         node_results.append(
@@ -328,9 +324,7 @@ class WorkflowRunner:
                         node_id=nid,
                         output_dir=run_output_dir / nid,
                     )
-                    tasks.append(
-                        self._execute_with_sem(node.slug, resolved, context)
-                    )
+                    tasks.append(self._execute_with_sem(node.slug, resolved, context))
                     task_node_ids.append(nid)
 
                 if tasks:

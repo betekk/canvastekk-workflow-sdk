@@ -43,12 +43,16 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
         violations.append((f"{path}.$schema", f"pre-2020-12 dialect URI: {uri}"))
 
     _flag_keyword(
-        schema, path, "definitions",
+        schema,
+        path,
+        "definitions",
         "draft-07 'definitions' is not 2020-12 — use '$defs'",
         violations,
     )
     _flag_keyword(
-        schema, path, "recursiveAnchor",
+        schema,
+        path,
+        "recursiveAnchor",
         "'recursiveAnchor' is 2019-09 — not part of 2020-12",
         violations,
     )
@@ -61,11 +65,7 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
     deps = schema.get("dependencies")
     if isinstance(deps, dict):
         for dep_key, dep_value in deps.items():
-            kind = (
-                "dependentRequired"
-                if isinstance(dep_value, list)
-                else "dependentSchemas"
-            )
+            kind = "dependentRequired" if isinstance(dep_value, list) else "dependentSchemas"
             violations.append(
                 (
                     f"{path}.dependencies.{dep_key}",
@@ -85,9 +85,7 @@ def _lint_node(schema: Any, path: str, violations: list[tuple[str, str]]) -> Non
                 _lint_node(sub, f"{path}.{key}[{i}]", violations)
     items = schema.get("items")
     if isinstance(items, list):
-        violations.append(
-            (f"{path}.items", "array-form 'items' is draft-07 — 2020-12 uses 'prefixItems'")
-        )
+        violations.append((f"{path}.items", "array-form 'items' is draft-07 — 2020-12 uses 'prefixItems'"))
         for i, sub in enumerate(items):
             _lint_node(sub, f"{path}.items[{i}]", violations)
     else:

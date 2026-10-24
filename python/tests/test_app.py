@@ -1351,7 +1351,12 @@ class TestManifestContract:
         data = echo_client.get("/manifest").json()
         assert data["contract"]["transport"] == "http"
         assert data["contract"]["routes"] == [
-            "/execute", "/health", "/manifest", "/metrics", "/live", "/ready",
+            "/execute",
+            "/health",
+            "/manifest",
+            "/metrics",
+            "/live",
+            "/ready",
         ]
         assert data["contract"]["capabilities"] == {"dry_run": False}
         assert data["contract"]["openapi"] == "3.2"
@@ -1439,9 +1444,7 @@ class TestDryRunExecution:
         node = BoomNode()
         from canvastekk_workflow_sdk.request import NodeExecutionRequest
 
-        resp = node.run(
-            NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, dry_run=True)
-        )
+        resp = node.run(NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, dry_run=True))
         assert resp.status == "pass"
         assert resp.dry_run is True
         assert resp.execution_id.startswith("dryrun-")
@@ -1461,20 +1464,14 @@ class DeclaredHookNode(EchoNode):
     """Author-declared contract including /hook, WITHOUT a hook override."""
 
     definition = EchoNode.definition.model_copy(
-        update={
-            "contract": NodeContract(
-                routes=["/execute", "/health", "/manifest", "/hook"]
-            )
-        }
+        update={"contract": NodeContract(routes=["/execute", "/health", "/manifest", "/hook"])}
     )
 
 
 class TestManifestContractStamping:
     """#138: the served contract must not declare routes the node cannot answer."""
 
-    def test_default_contract_omits_unimplemented_hook(
-        self, echo_client: TestClient
-    ) -> None:
+    def test_default_contract_omits_unimplemented_hook(self, echo_client: TestClient) -> None:
         routes = echo_client.get("/manifest").json()["contract"]["routes"]
         assert "/hook" not in routes
         assert "/execute" in routes
@@ -1548,9 +1545,7 @@ class TestCapabilityAndVersionHeaderSdk161:
                 return super().execute(inputs, context)
 
         client = TestClient(create_node_app(CaptureNode()))
-        client.post(
-            "/execute", json={"run_id": "r-cap3", "node_id": "n-cap3", "inputs": {}}
-        )
+        client.post("/execute", json={"run_id": "r-cap3", "node_id": "n-cap3", "inputs": {}})
         assert captured["capability"] is None
 
     def test_sdk_version_header_stamped(self, echo_client):

@@ -145,9 +145,7 @@ class MultiNodeHealthResponse(BaseModel):
     """Response from the multi-node application's root /health endpoint."""
 
     status: Literal["healthy"] = Field(description="Aggregate health status")
-    nodes: list[str] = Field(
-        description="URL prefixes of the mounted node sub-applications"
-    )
+    nodes: list[str] = Field(description="URL prefixes of the mounted node sub-applications")
 
 
 class LivenessResponse(BaseModel):
@@ -181,9 +179,7 @@ class MetricsSummaryResponse(BaseModel):
     avg_duration_ms: float | None = Field(default=None, description="Mean execution duration")
     min_duration_ms: float | None = Field(default=None, description="Fastest execution duration")
     max_duration_ms: float | None = Field(default=None, description="Slowest execution duration")
-    total_token_usage: dict[str, int] | None = Field(
-        default=None, description="Token usage totals by kind"
-    )
+    total_token_usage: dict[str, int] | None = Field(default=None, description="Token usage totals by kind")
 
 
 class HealthResponse(BaseModel):

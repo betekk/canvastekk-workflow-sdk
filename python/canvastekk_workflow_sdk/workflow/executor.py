@@ -167,9 +167,7 @@ class HttpExecutor(NodeExecutor):
                 response.raise_for_status()
                 break
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
-                transient = isinstance(exc, httpx.TransportError) or (
-                    exc.response.status_code in (502, 503, 504)
-                )
+                transient = isinstance(exc, httpx.TransportError) or (exc.response.status_code in (502, 503, 504))
                 if not transient or attempt == self._retries:
                     raise
                 await asyncio.sleep(0.5 * (2**attempt))
@@ -183,9 +181,7 @@ class HttpExecutor(NodeExecutor):
             if not isinstance(outputs, dict):
                 raise RuntimeError(f"Node '{slug}' returned malformed outputs (not an object)")
             return outputs
-        raise RuntimeError(
-            f"Node '{slug}' returned failure: {data.get('error', 'unknown')}"
-        )
+        raise RuntimeError(f"Node '{slug}' returned failure: {data.get('error', 'unknown')}")
 
     def has(self, slug: str) -> bool:
         """Check if a slug is registered.

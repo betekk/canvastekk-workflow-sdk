@@ -113,9 +113,7 @@ def mint_node_token(
         "iat": issued_at,
         "exp": issued_at + int(ttl_seconds),
     }
-    payload_segment = _b64url_encode(
-        json.dumps(claims, separators=(",", ":")).encode("utf-8")
-    )
+    payload_segment = _b64url_encode(json.dumps(claims, separators=(",", ":")).encode("utf-8"))
     signature = hmac.new(
         signing_key.encode("utf-8"),
         (NODE_TOKEN_PREFIX + payload_segment).encode("ascii"),

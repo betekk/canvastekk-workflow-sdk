@@ -32,7 +32,6 @@ if TYPE_CHECKING:  # pragma: no cover - import-time only
     from fastapi import FastAPI
 
 
-
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.base import BaseNode
 

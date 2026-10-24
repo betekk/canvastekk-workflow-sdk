@@ -196,8 +196,6 @@ class TestErrorEnvelopeSdk161:
         from canvastekk_workflow_sdk import error_envelope
         from canvastekk_workflow_sdk.exceptions import IO_SUBCODE_DOWNLOAD_FAILED
 
-        err = NodeIOError(
-            "download failed", details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED}
-        )
+        err = NodeIOError("download failed", details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED})
         assert error_envelope(err)["code"] == "IO_ERROR"
         assert err.details["sub_code"] == "IO_DOWNLOAD_FAILED"

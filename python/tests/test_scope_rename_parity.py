@@ -33,9 +33,7 @@ def test_no_definitions_scope_parsing_in_sdk() -> None:
     """
     offenders: list[str] = []
     for path in _source_files():
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue

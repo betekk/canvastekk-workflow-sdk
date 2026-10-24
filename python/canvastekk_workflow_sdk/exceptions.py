@@ -86,6 +86,7 @@ def error_envelope(error: NodeExecutionError) -> dict[str, str]:
 
 class NodeTimeoutError(NodeExecutionError):
     """Raised when node execution exceeds the configured timeout."""
+
     category = "timeout"
 
     def __init__(
@@ -110,6 +111,7 @@ class NodeTimeoutError(NodeExecutionError):
 
 class NodeValidationError(NodeExecutionError):
     """Raised when input validation against JSON Schema fails."""
+
     category = "validation"
 
     def __init__(
@@ -146,6 +148,7 @@ class NodeValidationError(NodeExecutionError):
 
 class NodeIOError(NodeExecutionError):
     """Raised when file I/O operations fail."""
+
     category = "transport"
 
     def __init__(
@@ -175,6 +178,7 @@ class NodeIOError(NodeExecutionError):
 
 class NodeConfigurationError(NodeExecutionError):
     """Raised when node configuration is invalid."""
+
     category = "lifecycle"
 
     def __init__(
@@ -201,6 +205,7 @@ class NodeConfigurationError(NodeExecutionError):
 
 class WorkflowExecutionError(NodeExecutionError):
     """Raised when local workflow execution fails."""
+
     category = "domain"
 
     def __init__(
@@ -230,6 +235,7 @@ class WorkflowExecutionError(NodeExecutionError):
 
 class WorkflowValidationError(NodeExecutionError):
     """Raised when workflow spec validation fails."""
+
     category = "validation"
 
     def __init__(
@@ -266,6 +272,7 @@ class WorkflowValidationError(NodeExecutionError):
 
 class NodeOutputValidationError(NodeExecutionError):
     """Raised when output validation against JSON Schema fails."""
+
     category = "validation"
 
     def __init__(

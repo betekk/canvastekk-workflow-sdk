@@ -174,7 +174,6 @@ class DeprecationInfo(BaseModel):
         return self
 
 
-
 CONTRACT_ROUTE_VOCABULARY: frozenset[str] = frozenset(
     {"/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready", "/openapi"}
 )
@@ -630,9 +629,7 @@ class WorkflowNodeManifest(BaseModel):
                 paths[route] = {
                     "get": {
                         "summary": f"Manifest for {self.name}",
-                        "responses": {
-                            "200": {"description": "This node's WorkflowNodeManifest"}
-                        },
+                        "responses": {"200": {"description": "This node's WorkflowNodeManifest"}},
                     }
                 }
             elif route == "/hook":

@@ -55,9 +55,7 @@ def test_expired_warn_window_does_not_raise_at_entrypoint(monkeypatch: pytest.Mo
     enforce_support_horizon()
 
 
-def test_break_glass_downgrades_to_critical(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_break_glass_downgrades_to_critical(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     import logging
 
     _freeze(monkeypatch, RELEASE + timedelta(days=SUPPORT_HORIZON_DAYS + 1))
