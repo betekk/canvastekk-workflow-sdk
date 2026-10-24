@@ -16,6 +16,10 @@ defaults:
   run:
     working-directory: typescript
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   pick-runner:
     runs-on: ubuntu-24.04
