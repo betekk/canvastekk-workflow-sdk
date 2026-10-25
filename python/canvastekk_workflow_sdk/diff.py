@@ -116,8 +116,6 @@ def diff_manifests(old: dict[str, Any], new: dict[str, Any]) -> ManifestDiff:
     diff.old_version = old.get("version")
     diff.new_version = new.get("version")
 
-    # Registry-shaped inputs (export_definition output) and pre-DA-2627 manifests
-    # carry identity under "name"; when slug is absent, name IS the identity.
     old_slug = old.get("slug", old.get("name"))
     new_slug = new.get("slug", new.get("name"))
     if old_slug and new_slug and old_slug != new_slug:

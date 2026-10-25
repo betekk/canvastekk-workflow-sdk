@@ -161,12 +161,6 @@ async function putPartChunk(
       new URL(url),
       {
         method: "PUT",
-        // No Content-MD5 (python parity, DA-3341): the engine presigns part
-        // URLs with SignedHeaders=host only and the MD5 is unknowable at mint
-        // time, so an unsigned Content-MD5 header makes S3 reject the PUT with
-        // AccessDenied "There were headers present in the request which were
-        // not signed". Integrity rides TLS in transit plus S3's MPU etag
-        // consistency.
         headers: {
           "Content-Type": contentType,
           "Content-Length": String(chunk.length),
@@ -204,7 +198,6 @@ async function initiate(
   contentType: string,
   element?: { index: number; suffix: string },
 ): Promise<InitiateBundle> {
-  // tracker#3969: array sessions carry the element ref on the initiate body.
   const raw = await controlRequest("POST", session.initiate_url, {
     size,
     content_type: contentType,
@@ -262,8 +255,6 @@ export async function uploadViaSession(
     `Starting multipart session upload file=${filePath} size=${size} parts=${totalParts} part_size=${partSize}`,
   );
 
-  // Parallelism clamped so buffered bytes stay under MAX_BUFFERED_BYTES
-  // (engine part_size is bounded below only).
   const maxParallel = Math.max(
     1,
     Math.min(
@@ -281,8 +272,6 @@ export async function uploadViaSession(
       let failed = false;
       for (let start = 0; start < remaining.length; start += maxParallel) {
         const batch = remaining.slice(start, start + maxParallel);
-        // Pre-read the batch's chunks sequentially (bounded memory), then
-        // PUT them in parallel (DA-2882).
         const chunks: Buffer[] = [];
         for (const partNumber of batch) {
           const length = Math.min(partSize, size - (partNumber - 1) * partSize);
@@ -337,17 +326,12 @@ export async function uploadViaSession(
       }
       if (round === resumeAttempts) break;
 
-      // DA-2881 reconcile-resume: ask the server which parts actually
-      // landed (a mid-batch sibling's PUT may have completed) and re-attempt
-      // only the unconfirmed ones.
       const statusRaw = await controlRequest("GET", session.status_url);
       const uploaded = new Set(
         ((statusRaw as { uploaded_parts?: Array<{ part_number?: number }> })?.uploaded_parts ?? [])
           .map((p) => p?.part_number)
           .filter((n): n is number => typeof n === "number"),
       );
-      // Keep only parts with no server confirmation OR no locally-recorded
-      // etag — the latter are re-PUT (idempotent overwrite of the same part).
       remaining = remaining.filter((n) => !uploaded.has(n) || !etags.has(n));
       if (remaining.length > 0) {
         console.warn(`resume round: ${remaining.length}/${totalParts} part(s) still unconfirmed`);
@@ -361,16 +345,12 @@ export async function uploadViaSession(
         );
       }
     } catch (err) {
-      // Local I/O / part / resume failures abort best-effort (parts are junk
-      // without a complete file behind them). Re-raise the original error.
       await abortSession(session, bundle.upload_id);
       throw err;
     } finally {
       await fileHandle.close();
     }
 
-    // DA-2886 parity: a complete failure does NOT abort — the parts are
-    // already valid in S3 and complete is idempotent (python multipart.py).
     const parts: CompletedPart[] = [...etags.entries()]
       .map(([part_number, etag]) => ({ part_number, etag }))
       .sort((a, b) => a.part_number - b.part_number);

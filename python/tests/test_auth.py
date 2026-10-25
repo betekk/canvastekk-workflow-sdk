@@ -511,7 +511,6 @@ class TestCentralAuth:
         assert result["auth_mode"] == "central"
         assert result["run_id"] == "run-7"
         assert result["node_id"] == "node-a"
-        # Second call must hit the cache — stub sees exactly one call.
         auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert counter["calls"] == 1
 
@@ -519,9 +518,7 @@ class TestCentralAuth:
         monkeypatch.setenv("CWE_API_BASE_URL", "http://engine.example")
         auth = self._auth()
         counter: dict[str, int] = {}
-        monkeypatch.setattr(
-            type(auth), "_remote_verify", self._stub_verify([(False, None)], counter)
-        )
+        monkeypatch.setattr(type(auth), "_remote_verify", self._stub_verify([(False, None)], counter))
         with pytest.raises(HTTPException) as first:
             auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert first.value.status_code == 401
@@ -529,9 +526,7 @@ class TestCentralAuth:
             auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert counter["calls"] == 1
 
-    def test_transport_failure_fails_closed_503_not_cached(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_transport_failure_fails_closed_503_not_cached(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CWE_API_BASE_URL", "http://engine.example")
         from canvastekk_workflow_sdk.auth import _VerifyUnavailableError
 
@@ -545,8 +540,6 @@ class TestCentralAuth:
         with pytest.raises(HTTPException) as first:
             auth.authenticate(self._request_with_key("cwnt_v1.abc.def"))
         assert first.value.status_code == 503
-        # Not cached: a retry after recovery re-queries (stub would be
-        # exhausted otherwise — provide a good verdict next).
         monkeypatch.setattr(
             type(auth),
             "_remote_verify",
@@ -561,34 +554,26 @@ class TestCentralAuth:
         result = auth.authenticate(self._request_with_key("legacy-secret"))
         assert result == {"auth_mode": "legacy_api_key"}
 
-    def test_legacy_rotation_next_key_accepted(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_legacy_rotation_next_key_accepted(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_API_KEY", "")
         monkeypatch.setenv("CANVASTEKK_API_KEY_NEXT", "rotating-secret")
         auth = self._auth()
         result = auth.authenticate(self._request_with_key("rotating-secret"))
         assert result == {"auth_mode": "legacy_api_key"}
 
-    def test_legacy_leg_inert_when_env_unset(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_legacy_leg_inert_when_env_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CWE_API_BASE_URL", "http://engine.example")
         monkeypatch.delenv("CANVASTEKK_API_KEY", raising=False)
         monkeypatch.delenv("CANVASTEKK_API_KEY_NEXT", raising=False)
         auth = self._auth()
         counter: dict[str, int] = {}
-        monkeypatch.setattr(
-            type(auth), "_remote_verify", self._stub_verify([(False, None)], counter)
-        )
+        monkeypatch.setattr(type(auth), "_remote_verify", self._stub_verify([(False, None)], counter))
         with pytest.raises(HTTPException) as exc:
             auth.authenticate(self._request_with_key("legacy-secret"))
         assert exc.value.status_code == 401
         assert counter["calls"] == 1
 
-    def test_missing_base_url_and_no_legacy_match_is_401(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_missing_base_url_and_no_legacy_match_is_401(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CWE_API_BASE_URL", raising=False)
         monkeypatch.delenv("CANVASTEKK_API_KEY", raising=False)
         auth = self._auth()
@@ -610,9 +595,7 @@ class TestCentralAuth:
     def test_dev_mode_bypasses(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_DEV_MODE", "true")
         auth = self._auth()
-        assert auth.authenticate(self._request_with_key("anything")) == {
-            "auth_mode": "dev_bypass"
-        }
+        assert auth.authenticate(self._request_with_key("anything")) == {"auth_mode": "dev_bypass"}
 
     def test_real_http_stub_valid_verdict(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import json
@@ -643,7 +626,7 @@ class TestCentralAuth:
             second = auth.authenticate(self._request_with_key("cwnt_v1.real.http"))
             assert first["auth_mode"] == "central"
             assert second["run_id"] == "run-7"
-            assert calls["count"] == 1  # cache honored over real urllib path
+            assert calls["count"] == 1
         finally:
             server.shutdown()
 
@@ -653,16 +636,14 @@ class TestCentralAuth:
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
-        sock.close()  # nothing listens here
+        sock.close()
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{port}")
         auth = self._auth(timeout=0.5)
         with pytest.raises(HTTPException) as exc:
             auth.authenticate(self._request_with_key("cwnt_v1.dead.port"))
         assert exc.value.status_code == 503
 
-    def test_malformed_verify_response_fails_closed(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_malformed_verify_response_fails_closed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import threading
         from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -700,14 +681,9 @@ class TestCentralAuth:
 
     def test_cache_clears_on_overflow(self, monkeypatch: pytest.MonkeyPatch) -> None:
         auth = self._auth()
-        # Fill the cache to capacity with expired junk entries.
-        auth._verdict_cache.update(
-            {f"k{i}": (False, None, 0.0) for i in range(auth._CACHE_MAX_ENTRIES)}
-        )
+        auth._verdict_cache.update({f"k{i}": (False, None, 0.0) for i in range(auth._CACHE_MAX_ENTRIES)})
         counter: dict[str, int] = {}
-        monkeypatch.setattr(
-            type(auth), "_remote_verify", self._stub_verify([(True, dict(self.VALID_CLAIMS))], counter)
-        )
+        monkeypatch.setattr(type(auth), "_remote_verify", self._stub_verify([(True, dict(self.VALID_CLAIMS))], counter))
         monkeypatch.setenv("CWE_API_BASE_URL", "http://engine.example")
         auth._validated_claims("cwnt_v1.overflow.token")
         assert len(auth._verdict_cache) <= auth._CACHE_MAX_ENTRIES
@@ -727,9 +703,7 @@ class TestCentralAuth:
         assert auth._legacy_key_env_var is None
         assert auth._legacy_matches("anything") is False
 
-    def test_valid_verdict_missing_claims_fails_closed(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_valid_verdict_missing_claims_fails_closed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Parity with TS: valid:true without well-formed claims is malformed → 503."""
         import threading
         from http.server import BaseHTTPRequestHandler, HTTPServer

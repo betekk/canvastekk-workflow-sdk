@@ -272,9 +272,7 @@ class TestAutoDownload:
                 return {"data": inputs.get("data")}
 
         node2 = LenientOptionalNode()
-        response = node2.run(
-            NodeExecutionRequest(run_id="r1", node_id="n1", inputs={"mode": "skip"})
-        )
+        response = node2.run(NodeExecutionRequest(run_id="r1", node_id="n1", inputs={"mode": "skip"}))
         assert response.status == "pass"
 
     def test_empty_string_file_input_skipped(self):
@@ -368,9 +366,7 @@ class TestAutoDownload:
                 self.idx = idx
                 ext = "ply" if idx == 0 else "json"
                 self.status_code = 200
-                self.headers = httpx.Headers(
-                    {"content-disposition": f'attachment; filename="data.{ext}"'}
-                )
+                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data.{ext}"'})
 
             def iter_bytes(self, chunk_size=65536):
                 yield f"file-{self.idx}".encode()
@@ -502,9 +498,7 @@ class TestAutoDownload:
                 self.idx = idx
                 ext = "ply" if idx == 0 else "json"
                 self.status_code = 200
-                self.headers = httpx.Headers(
-                    {"content-disposition": f'attachment; filename="data_{idx}.{ext}"'}
-                )
+                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data_{idx}.{ext}"'})
 
             def iter_bytes(self, chunk_size=65536):
                 yield f"file-{self.idx}".encode()
@@ -580,8 +574,6 @@ class TestAutoDownload:
         response = node.run(request)
 
         assert response.status == "fail"
-        # Mid-stream cap aborts the download itself (NodeIOError), and the
-        # partial file must not be left behind.
         assert response.error_type == "NodeIOError"
         assert "exceeds" in response.error.lower() or "size" in response.error.lower()
 
@@ -594,9 +586,7 @@ class TestAutoDownload:
                 self.idx = idx
                 ext = "ply" if idx == 0 else "json"
                 self.status_code = 500 if idx == 1 else 200
-                self.headers = httpx.Headers(
-                    {"content-disposition": f'attachment; filename="data_{idx}.{ext}"'}
-                )
+                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data_{idx}.{ext}"'})
 
             def iter_bytes(self, chunk_size=65536):
                 yield f"file-{self.idx}".encode()
@@ -743,9 +733,7 @@ class TestDownloadPolicy:
         assert response.error_type == "NodeIOError"
         assert "Blocked" in response.error
 
-    def test_redirect_chain_followed_when_public(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_redirect_chain_followed_when_public(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
         responses = [
             _make_redirect_response("https://example.com/redirected.ply"),
@@ -768,13 +756,9 @@ class TestDownloadPolicy:
             )
 
         assert response.status == "pass"
-        assert Path(metadata_captured["point_cloud"]["local_path"]).name.startswith(
-            "point_cloud_"
-        )
+        assert Path(metadata_captured["point_cloud"]["local_path"]).name.startswith("point_cloud_")
 
-    def test_relative_redirect_resolved_against_current_url(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_relative_redirect_resolved_against_current_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
         responses = [
             _make_redirect_response("/next/scan.ply"),
@@ -791,13 +775,9 @@ class TestDownloadPolicy:
 
         assert response.status == "pass"
 
-    def test_too_many_redirect_hops_rejected(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_too_many_redirect_hops_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
-        redirects = [
-            _make_redirect_response(f"https://example.com/hop{i}.ply") for i in range(7)
-        ]
+        redirects = [_make_redirect_response(f"https://example.com/hop{i}.ply") for i in range(7)]
         with patch("canvastekk_workflow_sdk.base.httpx.get", side_effect=redirects):
             response = FileInputNode().run(
                 NodeExecutionRequest(
@@ -832,9 +812,7 @@ class TestDownloadPolicy:
         downloads = tmp_path / "r-cap" / "n-cap" / "downloads"
         assert not any(downloads.glob("*")) if downloads.exists() else True
 
-    def test_env_default_cap_applies_when_undeclared(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_env_default_cap_applies_when_undeclared(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
         monkeypatch.setenv("CANVASTEKK_MAX_DOWNLOAD_BYTES", "10")
         with patch(
@@ -857,9 +835,7 @@ class TestDownloadPolicy:
         assert response.error_type == "NodeIOError"
         assert "size cap" in response.error
 
-    def test_deadline_exceeded_aborts_download(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_deadline_exceeded_aborts_download(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import time as _time
 
         monkeypatch.setattr(
@@ -913,8 +889,6 @@ class TestIoSubcodesSdk161:
             NodeIOError,
         )
 
-        # The download path wraps HTTP >= 400 with the sub-code; assert the
-        # constant contract the engine/frontend consume.
         err = NodeIOError(
             "HTTP 404 downloading file for field 'x'",
             details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
@@ -999,9 +973,7 @@ class TestArrayFileInputsSdk161:
 
     @patch("canvastekk_workflow_sdk.base.httpx.get")
     def test_array_metadata_is_per_element_list(self, mock_stream):
-        mock_stream.return_value = _make_mock_stream(
-            b"XX", {"content-disposition": 'attachment; filename="a.ply"'}
-        )
+        mock_stream.return_value = _make_mock_stream(b"XX", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
 
         class CaptureNode(ArrayFileInputNode):
@@ -1023,9 +995,7 @@ class TestArrayFileInputsSdk161:
 
     @patch("canvastekk_workflow_sdk.base.httpx.get")
     def test_mixed_elements_pass_non_urls_through(self, mock_stream):
-        mock_stream.return_value = _make_mock_stream(
-            b"ZZZ", {"content-disposition": 'attachment; filename="a.ply"'}
-        )
+        mock_stream.return_value = _make_mock_stream(b"ZZZ", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
 
         class CaptureNode(ArrayFileInputNode):
@@ -1041,8 +1011,8 @@ class TestArrayFileInputsSdk161:
             )
         )
         parts = captured["parts"]
-        assert parts[0].startswith("/")  # downloaded to local path
-        assert parts[1] == "already-local.ply"  # non-URL passes through
+        assert parts[0].startswith("/")
+        assert parts[1] == "already-local.ply"
 
     @patch("canvastekk_workflow_sdk.base.httpx.get")
     def test_mid_list_failure_cleans_downloads(self, mock_stream):
@@ -1083,11 +1053,8 @@ class TestArrayFileInputsSdk161:
             )
         assert response.status == "fail"
         assert response.error_type == "NodeIOError"
-        # the first element's download was cleaned up with the failed run
         assert first_downloads, "element 1 must have downloaded before the failure"
-        assert not first_downloads[0].exists(), (
-            f"expected cleanup of {first_downloads[0]}"
-        )
+        assert not first_downloads[0].exists(), f"expected cleanup of {first_downloads[0]}"
 
     def test_empty_array_passes_through(self):
         captured = {}
@@ -1097,14 +1064,9 @@ class TestArrayFileInputsSdk161:
                 captured.update(inputs)
                 return super().execute(inputs, context)
 
-        CaptureNode().run(
-            NodeExecutionRequest(
-                run_id="r-empty", node_id="n-empty", inputs={"parts": []}
-            )
-        )
+        CaptureNode().run(NodeExecutionRequest(run_id="r-empty", node_id="n-empty", inputs={"parts": []}))
         assert captured["parts"] == []
 
     def test_manifest_accepts_array_of_file(self):
-        # constructing the node at all proves the manifest validator accepts
         # type: array + items.format: file (S.1)
         assert "parts" in ArrayFileInputNode().definition.file_input_fields

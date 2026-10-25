@@ -19,11 +19,8 @@ import { promises as dns } from "node:dns";
 import { isIP, BlockList } from "node:net";
 
 export const MAX_REDIRECT_HOPS = 5;
-export const DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024 ** 3; // 10 GiB
+export const DEFAULT_MAX_DOWNLOAD_BYTES = 10 * 1024 ** 3;
 
-// NOTE: IPv4 literals are constructed from numbers/fragments (not written
-// as full dotted-quads) deliberately — transport-layer secret masking
-// garbles full IPv4 literals in agent-generated writes. Do not "simplify".
 const ipv4 = (a: number, b: number, c: number, d: number) => `${a}.${b}.${c}.${d}`;
 const linkLocalPrefix = "169" + ".254";
 
@@ -34,12 +31,8 @@ const METADATA_HOSTS = new Set([
   "metadata.goog",
 ]);
 
-// NOTE: separate BlockLists per family — mixing IPv4 and IPv6 entries in a
-// single BlockList makes .check(publicIPv4, "ipv4") return true (Node
-// BlockList v4-mapped-address handling bug).
 const blockedV4 = new BlockList();
 const blockedV6 = new BlockList();
-// IPv4: loopback, this-network, CGNAT, RFC1918, link-local (incl. cloud metadata), IETF reserved
 blockedV4.addSubnet(ipv4(127, 0, 0, 0), 8);
 blockedV4.addSubnet(ipv4(0, 0, 0, 0), 8);
 blockedV4.addSubnet(ipv4(10, 0, 0, 0), 8);
@@ -47,10 +40,9 @@ blockedV4.addSubnet(ipv4(100, 64, 0, 0), 10);
 blockedV4.addSubnet(ipv4(172, 16, 0, 0), 12);
 blockedV4.addSubnet(ipv4(192, 168, 0, 0), 16);
 blockedV4.addSubnet(ipv4(169, 254, 0, 0), 16);
-blockedV4.addSubnet(ipv4(240, 0, 0, 0), 4); // reserved
-blockedV4.addSubnet(ipv4(224, 0, 0, 0), 4); // multicast
+blockedV4.addSubnet(ipv4(240, 0, 0, 0), 4);
+blockedV4.addSubnet(ipv4(224, 0, 0, 0), 4);
 blockedV4.addAddress(ipv4(255, 255, 255, 255));
-// IPv6: unspecified, loopback, unique-local, link-local, multicast, IPv4-mapped space
 blockedV6.addAddress("::", "ipv6");
 blockedV6.addAddress("::1", "ipv6");
 blockedV6.addSubnet("fc00::", 7, "ipv6");
@@ -97,7 +89,6 @@ function allowlistSuffixes(): string[] {
  */
 export function ipIsBlocked(address: string): boolean {
   const normalized = address.toLowerCase().split("%", 1)[0];
-  // Unwrap IPv4-mapped IPv6 into its IPv4 form.
   const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(normalized);
   const candidate = mapped ? mapped[1] : normalized;
   const family = isIP(candidate);
@@ -129,14 +120,10 @@ export async function validateExternalUrl(
   const parsed = new URL(url);
   const allowHttp = opts.allowHttp ?? isDevMode();
   const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
-  // WHATWG URL folds `https:///path` into host="path"; Python's urlsplit
-  // sees an empty netloc. Detect the empty authority in the raw string.
   if (!hostname || /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\//.test(url)) {
     throw new UrlPolicyError("URL has no host");
   }
 
-  // Dev mode lifts scheme AND IP restrictions (it already bypasses auth);
-  // enables LocalFileServer http://127.0.0.1 test flows.
   if (isDevMode() && opts.allowHttp !== false) return url;
 
   if (parsed.protocol !== "https:" && !(allowHttp && parsed.protocol === "http:")) {
@@ -169,7 +156,6 @@ export async function validateExternalUrl(
   try {
     addresses = await resolve(hostname);
   } catch {
-    // Unresolvable now — the request itself would fail identically.
     return url;
   }
   for (const address of addresses) {

@@ -60,7 +60,9 @@ class WorkflowDefinitionNode(BaseModel):
 
     id: str = Field(min_length=1, description="Unique node instance ID within the workflow")
     workflow_node_id: str | None = Field(default=None, description="Registry node type ID reference")
-    slug: str | None = Field(default=None, description="Node type slug from registry (e.g. '__start__', 'segmentation-v1.0.0')")
+    slug: str | None = Field(
+        default=None, description="Node type slug from registry (e.g. '__start__', 'segmentation-v1.0.0')"
+    )
     version: str | None = Field(default=None, description="Pinned node version")
     name: str | None = Field(default=None, description="Display label")
     x: float | None = Field(default=None, description="Canvas X coordinate")

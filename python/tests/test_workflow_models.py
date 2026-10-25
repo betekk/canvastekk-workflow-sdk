@@ -1,6 +1,5 @@
 """Tests for workflow models."""
 
-
 from canvastekk_workflow_sdk.workflow.models import (
     EdgeType,
     WorkflowDefinitionNode,

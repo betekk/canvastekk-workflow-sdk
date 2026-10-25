@@ -46,7 +46,7 @@ def test_to_openapi_golden_declaring_node() -> None:
     manifest = WorkflowNodeManifest.model_validate(MANIFEST)
     doc = manifest.to_openapi()
     assert doc["openapi"] == "3.2.0"
-    assert json.loads(json.dumps(doc)) == doc  # JSON-serializable, no leaks
+    assert json.loads(json.dumps(doc)) == doc
     golden = json.loads(GOLDEN.read_text())
     assert doc == golden
 

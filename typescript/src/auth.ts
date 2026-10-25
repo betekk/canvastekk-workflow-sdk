@@ -62,7 +62,6 @@ function markAuth<T extends AuthMiddleware>(mw: T): T {
   return Object.assign(mw, { [CANVASTEKK_AUTH_MARKER]: true });
 }
 
-
 /**
  * Sends a 401 Unauthorized JSON response.
  *
@@ -89,8 +88,6 @@ export class NodeAuth {
         return;
       }
 
-      // Rotation window (DA-3191): <keyEnvVar>_NEXT is accepted alongside the
-      // current key; empty values are ignored.
       const expectedKeys = [
         process.env[keyEnvVar] ?? "",
         process.env[`${keyEnvVar}_NEXT`] ?? "",
@@ -140,11 +137,8 @@ export class NodeAuth {
     const verifyPath = opts?.verifyPath ?? "/api/nodes/verify-token";
     const cacheTtlMs = opts?.cacheTtlMs ?? 60_000;
     const timeoutMs = opts?.timeoutMs ?? 5_000;
-    // Explicit null disables the legacy leg (central-only); ?? would
-    // swallow null back to the default — compare against undefined.
     const legacyKeyEnvVar =
       opts?.legacyKeyEnvVar !== undefined ? opts.legacyKeyEnvVar : "CANVASTEKK_API_KEY";
-    // sha256(token) -> { valid, claims, expiresAt } (monotonic-ish Date.now)
     const verdictCache = new Map<string, { valid: boolean; claims?: NodeTokenClaims; expiresAt: number }>();
 
     /**
@@ -239,7 +233,6 @@ export class NodeAuth {
       try {
         verdict = await remoteVerify(provided, baseUrl);
       } catch {
-        // Fail-closed (DA-1949): transport errors answer 503, never cached.
         res.status(503).json({ detail: "Token validator unavailable" });
         return;
       }

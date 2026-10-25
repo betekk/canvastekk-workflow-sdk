@@ -16,12 +16,12 @@ defaults:
   run:
     working-directory: typescript
 
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
 jobs:
-  # local-if-idle canonical block — source: canvastekk-devops docs/ci/local-if-idle.md (2026-09)
-  # Use an org `local` self-hosted runner (org pool) when one is online+idle,
-  # else ubuntu-24.04. Probe/API failures degrade to ubuntu-24.04 with a
-  # ::warning::; missing/invalid GH_APP credentials fail the token-mint step
-  # loudly (by design — managed credentials).
   pick-runner:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -29,9 +29,6 @@ jobs:
     outputs:
       labels: ${{ steps.pick.outputs.labels }}
     steps:
-      # Runner probe authenticates as the canvastekk-config-manager GitHub
-      # App (org "Self-hosted runners: read-only") — a short-lived per-run
-      # installation token, not a personal org PAT.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         id: app-token
         with:
@@ -73,10 +70,6 @@ jobs:
             echo 'labels=["ubuntu-24.04"]' >> "$GITHUB_OUTPUT"
           fi
 
-  # DA-3160: workflow-level defaults.run.working-directory (<lang>/) applies to
-  # every run step INCLUDING this gate — but pick-runner has no checkout, so
-  # that directory does not exist at gate time and bash cannot start
-  # (evidence: PR #82 first runs, 2026-09-28). Override at job scope.
     defaults:
       run:
         working-directory: ${{ github.workspace }}

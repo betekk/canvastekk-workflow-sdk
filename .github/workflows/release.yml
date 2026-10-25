@@ -1,27 +1,5 @@
 name: Release
 
-# Fleet standard release mechanism (betekk/canvastekk-tracker#3929 / #2039):
-# the fleet reusable-release (vendored here as reusable-release.yml — a
-# scrubbed copy of betekk-gha@v1.7.2; this repo is PUBLIC and public repos
-# cannot call reusable workflows from private repositories, so the mechanism
-# rides in-tree) mints dev counter tags / prod finals + git-cliff
-# changelog + GitHub Release. The chained publish job ships PROD FINALS ONLY:
-# wheel + tgz release assets (consumer-pinned URLs — canvastekk-ml-service
-# deploy/register.sh pins the wheel; DA-2677 tgz channel), dual GitHub-Packages
-# publishes (pip + npm), import smokes, and the sdk-released dispatch to
-# canvastekk-workflow-nodes (payload contract: nodes deploy-lambda.yml:18).
-#
-# Version files are TAG-DERIVED at build time: scripts/bump_versions.py runs
-# ephemerally against the minted tag and its output is never committed — the
-# in-repo version files freeze at the last released value (lockstep with
-# poetry.lock, which therefore never needs regenerating on this path).
-#
-# Caller contract (reusable-release.yml@v1.7.2 semantics — the vendored copy
-# re-exports new_tag/new_version at workflow_call.outputs, which chained jobs
-# gate on):
-#   - secrets: inherit REQUIRED (launch-fails with 0 jobs otherwise)
-#   - NO caller-level concurrency (the reusable owns release-<ref>)
-#   - issues: write needed by the reusable's notify-failure job
 
 on:
   push:
@@ -82,7 +60,6 @@ jobs:
           python3 scripts/bump_versions.py "${RELEASE_VERSION}"
           git diff --stat || true   # informational only; runner discards the tree
 
-      # ─── Python SDK: build wheel, attach, publish, verify ──────────
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -194,7 +171,6 @@ jobs:
           print('Post-publish verification passed: all canonical names resolve correctly')
           "
 
-      # ─── TypeScript SDK: build, attach, publish, verify ────────────
 
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -259,7 +235,6 @@ jobs:
           console.log('Post-publish TS verification passed: version ' + VERSION + ' resolved correctly');
           "
 
-      # ─── Post-release dispatch to Nodes (DA-1546 chain) ─────────────
 
       - name: Detect breaking changes
         id: detect-breaking

@@ -53,8 +53,10 @@ def _conforming_handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=MANIFEST)
     if request.url.path == "/execute":
         body = request.read()
-        return httpx.Response(200, json={"ok": True}) if b"dry_run" in body else httpx.Response(
-            422, json={"detail": "validation failed"}
+        return (
+            httpx.Response(200, json={"ok": True})
+            if b"dry_run" in body
+            else httpx.Response(422, json={"detail": "validation failed"})
         )
     if request.url.path in ("/hook", "/metrics", "/live", "/ready"):
         return httpx.Response(200, json={})
@@ -65,7 +67,6 @@ def test_verify_node_conforming(monkeypatch) -> None:
     _patch_client(monkeypatch)(_conforming_handler)
     report = verify_node("http://node.test")
     assert report.ok
-    # derived: /manifest + 6 remaining SDK-served routes + the dry-run skip line
     assert len(report.checks) == 8
     assert all(c.ok for c in report.checks)
 
@@ -141,7 +142,6 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
             api_key="k",
             verify=True,
         )
-    # /manifest 404s -> the probe set cannot be derived; the registry POST never fired
     assert probe_paths == ["/manifest"]
     assert post_urls == []
 
@@ -158,10 +158,13 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "Client", lambda **kw: client)
     monkeypatch.setattr(
         "canvastekk_workflow_sdk.registry.httpx.post",
-        lambda url, **kw: post_calls.append(url) or httpx.Response(
-            201,
-            json={**MANIFEST, "action": "created", "revision_id": "rev-1"},
-            request=httpx.Request("POST", url),
+        lambda url, **kw: (
+            post_calls.append(url)
+            or httpx.Response(
+                201,
+                json={**MANIFEST, "action": "created", "revision_id": "rev-1"},
+                request=httpx.Request("POST", url),
+            )
         ),
     )
 
@@ -179,7 +182,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
         api_key="k",
         verify=True,
     )
-    assert "/health" in probe_calls  # probe ran first
+    assert "/health" in probe_calls
     assert result.action == "created"
     assert post_calls == ["https://engine.test/api/workflows/nodes/"]
 
@@ -229,8 +232,6 @@ def test_cli_verify_nonconforming_exits_nonzero(monkeypatch, capsys) -> None:
     assert "NON-CONFORMING" in capsys.readouterr().out
 
 
-# --- #113: manifest-derived probe set -------------------------------
-
 DERIVED_MANIFEST = {
     **MANIFEST,
     "contract": {
@@ -275,8 +276,6 @@ def test_verify_node_broken_declared_route_fails_at_its_name(monkeypatch) -> Non
     assert not metrics.ok
     assert not report.ok
 
-
-# --- #113: capability-gated dry-run positive probe -------------------
 
 DRY_RUN_MANIFEST = {
     **DERIVED_MANIFEST,
@@ -350,9 +349,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
     monkeypatch.setattr(conf, "verify_node", fake_verify)
     from canvastekk_workflow_sdk.__main__ import main
 
-    monkeypatch.setattr(
-        "sys.argv", ["canvastekk_workflow_sdk", "verify", "http://node.test", "--dry-run"]
-    )
+    monkeypatch.setattr("sys.argv", ["canvastekk_workflow_sdk", "verify", "http://node.test", "--dry-run"])
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 0
@@ -436,7 +433,7 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
         report = verify_node("http://node.test", api_key=token)
         assert report.ok, [c.route for c in report.checks if not c.ok]
         assert all(c.ok for c in report.checks)
-        assert len(report.checks) >= 6  # manifest + derived route probes
+        assert len(report.checks) >= 6
     finally:
         server.shutdown()
 

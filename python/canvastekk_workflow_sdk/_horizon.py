@@ -82,8 +82,7 @@ def enforce_support_horizon(today: date | None = None) -> None:
     log = _logger
     if os.environ.get(BREAK_GLASS_ENV) == "1":
         log.critical(
-            "support horizon expired for SDK %s (sunset %s); continuing via "
-            "%s=1 — upgrade the SDK",
+            "support horizon expired for SDK %s (sunset %s); continuing via %s=1 — upgrade the SDK",
             RELEASE_DATE,
             _sunset().isoformat(),
             BREAK_GLASS_ENV,

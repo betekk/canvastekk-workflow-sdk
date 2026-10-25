@@ -34,10 +34,10 @@ def _manifest(**overrides) -> WorkflowNodeManifest:
 class TestBuildEngineRequest:
     def test_vocabulary_adapter_mapping(self) -> None:
         payload = _build_engine_request(_manifest())
-        assert payload["name"] == "echo"  # manifest slug → engine name input
-        assert payload["label"] == "Echo"  # manifest display name → engine label
+        assert payload["name"] == "echo"
+        assert payload["label"] == "Echo"
         assert payload["description"] == "Echo node"
-        assert "slug" not in payload  # engine 422s on client-sent slug
+        assert "slug" not in payload
 
     def test_keys_within_engine_whitelist(self) -> None:
         manifest = _manifest(
@@ -47,13 +47,24 @@ class TestBuildEngineRequest:
         )
         payload = _build_engine_request(manifest)
         allowed = {
-            "name", "version", "label", "description", "input_schema", "output_schema",
-            "invoke_type", "invoke_url", "invoke_config", "category", "tags", "styles",
-            "constraints", "token_cost", "timeout_seconds", "deprecation",
+            "name",
+            "version",
+            "label",
+            "description",
+            "input_schema",
+            "output_schema",
+            "invoke_type",
+            "invoke_url",
+            "invoke_config",
+            "category",
+            "tags",
+            "styles",
+            "constraints",
+            "token_cost",
+            "timeout_seconds",
+            "deprecation",
         }
         assert set(payload) <= allowed
-        # #123: legacy manifest key stripped at parse; constraints carry the
-        # docs field + the stamped provenance (sole version key) only.
         assert payload["constraints"] == {
             "docs_url": "https://docs.example.com/echo",
             "sdk_version": manifest.sdk_version,
@@ -127,33 +138,26 @@ class TestRunRegister:
 
         err = urllib.error.HTTPError("u", 401, "Unauthorized", hdrs=None, fp=io.BytesIO(b"{}"))
         with patch("urllib.request.urlopen", side_effect=err):
-            code, _, out = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, out = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 3
-        assert "t0ps3cret" not in out  # token never leaks
+        assert "t0ps3cret" not in out
 
     def test_client_error_exit_code(self) -> None:
         import urllib.request
 
         err = urllib.error.HTTPError("u", 422, "Unprocessable", hdrs=None, fp=io.BytesIO(b'{"detail": "slug"}'))
         with patch("urllib.request.urlopen", side_effect=err):
-            code, _, _ = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, _ = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 4
 
     def test_network_error_exit_code(self) -> None:
         import urllib.request
 
         with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("refused")):
-            code, _, _ = self._run(
-                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"]
-            )
+            code, _, _ = self._run(["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng"])
         assert code == 6
 
 
-# Module-level definition for module:attribute path used by CLI tests above.
 _manifest_module_marker = _manifest()
 
 
@@ -161,8 +165,6 @@ class TestProbeValueDomain:
     """DA-2603 review: probe mirrors the engine's value domain, not just key shape."""
 
     def test_rejects_category_outside_engine_enum(self) -> None:
-        # "transform" is the SDK docstring example the ENGINE rejects (maps to
-        # "conversion" only via the nodes CI rewrite) — probe must catch it.
         report = _probe_definition(_manifest(category="transform"))
         assert not report["valid"]
         assert any("category" in e for e in report["errors"])
@@ -185,8 +187,6 @@ class TestRegisterManifestFileInput:
     def test_manifest_file_registers(self, tmp_path) -> None:
 
         path = tmp_path / "manifest.json"
-        # Realistic served-manifest shape: extra keys (id, sdk_version, mode,
-        # code_digest) must be ignored by the model.
         path.write_text(
             json.dumps(
                 {
@@ -214,8 +214,9 @@ class TestRegisterManifestFileInput:
                 response.status = 200
             return response
 
-        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}), patch(
-            "urllib.request.urlopen", side_effect=fake_urlopen
+        with (
+            patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}),
+            patch("urllib.request.urlopen", side_effect=fake_urlopen),
         ):
             code = _run_register(["--manifest", str(path), "--engine-url", "https://eng", "--json"])
         assert code == 0

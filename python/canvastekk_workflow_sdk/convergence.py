@@ -158,16 +158,10 @@ def assert_staged(
     invoke_base: str,
 ) -> None:
     """Presence-only: every staged canonical slug must own an active registration."""
-    owned = {
-        canonical_from_invoke_url(node.get("invoke_url"), invoke_base)
-        for node in actives
-    }
+    owned = {canonical_from_invoke_url(node.get("invoke_url"), invoke_base) for node in actives}
     missing = [s for s in staged if s not in owned]
     if missing:
-        # GitHub parses workflow commands (::error::) from STDOUT only.
-        print(
-            "::error::convergence assert FAILED — staged slugs missing from registry:"
-        )
+        print("::error::convergence assert FAILED — staged slugs missing from registry:")
         for s in missing:
             print(f"  missing: {s}")
         print(f"staged({len(staged)}): {' '.join(sorted(staged))}")
@@ -182,14 +176,12 @@ def _get_json(url: str, token: str) -> dict:
 
 
 def _delete(url: str, token: str) -> None:
-    req = urllib.request.Request(
-        url, method="DELETE", headers={"X-Service-Token": token}
-    )
+    req = urllib.request.Request(url, method="DELETE", headers={"X-Service-Token": token})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()
     except urllib.error.HTTPError as exc:
-        if exc.code != 404:  # concurrent delete is idempotently fine
+        if exc.code != 404:
             raise
 
 
@@ -215,7 +207,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    token = args.token or (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))  # tracker#3911: old name dies at #3838
+    token = args.token or (
+        os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
+    )
     if not token:
         print("::error::no service token (pass --token or set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return 2
@@ -233,9 +227,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     drain(args.registry_base, token, candidates, args.dry_run)
 
-    # Assert against the POST-drain snapshot: feeding the pre-drain list
-    # would let a self-drained staged slug (the exact wrong-state the assert
-    # exists to catch) pass green.
     drained_names = {node.get("name") for node in candidates}
     assert_staged(
         staged,

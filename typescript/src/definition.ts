@@ -3,10 +3,6 @@ import { VERSION } from "./version.js";
 import { NodeValidationError } from "./exceptions.js";
 
 const SLUG_PATTERN = /^[a-z]([a-z0-9-]*[a-z0-9])?$/;
-// DA-2627: marker for the ambiguous name-only construction. Set by the
-// preprocess below and reported by the slug field's superRefine as a proper
-// zod issue — a throw here would escape safeParse (zod v3 does not catch
-// effect throws). Can never collide: not a valid slug by pattern.
 const AMBIGUOUS_NAME_SENTINEL = "__ambiguous_name__";
 const SEMVER_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
 
@@ -73,9 +69,6 @@ export type WorkflowNodeRole = z.infer<typeof WorkflowNodeRoleSchema>;
  */
 export const DeprecationInfoSchema = z
   .object({
-    // Strict YYYY-MM-DD (zod .date()) so lexicographic ordering in the
-    // superRefine check and the runtime sunset guard stays chronological —
-    // Python types these as pydantic `date` (DA-2312 parity).
     deprecated_at: z.iso.date().nullable().default(null),
     sunset_date: z.iso.date().nullable().default(null),
     replacement_slug: z.string().nullable().default(null),
@@ -83,9 +76,6 @@ export const DeprecationInfoSchema = z
     notice: z.string(),
   })
   .superRefine((dep, ctx) => {
-    // ISO 8601 dates (YYYY-MM-DD) compare lexicographically = chronologically.
-    // Boundary sunset_date == deprecated_at is allowed (DA-2312, parity with
-    // Python DeprecationInfo._validate_sunset_after_deprecation).
     if (
       dep.deprecated_at !== null &&
       dep.sunset_date !== null &&
@@ -126,8 +116,6 @@ function validateFileFieldFormats(
 
     const items = propSchema.items as Record<string, unknown> | undefined;
     if (fieldType === "array" && items?.format === "file") {
-      // S.1 (SDK#161): array-of-file fields are valid; items must be
-      // strings (a file element is a presigned URL).
       if (items.type !== undefined && items.type !== "string") {
         throw new Error(
           `Field '${name}' is an array whose items have format 'file' but items type is '${items.type}' (expected 'string').`,
@@ -142,12 +130,6 @@ function validateFileFieldFormats(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// Serving contract (D8, #110): the manifest declares HOW a node serves.
-// Mirrors python/canvastekk_workflow_sdk/definition.py — identical closed
-// vocabulary, minimum set, and duplicate rules (parity: same change).
-// ---------------------------------------------------------------------------
 
 export const CONTRACT_ROUTE_VOCABULARY = [
   "/execute",
@@ -264,18 +246,10 @@ const WorkflowNodeManifestObjectSchema = z
     default_retry: RetryConfigSchema.default(RetryConfigSchema.parse({})),
     category: z.string().default("utility"),
     timeout_seconds: z.number().int().min(1).default(30),
-    // DA-3499: host-enforced runtime ceiling bounding timeout_seconds. Hosts
-    // enforce min(timeout_seconds, hard_max_runtime_seconds); a declared
-    // budget above the ceiling fails the probe unless the node explicitly
-    // overrides the ceiling. Default: 7200 (2 hours). Host-side contract —
-    // never sent in the engine registration request.
     hard_max_runtime_seconds: z.number().int().min(1).default(7200),
     role: WorkflowNodeRoleSchema,
     styles: WorkflowNodeStylesSchema.nullable().default(null),
     deprecation: DeprecationInfoSchema.nullable().default(null),
-    // DA-3359: SDK provenance is STAMPED (defaults to the installed VERSION).
-    // The legacy minimum/maximum range fields were removed in #123/D16 —
-    // versions are provenance, never admission gates.
     sdk_version: z
       .string()
       .default(VERSION)
@@ -294,8 +268,6 @@ const WorkflowNodeManifestObjectSchema = z
       })
       .nullable()
       .default(null),
-    // Serving contract (D8, #110). Self-hosted authors declare what they
-    // serve; SDK-served nodes serialize the adapter-stamped default.
     contract: NodeContractSchema.nullable().default(null),
   })
   .transform((data, ctx) => {
@@ -366,8 +338,6 @@ function mapLegacyVocabulary(data: unknown): unknown {
     d.name = d.title;
     delete d.title;
   } else if (!hasSlug && hasName && !hasTitle) {
-    // Sentinel (not a throw): zod v3 safeParse does not catch throws from
-    // effects — the slug superRefine turns this into a proper issue.
     d.slug = AMBIGUOUS_NAME_SENTINEL;
   } else if (hasSlug && hasTitle) {
     console.warn(
@@ -402,8 +372,6 @@ export function getFileInputFields(def: WorkflowNodeManifest): string[] {
     Record<string, unknown>
   >;
   const isFileField = (schema: Record<string, unknown>): boolean => {
-    // S.1 (SDK#161): a file field is either a string with format "file"
-    // or an array whose items are.
     if (schema.format === "file") return true;
     const items = schema.items as Record<string, unknown> | undefined;
     return schema.type === "array" && items !== undefined && items.format === "file";
@@ -426,10 +394,6 @@ export function getFileOutputFields(def: WorkflowNodeManifest): string[] {
     string,
     Record<string, unknown>
   >;
-  // Mirrors getFileInputFields (S.1, SDK#161): a file field is a string with
-  // format "file" OR an array whose items are. The output side missed the
-  // array case — url-loader array runs uploaded nothing (canvastekk-tracker
-  // #3971 follow-up, live-run evidence).
   const isFileField = (schema: Record<string, unknown>): boolean => {
     if (schema.format === "file") return true;
     const items = schema.items as Record<string, unknown> | undefined;
@@ -463,7 +427,6 @@ export function validateFileInput(
     Record<string, unknown>
   >;
   const propSchema = properties[fieldName] ?? {};
-  // S.1 (SDK#161): array file fields carry their constraints on items.
   const schema =
     propSchema.type === "array"
       ? ((propSchema.items as Record<string, unknown>) ?? {})

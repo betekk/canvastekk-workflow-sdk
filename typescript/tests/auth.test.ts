@@ -94,9 +94,9 @@ describe("NodeAuth.central", () => {
     const middleware = NodeAuth.central();
     const first = await run(middleware, makeReq(VALID_TOKEN));
     const second = await run(middleware, makeReq(VALID_TOKEN));
-    expect(first.statusCode).toBe(0); // next() called, no status written
+    expect(first.statusCode).toBe(0);
     expect(second.statusCode).toBe(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // cache honored
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("http://engine.example/api/nodes/verify-token");
   });
 
@@ -121,7 +121,7 @@ describe("NodeAuth.central", () => {
     const first = await run(middleware, makeReq(VALID_TOKEN));
     const second = await run(middleware, makeReq(VALID_TOKEN));
     expect(first.statusCode).toBe(503);
-    expect(second.statusCode).toBe(0); // recovered verdict accepted
+    expect(second.statusCode).toBe(0);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

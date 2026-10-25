@@ -64,8 +64,6 @@ def test_core_import_succeeds_without_fastapi() -> None:
 
 
 def test_lazy_symbols_resolve_with_fastapi_installed() -> None:
-    # The normal (fastapi-installed) path: attribute access resolves and
-    # caches the real callable.
     import canvastekk_workflow_sdk as sdk
 
     assert callable(sdk.create_node_app)

@@ -47,8 +47,6 @@ const ajv = new Ajv({ strict: false });
 
 const logger = createLogger("base-node");
 
-// Fraction of the node's timeout_seconds reserved for execute() after all
-// file downloads complete; downloads share the remainder of the budget.
 const DOWNLOAD_BUDGET_FRACTION = 0.8;
 
 /**
@@ -268,9 +266,6 @@ export abstract class BaseNode {
     context: ExecutionContext,
   ): Promise<string> {
     const maxBytes = this.maxDownloadBytes(fieldName);
-    // DA-3499: the download budget derives from the effective runtime bound
-    // (mirrors python base.py — _download_deadline(effective_runtime_seconds)),
-    // never the raw timeout_seconds, so downloads cannot outlive the ceiling.
     const deadline = downloadDeadline(effectiveRuntimeSeconds(this.getDefinition()));
 
     try {
@@ -367,9 +362,6 @@ export abstract class BaseNode {
 
       const reader = body.getReader();
       const file = createWriteStream(localPath, { flags: "w" });
-      // Lazy open can error after abort/cleanup (e.g. temp dir removed); a
-      // listener here keeps such late errors from crashing the process.
-      // Real failures still surface via the once("error") handler below.
       file.on("error", () => {});
       try {
         let running = 0;
@@ -399,10 +391,10 @@ export abstract class BaseNode {
         });
       } catch (err) {
         file.destroy();
-        try { unlinkSync(localPath); } catch { /* nothing to clean */ }
+        try { unlinkSync(localPath); } catch { }
         throw err;
       } finally {
-        try { reader.releaseLock(); } catch { /* already released */ }
+        try { reader.releaseLock(); } catch { }
       }
 
       return localPath;
@@ -429,9 +421,6 @@ export abstract class BaseNode {
     if (dep.sunset_date) {
       const today = new Date().toISOString().slice(0, 10);
       if (today > dep.sunset_date) {
-        // S.2 (SDK#161): sunset is structured, not message-only — the
-        // lifecycle category plus NODE_SUNSET code and machine-readable
-        // details let consumers react without parsing prose.
         throw new NodeConfigurationError(
           `Node '${name}' was sunset on ${dep.sunset_date} and refuses to run; migrate to '${replacement}' (${dep.notice})`,
           {
@@ -514,10 +503,6 @@ export abstract class BaseNode {
         const value = inputs[fieldName];
 
         if (Array.isArray(value)) {
-          // S.1 (SDK#161): array file inputs — every URL element is
-          // downloaded, validated, and replaced by its local path; non-URL
-          // elements pass through untouched (mirrors the single-value skip
-          // rule). Failure cleans every file via the shared registry.
           const entries: Array<Record<string, unknown>> = [];
           const newElements: unknown[] = [];
           for (const element of value) {
@@ -558,8 +543,6 @@ export abstract class BaseNode {
         context.reportProgress(0.05, `Downloading ${fieldName}`);
 
         const localPath = await this.downloadOne(fieldName, value, context);
-        // Register the path BEFORE validation so a post-download validation
-        // failure still triggers cleanup of the completed file.
         downloaded.push(localPath);
 
         const fileSize = statSync(localPath).size;
@@ -577,7 +560,7 @@ export abstract class BaseNode {
       }
     } catch (err) {
       for (const p of downloaded) {
-        try { unlinkSync(p); } catch { /* ignore cleanup errors */ }
+        try { unlinkSync(p); } catch { }
       }
       throw err;
     }
@@ -631,11 +614,7 @@ export abstract class BaseNode {
   }
 
   async run(request: NodeExecutionRequest): Promise<NodeExecutionResponse> {
-    // DA-3359: entrypoint horizon gate (import stays log-only).
     enforceSupportHorizon();
-    // #3498: adopt the dispatcher-provided execution id so progress pings
-    // match the engine's pending-async park; fallback preserves inline
-    // behavior (engine adopts the response's execution_id).
     const executionId = request.execution_id ?? randomUUID();
     const startTime = performance.now();
     const def = this.getDefinition();
@@ -645,9 +624,6 @@ export abstract class BaseNode {
 
       this.validateInputs(request.inputs);
 
-      // D10 (#111): validation-only execution. Branch position IS the
-      // zero-side-effect guarantee — after full input validation, before
-      // context/file-download/middleware/execute/upload. Do not move it.
       if (request.dry_run) {
         const dryDurationMs = Math.round(performance.now() - startTime);
         if (!effectiveContract(def).capabilities.dry_run) {
@@ -677,8 +653,6 @@ export abstract class BaseNode {
         executionId,
       });
 
-      // Ambient context for BaseNode.reportProgress() during this run,
-      // including awaited continuations (DA-3232).
       return await executionContextStorage.run(context, async () => {
         let inputs = { ...request.inputs };
 
@@ -696,7 +670,6 @@ export abstract class BaseNode {
         this.validateOutputs(outputs);
 
         const durationMs = Math.round(performance.now() - startTime);
-        // DA-3359: one structured execution line per run.
         logger.info(`execution slug=${def.slug} status=pass duration_ms=${durationMs}`);
 
         for (const mw of this._middleware) {
@@ -720,7 +693,7 @@ export abstract class BaseNode {
       });
     } catch (err) {
       const durationMs = Math.round(performance.now() - startTime);
-      this.recordError(request, err as Error, durationMs); // DA-3359: failure chokepoint logs the execution line
+      this.recordError(request, err as Error, durationMs);
 
       if (err instanceof NodeExecutionError) {
         return NodeExecutionResponseFactory.failure(
@@ -795,7 +768,6 @@ export abstract class BaseNode {
    * Override for initialization logic.
    */
   async onStartup(): Promise<void> {
-    // no-op
   }
 
   /**
@@ -803,7 +775,6 @@ export abstract class BaseNode {
    * Override for cleanup logic.
    */
   async onShutdown(): Promise<void> {
-    // no-op
   }
 
   /**
@@ -816,8 +787,6 @@ export abstract class BaseNode {
    * @returns Promise resolving to the Express application
    */
   async createApp(opts?: CreateNodeAppOptions): Promise<unknown> {
-    // The dynamically-loaded adapter narrows opts to the express-typed
-    // CreateNodeAppOptions; callers get full typing on the /express subpath.
     const { createNodeApp } = await import("./app.js");
     return createNodeApp(this, opts as Parameters<typeof createNodeApp>[1]);
   }

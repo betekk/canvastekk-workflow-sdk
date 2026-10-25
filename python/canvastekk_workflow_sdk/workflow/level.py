@@ -58,8 +58,6 @@ def compute_levels(spec: WorkflowDefinitionSpec) -> list[list[str]]:
 
     if processed != len(node_ids):
         remaining = [nid for nid in node_ids if in_degree[nid] > 0]
-        raise ValueError(
-            f"Workflow contains a cycle involving node(s): {', '.join(sorted(remaining))}"
-        )
+        raise ValueError(f"Workflow contains a cycle involving node(s): {', '.join(sorted(remaining))}")
 
     return levels

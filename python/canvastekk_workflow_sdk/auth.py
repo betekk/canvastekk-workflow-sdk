@@ -39,8 +39,6 @@ if TYPE_CHECKING:  # pragma: no cover - import-time only
     from fastapi import HTTPException, Request
 
 
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -65,10 +63,8 @@ class _AuthBackend(ABC):
 
     def as_dependency(self) -> Any:
         """Return a FastAPI ``Depends()`` callable for this backend."""
-        from fastapi import Depends, Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Depends, Request
 
-        # `authenticate(request: Request)` is a string annotation (PEP 563);
-        # fastapi resolves hints against this module's globals at wiring time.
         globals().setdefault("Request", Request)
         return Depends(self.authenticate)
 
@@ -99,7 +95,8 @@ class _ApiKeyAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``X-API-Key`` header against the configured env var."""
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
+
         if _is_dev_mode():
             logger.debug("Dev mode: skipping API key authentication")
             return {"auth_mode": "dev_bypass"}
@@ -110,10 +107,7 @@ class _ApiKeyAuth(_AuthBackend):
             raise HTTPException(status_code=401, detail="Authentication not configured")
 
         provided_key = request.headers.get("X-API-Key", "")
-        if not any(
-            hmac.compare_digest(provided_key.encode(), expected.encode())
-            for expected in expected_keys
-        ):
+        if not any(hmac.compare_digest(provided_key.encode(), expected.encode()) for expected in expected_keys):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
         return {"auth_mode": "api_key"}
@@ -164,7 +158,6 @@ class _CentralAuth(_AuthBackend):
         self._cache_ttl = cache_ttl
         self._timeout = timeout
         self._legacy_key_env_var = legacy_key_env_var
-        # sha256(token) -> (valid, claims_or_none, monotonic_expiry)
         self._verdict_cache: dict[str, tuple[bool, dict[str, Any] | None, float]] = {}
 
     def _legacy_matches(self, provided: str) -> bool:
@@ -176,9 +169,7 @@ class _CentralAuth(_AuthBackend):
             os.environ.get(f"{self._legacy_key_env_var}_NEXT", ""),
         )
         expected = [key for key in keys if key]
-        return any(
-            hmac.compare_digest(provided.encode(), key.encode()) for key in expected
-        )
+        return any(hmac.compare_digest(provided.encode(), key.encode()) for key in expected)
 
     def _cache_expiry(self, valid: bool, claims: dict[str, Any] | None) -> float:
         """Return the monotonic instant a cached verdict expires."""
@@ -202,15 +193,13 @@ class _CentralAuth(_AuthBackend):
 
         url = f"{base_url}{self._verify_path}"
         body = json.dumps({"token": token}).encode("utf-8")
-        request = urllib.request.Request(
-            url, data=body, headers={"Content-Type": "application/json"}, method="POST"
-        )
+        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
                 payload = json.loads(response.read())
         except (
             urllib.error.URLError,
-            http.client.HTTPException,  # malformed status line / truncated body
+            http.client.HTTPException,
             TimeoutError,
             OSError,
             ValueError,
@@ -222,9 +211,7 @@ class _CentralAuth(_AuthBackend):
             run_id = payload.get("run_id")
             node_id = payload.get("node_id")
             exp = payload.get("exp")
-            if not isinstance(run_id, str) or not isinstance(node_id, str) or not isinstance(
-                exp, (int, float)
-            ):
+            if not isinstance(run_id, str) or not isinstance(node_id, str) or not isinstance(exp, (int, float)):
                 raise _VerifyUnavailableError("Malformed verify response")
             claims = {"run_id": run_id, "node_id": node_id, "exp": exp}
             return True, claims
@@ -258,6 +245,7 @@ class _CentralAuth(_AuthBackend):
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``X-API-Key`` token (or legacy key) centrally."""
         from fastapi import HTTPException
+
         if _is_dev_mode():
             logger.debug("Dev mode: skipping central token authentication")
             return {"auth_mode": "dev_bypass"}
@@ -272,9 +260,7 @@ class _CentralAuth(_AuthBackend):
         try:
             claims = self._validated_claims(provided)
         except _VerifyUnavailableError as error:
-            raise HTTPException(
-                status_code=503, detail="Token validator unavailable"
-            ) from error
+            raise HTTPException(status_code=503, detail="Token validator unavailable") from error
         if claims is None:
             raise HTTPException(status_code=401, detail="Invalid node token")
         return {
@@ -323,7 +309,8 @@ class _JwtAuth(_AuthBackend):
 
     def authenticate(self, request: Request) -> dict[str, Any]:
         """Validate the ``Authorization: Bearer`` JWT token."""
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
+
         if _is_dev_mode():
             logger.debug("Dev mode: skipping JWT authentication")
             return {"auth_mode": "dev_bypass"}
@@ -444,7 +431,8 @@ class _KeycloakAuth(_AuthBackend):
         Raises:
             HTTPException: 401 if authentication fails, 503 if JWKS fetch fails
         """
-        from fastapi import HTTPException  # lazy: core installs without fastapi (#104)
+        from fastapi import HTTPException
+
         if _is_dev_mode():
             logger.debug("Dev mode: skipping Keycloak authentication")
             return {"auth_mode": "dev_bypass"}
@@ -546,7 +534,8 @@ class NodeAuth:
 
     @staticmethod
     def api_key(key_env_var: str = "CANVASTEKK_API_KEY") -> _ApiKeyAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
+
         globals().setdefault("Request", Request)
         """Create an API key authentication backend.
 
@@ -566,7 +555,8 @@ class NodeAuth:
         timeout: float = 5.0,
         legacy_key_env_var: str | None = "CANVASTEKK_API_KEY",
     ) -> _CentralAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
+
         globals().setdefault("Request", Request)
         """Create a central-validation auth backend (engine-issued tokens).
 
@@ -600,7 +590,8 @@ class NodeAuth:
         algorithm: str = "HS256",
         audience: str | None = None,
     ) -> _JwtAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
+
         globals().setdefault("Request", Request)
         """Create a JWT (HMAC-SHA256) authentication backend.
 
@@ -623,7 +614,8 @@ class NodeAuth:
         audience: str | None = None,
         algorithm: str = "RS256",
     ) -> _KeycloakAuth:
-        from fastapi import Request  # lazy: core installs without fastapi (#104)
+        from fastapi import Request
+
         globals().setdefault("Request", Request)
         """Create a Keycloak RS256 JWT authentication backend.
 

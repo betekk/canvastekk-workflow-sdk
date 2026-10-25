@@ -109,7 +109,6 @@ function getEnvLogLevel(): LogLevel {
 
 /** Reads CANVASTEKK_LOG_FORMAT from env, defaulting to "json". */
 function getEnvLogFormat(): string {
-  // DA-3359: console output is the default; "json" opts into one-line JSON.
   const raw = (process.env.CANVASTEKK_LOG_FORMAT ?? "console").toLowerCase();
   return raw === "json" ? "json" : "console";
 }

@@ -84,7 +84,6 @@ export function buildRegistryPayload(
 
   const resolvedStyles = definition.styles ?? null;
 
-  // DA-1955: manifest compat + docs fields merge into constraints; caller wins.
   const resolvedConstraints: Record<string, unknown> = { ...(constraints ?? {}) };
   const manifestConstraintFields: [string, string | null][] = [
     ["docs_url", definition.docs_url ?? null],
@@ -95,27 +94,12 @@ export function buildRegistryPayload(
       resolvedConstraints[key] = value;
     }
   }
-  // DA-3359 stamped provenance — the ONLY version key on the wire (the
-  // legacy minimum_sdk_version dual-write was removed in #123/D16:
-  // versions are provenance, never admission gates; the engine gate is
-  // advisory since engine#671 and behavioral in #658). The stamp is ALWAYS
-  // the installed VERSION (python parity — a manifest parsed from disk
-  // carries its authoring stamp; provenance is the SDK doing the registering).
   resolvedConstraints.sdk_version = VERSION;
 
-  // D8/#110: the DECLARED serving contract rides constraints — the engine's
-  // RegisterWorkflowNodeRequest is extra="forbid" and has no top-level
-  // contract field yet, but `constraints` is a declared free-form dict.
-  // The engine's registration gate reads it from here (engine #658) and may
-  // promote it to a top-level field engine-side. Caller-supplied wins.
   if (definition.contract !== null && !("contract" in resolvedConstraints)) {
     resolvedConstraints.contract = definition.contract;
   }
 
-  // DA-1955: engine RegisterWorkflowNodeRequest is extra="forbid" without
-  // node_role/retry/node_status — those keys are NOT emitted here.
-  // (`deprecation` is accepted by the engine since DA-2305/#319 and is
-  // emitted below when set — DA-2312, parity with Python v0.25.0.)
   const payload: Record<string, unknown> = {
     name: definition.slug,
     label: definition.name,
@@ -141,8 +125,6 @@ export function buildRegistryPayload(
     payload.constraints = resolvedConstraints;
   }
   if (definition.deprecation != null) {
-    // DA-2312: parse-before-emit — always the full 5-key dump (defaults
-    // applied), parity with Python model_dump emission (SDK v0.25.0 / PR #59).
     payload.deprecation = DeprecationInfoSchema.parse(definition.deprecation);
   }
 
@@ -217,7 +199,6 @@ export async function registerNode(
     Accept: "application/json",
   };
   if (serviceToken) {
-    // #135: wire form follows credential type (ctk_ → Bearer).
     const [authName, authValue] = registryAuthHeader(serviceToken);
     headers[authName] = authValue;
   } else if (apiKey) {
@@ -290,10 +271,6 @@ export function exportDefinition(
     nodeStatus: opts.nodeStatus,
   });
 
-  // DA-1955: full manifest shape (parity with python export_definition).
-  // The exported file targets the node's /manifest endpoint format
-  // (SDKNodeDefinition, extra-tolerant), not the engine's extra="forbid"
-  // registration request — re-add registry-only keys the payload omits.
   registryDict.node_role = definition.role;
   registryDict.retry = definition.default_retry;
   registryDict.node_status = opts.nodeStatus ?? "active";

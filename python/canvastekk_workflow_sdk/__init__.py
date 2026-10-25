@@ -193,14 +193,9 @@ __all__ = [
     "validate",
 ]
 
-# DA-3359: single source of truth lives in _version.py (leaf module — no
-# import cycle); re-exported for backwards compatibility.
 from canvastekk_workflow_sdk._version import RELEASE_DATE as RELEASE_DATE  # noqa: E402, F401
 from canvastekk_workflow_sdk._version import __version__ as __version__  # noqa: E402, F401
 
-# Server symbols live behind lazily-imported fastapi-backed modules; the
-# core package imports (and installs) without fastapi. Access raises a
-# guided ImportError when the `[fastapi]` extra is missing.
 _LAZY_SERVER_EXPORTS = {
     "create_node_app": "canvastekk_workflow_sdk.app",
     "create_multi_node_app": "canvastekk_workflow_sdk.router",
@@ -209,7 +204,7 @@ _LAZY_SERVER_EXPORTS = {
 }
 
 
-def __getattr__(name: str):  # PEP 562
+def __getattr__(name: str):
     if name in _LAZY_SERVER_EXPORTS:
         try:
             import fastapi  # noqa: F401
@@ -222,6 +217,6 @@ def __getattr__(name: str):  # PEP 562
 
         module = importlib.import_module(_LAZY_SERVER_EXPORTS[name])
         value = getattr(module, name)
-        globals()[name] = value  # cache: subsequent lookups skip this hook
+        globals()[name] = value
         return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

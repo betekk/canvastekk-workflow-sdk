@@ -8,6 +8,7 @@ export default tseslint.config(
   { languageOptions: { ecmaVersion: "latest", sourceType: "module" } },
   {
     rules: {
+      "no-empty": ["error", { allowEmptyCatch: true }],
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },

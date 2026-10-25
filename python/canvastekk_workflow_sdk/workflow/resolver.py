@@ -81,8 +81,7 @@ def _resolve_output(
         return _walk_dot_path(source_outputs, from_output, from_node)
     node_ctx = f" from node '{from_node}'" if from_node else ""
     raise KeyError(
-        f"Cannot resolve from_output '{from_output}'{node_ctx}; "
-        f"available keys: {sorted(source_outputs.keys())}"
+        f"Cannot resolve from_output '{from_output}'{node_ctx}; available keys: {sorted(source_outputs.keys())}"
     )
 
 
@@ -105,9 +104,7 @@ def _walk_dot_path(data: dict[str, Any], path: str, from_node: str = "") -> Any:
         if not segment:
             raise KeyError(f"Invalid dot-path '{path}' (empty segment)")
         if not isinstance(current, dict):
-            raise KeyError(
-                f"Cannot walk dot-path '{path}': segment '{segment}' hits non-dict"
-            )
+            raise KeyError(f"Cannot walk dot-path '{path}': segment '{segment}' hits non-dict")
         if segment not in current:
             node_ctx = f" from node '{from_node}'" if from_node else ""
             raise KeyError(f"Dot-path '{path}': segment '{segment}' not found{node_ctx}")

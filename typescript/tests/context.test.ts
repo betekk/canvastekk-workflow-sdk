@@ -215,7 +215,6 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
       executionId: "exec-45",
       outputDir: join(testDir, "n6"),
     });
-    // Reach into the private logger to observe the warn swallow.
     (ctx as unknown as { _logger: { info: (m: string) => void; warn: (m: string) => void } })._logger = {
       info: () => {},
       warn: (m: string) => warnings.push(m),

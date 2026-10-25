@@ -113,14 +113,10 @@ def _check_edge_references(
         edge_ids.add(edge.id)
 
         if edge.from_node not in node_ids:
-            result.errors.append(
-                f"Edge references non-existent from_node: '{edge.from_node}'"
-            )
+            result.errors.append(f"Edge references non-existent from_node: '{edge.from_node}'")
             result.is_valid = False
         if edge.to_node not in node_ids:
-            result.errors.append(
-                f"Edge references non-existent to_node: '{edge.to_node}'"
-            )
+            result.errors.append(f"Edge references non-existent to_node: '{edge.to_node}'")
             result.is_valid = False
 
 
@@ -150,9 +146,7 @@ def _check_start_end(
         return
 
     if len(start_nodes) != 1:
-        result.errors.append(
-            f"Workflow must have exactly 1 __start__ node, found {len(start_nodes)}"
-        )
+        result.errors.append(f"Workflow must have exactly 1 __start__ node, found {len(start_nodes)}")
         result.is_valid = False
         return
 
@@ -179,9 +173,7 @@ def _check_start_end(
 
     for eid in end_ids:
         if out_degree.get(eid, 0) != 0:
-            result.errors.append(
-                f"__end__ node '{eid}' must have no outgoing edges (out_degree must be 0)"
-            )
+            result.errors.append(f"__end__ node '{eid}' must have no outgoing edges (out_degree must be 0)")
             result.is_valid = False
 
 
@@ -260,18 +252,14 @@ def _check_connectivity(
     orphans = sorted(all_ids - reachable)
     if orphans:
         result.orphans = orphans
-        result.errors.append(
-            f"Orphan node(s) unreachable from __start__: {', '.join(orphans)}"
-        )
+        result.errors.append(f"Orphan node(s) unreachable from __start__: {', '.join(orphans)}")
         result.is_valid = False
 
     can_reach_end = _bfs_multi(end_ids, rev_adj)
     dead_ends = sorted(all_ids - can_reach_end)
     if dead_ends:
         result.dead_ends = dead_ends
-        result.errors.append(
-            f"Dead-end node(s) with no path to __end__: {', '.join(dead_ends)}"
-        )
+        result.errors.append(f"Dead-end node(s) with no path to __end__: {', '.join(dead_ends)}")
         result.is_valid = False
 
 

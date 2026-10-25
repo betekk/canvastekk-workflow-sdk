@@ -87,9 +87,6 @@ export function resolveInputs(
       }
       defineOwn(resolved, edge.to_input, value);
     } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      // Merge via own-data-property creation: JSON.parse creates an *own*
-      // __proto__ property which Object.assign would copy via [[Set]],
-      // swapping the target's prototype.
       for (const [k, v] of Object.entries(value)) {
         if (!DANGEROUS_KEYS.has(k)) defineOwn(resolved, k, v);
       }
@@ -117,8 +114,6 @@ function resolveOutput(
 ): unknown {
   if (!fromOutput) return sourceOutputs;
 
-  // Object.hasOwn: the `in` operator also matches inherited builtins
-  // (e.g. from_output "toString" would "resolve" to a function).
   if (Object.hasOwn(sourceOutputs, fromOutput)) return sourceOutputs[fromOutput];
 
   if (fromOutput.includes(".")) return walkDotPath(sourceOutputs, fromOutput, fromNode);

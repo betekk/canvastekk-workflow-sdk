@@ -146,8 +146,6 @@ export class S3PresignedUploader implements OutputUploader {
       if (!(fieldName in uploadUrls)) continue;
 
       if (!Object.hasOwn(response.outputs, fieldName)) {
-        // Omitted output: the engine stamps s3:// URIs only for fields
-        // present in the response, so omission is legal.
         continue;
       }
 
@@ -155,7 +153,6 @@ export class S3PresignedUploader implements OutputUploader {
       const target = uploadUrls[fieldName];
 
       if (Array.isArray(value)) {
-        // tracker#3969: array file outputs — one indexed redemption per element.
         if (!target.array) {
           throw new NodeIOError(
             `Output field '${fieldName}' value is a list but its target is not an array session`,

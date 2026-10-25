@@ -25,8 +25,6 @@ describe("WorkflowRunner", () => {
     expect(result.status).toBe("completed");
     expect(result.node_results).toHaveLength(3);
     expect(result.node_results[1].status).toBe("completed");
-    // Note: input propagation behavior depends on runner implementation
-    // This test documents current behavior
   });
 
   it("parallel execution within a level", async () => {
@@ -81,7 +79,6 @@ describe("WorkflowRunner", () => {
 
     expect(result.status).toBe("failed");
     expect(result.node_results.find((r) => r.node_id === "fail")?.status).toBe("failed");
-    // success node may be skipped or not depending on level order; with fail_fast, we stop after the level containing the failure
     expect(result.node_results.some((r) => r.status === "failed")).toBe(true);
   });
 
@@ -109,7 +106,6 @@ describe("WorkflowRunner", () => {
 
     expect(result.status).toBe("failed");
     expect(result.node_results.find((r) => r.node_id === "fail")?.status).toBe("failed");
-    // With continue, downstream nodes run and may complete (or be skipped due to upstream failure)
     expect(result.node_results.find((r) => r.node_id === "success")?.status).toBe("skipped");
   });
 
@@ -136,7 +132,6 @@ describe("WorkflowRunner", () => {
     const result = await runner.run(spec);
 
     expect(result.status).toBe("failed");
-    // downstream node should be skipped when upstream fails
     const nextRes = result.node_results.find((r) => r.node_id === "next");
     expect(nextRes?.status).toBe("skipped");
     expect(nextRes?.skipped_reason).toBe("upstream_failed");
@@ -144,7 +139,6 @@ describe("WorkflowRunner", () => {
 
   it("Executor registration check (missing slug → failed)", async () => {
     const executor = new InProcessExecutor();
-    // Not registering 'unknown-v1'
 
     const spec = await new WorkflowBuilder()
       .addStart("start")
@@ -181,9 +175,8 @@ describe("WorkflowRunner", () => {
     const result = await runner.run(spec);
 
     expect(result.status).toBe("completed");
-    expect(result.output_dir).toBe(null); // cleaned up
+    expect(result.output_dir).toBe(null);
 
-    // Access the temp dir via the node output before cleanup to confirm it existed
     const n1Res = result.node_results.find((r) => r.node_id === "n1");
     expect(n1Res?.outputs?.output).toMatch(/^\/tmp\/wf-runner-/);
   });
@@ -207,7 +200,6 @@ describe("WorkflowRunner", () => {
 
     expect(result.status).toBe("completed");
     expect(result.output_dir).toMatch(/^\/tmp\/wf-runner-/);
-    // Per-node subdirs: the node's output dir is a subdir of the run dir.
     expect(result.node_results.find((r) => r.node_id === "n1")?.outputs?.output).toBe(join(result.output_dir, "n1"));
   });
 
@@ -231,7 +223,6 @@ describe("WorkflowRunner", () => {
 
     expect(result.status).toBe("completed");
     expect(result.output_dir).toBe(customDir);
-    // Even with cleanup: true, user-supplied dir is NOT cleaned up
   });
 
   it("Shared outputDir enables file-passing between nodes", async () => {
@@ -294,7 +285,6 @@ describe("WorkflowRunner", () => {
     expect(n1Res?.status).toBe("completed");
     expect(n1Res?.outputs).toEqual({ ok: true });
     expect(n1Res?.duration_ms).toBeGreaterThanOrEqual(0);
-    // error and skippedReason may be undefined for completed nodes
   });
 
   it("Multiple end nodes aggregate outputs from all end nodes", async () => {
@@ -339,8 +329,6 @@ describe("WorkflowRunner", () => {
     const result = await runner.run(spec, { inputKey: "injected" });
 
     expect(result.status).toBe("completed");
-    // Note: input propagation behavior depends on runner implementation
-    // This test documents current behavior
   });
 });
 describe("WorkflowRunner start-input seeding (DA-1711)", () => {

@@ -63,9 +63,6 @@ def _validate_definition(definition) -> dict:
         "id": definition.id,
     }
 
-    # The model_validator already ran at definition time.
-    # If we got here, basic format validation passed.
-
     for name in definition.file_input_fields:
         schema = definition.input_schema.get("properties", {}).get(name, {})
         field_report = {"name": name, "format": schema.get("format"), "type": schema.get("type")}
@@ -89,8 +86,6 @@ def _validate_definition(definition) -> dict:
         field_report = {"name": name, "format": schema.get("format"), "type": schema.get("type")}
         report["file_output_fields"].append(field_report)
 
-    # Draft-7 structural validation of the JSON schemas (DA-1955).
-    # Catches broken schemas at authoring time instead of at engine registration.
     for label, schema in (("input_schema", definition.input_schema), ("output_schema", definition.output_schema)):
         try:
             Draft7Validator.check_schema(schema)
@@ -101,10 +96,6 @@ def _validate_definition(definition) -> dict:
     return report
 
 
-# Engine registration request whitelist — mirrors the engine's
-# CreateWorkflowNodeRequest (see canvastekk-workflow-engine
-# schemas/api/nodes.py and the CI register path in
-# canvastekk-workflow-nodes deploy-lambda.yml). DA-2603/DA-2666.
 _ENGINE_REQUEST_ALLOWED = frozenset(
     {
         "name",
@@ -182,9 +173,7 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
         report["errors"].append(f"Engine request carries keys outside the engine whitelist: {extra}")
     if definition.category not in _ENGINE_CATEGORIES:
         report["valid"] = False
-        report["errors"].append(
-            f"category {definition.category!r} is outside the engine's enum {_ENGINE_CATEGORIES}"
-        )
+        report["errors"].append(f"category {definition.category!r} is outside the engine's enum {_ENGINE_CATEGORIES}")
     if definition.timeout_seconds > _ENGINE_MAX_TIMEOUT_SECONDS:
         report["valid"] = False
         report["errors"].append(f"timeout_seconds {definition.timeout_seconds} exceeds the engine ceiling 86400")
@@ -265,7 +254,7 @@ def _run_register(args: list[str]) -> int:
     if (not module_path and not manifest_source) or not engine_url:
         return _usage()
 
-    token = (os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", ""))  # tracker#3911: old name dies at #3838
+    token = os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
     if not token:
         print("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)", file=sys.stderr)
         return 2
@@ -277,9 +266,6 @@ def _run_register(args: list[str]) -> int:
 
     use_json = "--json" in args
     if manifest_source:
-        # DA-2604: --manifest <file.json|URL> — parity with the ts CLI; CI
-        # cannot import module:attribute from a deployed Lambda, so the
-        # manifest is fetched to a file (or URL) and loaded directly.
         definition = _manifest_from_source(manifest_source)
         if isinstance(definition, int):
             return definition
@@ -545,14 +531,12 @@ def main() -> None:
         print("Commands:")
         print("  validate <module:attribute> [--json]  Validate a node manifest definition")
         print("  probe <module:attribute> [--json]     Offline registration probes (validate + engine mirror)")
-        print(
-            "  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]"
-        )
+        print("  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]")
         print("                                        Publish the manifest to the engine registry")
+        print("  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH")
         print(
-            "  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH"
+            "                                        [--staged S] [--dry-run] — drain retired slugs and assert staged presence"
         )
-        print("                                        [--staged S] [--dry-run] — drain retired slugs and assert staged presence")
         print("  diff <old.json> <new.json> [--json]   Classify breaking changes between manifests")
         print("  init [--agents-md] [--force]          Scaffold AI agent skills into your project")
         print(
@@ -637,9 +621,6 @@ def main() -> None:
     module_path = args[1]
     use_json = "--json" in args
 
-    # DA-2603: probe distinguishes usage/load failures (exit 2) from
-    # validation failures (exit 1) — parity with the ts CLI. validate keeps
-    # its historical single exit-1 contract.
     load_fail_code = 2 if args[0] == "probe" else 1
 
     try:

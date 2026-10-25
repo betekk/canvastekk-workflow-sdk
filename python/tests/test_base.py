@@ -214,9 +214,6 @@ class TestBaseNode:
         node = EchoNode()
         app = node.create_app()
         assert app is not None
-        # Check that routes exist. fastapi >=0.143 nests the router under an
-        # _IncludedRouter in app.routes, so introspect via the public
-        # openapi paths instead of iterating app.routes.
         paths = set(app.openapi()["paths"])
         assert "/execute" in paths
         assert "/health" in paths
@@ -808,12 +805,10 @@ class TestBaseNodeReportProgress:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
         node = ProgressNode()
-        node.report_progress(50, "orphan")  # must not raise or send
+        node.report_progress(50, "orphan")
         assert calls == []
 
-    def test_sends_run_execution_id_inside_execute(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_sends_run_execution_id_inside_execute(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
         node = ProgressNode()
@@ -833,9 +828,7 @@ class TestBaseNodeReportProgress:
             )
         ]
 
-    def test_interleaved_runs_ping_own_execution_ids(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_interleaved_runs_ping_own_execution_ids(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: calls.append((u, p)))
         node = SlowProgressNode()
@@ -843,16 +836,12 @@ class TestBaseNodeReportProgress:
 
         def _run_a() -> None:
             results["a"] = node.run(
-                NodeExecutionRequest(
-                    run_id="ra", node_id="na", inputs={}, callback_url="http://engine/cb/ra"
-                )
+                NodeExecutionRequest(run_id="ra", node_id="na", inputs={}, callback_url="http://engine/cb/ra")
             )
 
         def _run_b() -> None:
             results["b"] = node.run(
-                NodeExecutionRequest(
-                    run_id="rb", node_id="nb", inputs={}, callback_url="http://engine/cb/rb"
-                )
+                NodeExecutionRequest(run_id="rb", node_id="nb", inputs={}, callback_url="http://engine/cb/rb")
             )
 
         ta = threading.Thread(target=_run_a)
@@ -871,16 +860,12 @@ class TestBaseNodeReportProgress:
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: None)
         node = FailingNode()
         resp = node.run(
-            NodeExecutionRequest(
-                run_id="r-err", node_id="n-err", inputs={}, callback_url="http://engine/cb"
-            )
+            NodeExecutionRequest(run_id="r-err", node_id="n-err", inputs={}, callback_url="http://engine/cb")
         )
         assert resp.status == "fail"
         assert execution_context_var.get() is None
 
-    def test_provided_execution_id_flows_to_pings(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_provided_execution_id_flows_to_pings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """#3498: a dispatcher-provided execution_id is adopted verbatim —
         context, response, and every progress ping carry it."""
         calls: list[tuple[str, dict]] = []
@@ -904,18 +889,18 @@ class TestBaseNodeReportProgress:
             )
         ]
 
-    def test_fallback_invents_distinct_ids_per_run(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_fallback_invents_distinct_ids_per_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """#3498 back-compat: absent execution_id → uuid4 fallback (inline
         behavior unchanged); two runs never share an id."""
         monkeypatch.setattr(context_module, "_deliver_progress_ping", lambda u, p: None)
         node = ProgressNode()
         req = NodeExecutionRequest(
-            run_id="r-fb", node_id="n-fb", inputs={},
+            run_id="r-fb",
+            node_id="n-fb",
+            inputs={},
             callback_url="http://engine/callbacks/r-fb/n-fb",
         )
         a = node.run(req.model_copy())
         b = node.run(req.model_copy())
         assert a.execution_id != b.execution_id
-        assert len(a.execution_id) == 36  # uuid4 shape
+        assert len(a.execution_id) == 36

@@ -33,9 +33,7 @@ def test_no_definitions_scope_parsing_in_sdk() -> None:
     """
     offenders: list[str] = []
     for path in _source_files():
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
@@ -54,15 +52,13 @@ def test_engine_payload_shape_documents_the_finding() -> None:
     engine_payload = {
         "slug": "defect-checker-app",
         "name": "Defect Checker",
-        "scope": "system",  # renamed from "global" (DA-3583)
-        "app_key": "defect-checker",  # DA-3585
+        "scope": "system",
+        "app_key": "defect-checker",
         "spec": {
             "nodes": [],
             "edges": [],
-            "output_contract": {"type": "object"},  # DA-3589
+            "output_contract": {"type": "object"},
         },
     }
-    # Plain dict passthrough — the SDK transports specs opaquely (builder
-    # templates embed specs as data), never validating scope.
     assert engine_payload["scope"] == "system"
     assert isinstance(engine_payload["spec"], dict)

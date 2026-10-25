@@ -149,9 +149,6 @@ describe("uploadViaSession (DA-2886)", () => {
       expect(parts).toHaveLength(3);
       expect(parts.map((p) => p.url.split("/part/")[1])).toEqual(["1", "2", "3"]);
       for (const p of parts) {
-        // The engine presigns part URLs with SignedHeaders=host — any header
-        // outside that set (e.g. Content-MD5) makes S3 reject the PUT with
-        // AccessDenied (DA-3341).
         expect(p.contentMd5).toBeUndefined();
         expect(p.contentLength).toBeDefined();
       }
@@ -176,7 +173,7 @@ describe("uploadViaSession (DA-2886)", () => {
     const srv = await startServer({ failPartsFirst: { 2: 1 } });
     try {
       await uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
-      expect(srv.partAttempt(2)).toBe(2); // failed once, succeeded on retry
+      expect(srv.partAttempt(2)).toBe(2);
       expect(srv.calls.some((c) => c.url === "/complete")).toBe(true);
       expect(srv.calls.some((c) => c.url === "/abort")).toBe(false);
     } finally {
@@ -194,7 +191,6 @@ describe("uploadViaSession (DA-2886)", () => {
         }),
       ).rejects.toThrow(/incomplete/);
 
-      // part 1 attempted 3 (retry) + 3 (resume round) = 6 times
       expect(srv.partAttempt(1)).toBe(6);
       expect(srv.calls.some((c) => c.url === "/status")).toBe(true);
       expect(srv.calls.some((c) => c.url === "/abort")).toBe(true);

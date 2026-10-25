@@ -173,9 +173,6 @@ describe("allowlist", () => {
   });
 
   it("URL without host rejected", async () => {
-    // Node's URL parser never yields an empty hostname for https URLs —
-    // invalid inputs throw at parse time. The empty-host guard is
-    // defense-in-depth; assert the parse behavior here.
     await expect(validateExternalUrl("https://:443/file.ply")).rejects.toThrow(/Invalid URL|no host/i);
   });
 });

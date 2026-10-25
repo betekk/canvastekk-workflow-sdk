@@ -23,23 +23,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Max characters of a progress-ping message (engine payload cap, #495).
 PROGRESS_MESSAGE_MAX_CHARS = 1000
 
-# Per-ping timeout — a slow or hung engine must not hold threads (DA-3230).
 PROGRESS_PING_TIMEOUT_S = 5.0
 
-# Ambient per-run execution context (DA-3230).
-#
-# BaseNode.run() sets the run's ExecutionContext for the duration of
-# execution, so BaseNode.report_progress() can resolve the current run
-# without threading the context through node signatures. contextvars keep
-# concurrent runs of one shared node instance isolated (asyncio.to_thread
-# runs in a copy of the current context) — instance-held state would
-# cross-run-race. Mirror of the TypeScript leg's executionContextStorage.
-execution_context_var: ContextVar[ExecutionContext | None] = ContextVar(
-    "canvastekk_execution_context", default=None
-)
+execution_context_var: ContextVar[ExecutionContext | None] = ContextVar("canvastekk_execution_context", default=None)
 
 
 def _deliver_progress_ping(url: str, payload: dict[str, Any]) -> None:
@@ -56,7 +44,7 @@ def _deliver_progress_ping(url: str, payload: dict[str, Any]) -> None:
     """
     try:
         httpx.post(url, json=payload, timeout=PROGRESS_PING_TIMEOUT_S)
-    except Exception as exc:  # best-effort by contract — never propagate
+    except Exception as exc:
         logger.warning("Progress ping failed (best-effort, ignored): %s", exc)
 
 
@@ -204,9 +192,7 @@ class ExecutionContext:
         """
         candidate = (self._output_dir / filename).resolve()
         if not candidate.is_relative_to(self._output_dir.resolve()):
-            raise ValueError(
-                f"Output filename '{filename}' escapes the output directory"
-            )
+            raise ValueError(f"Output filename '{filename}' escapes the output directory")
         return candidate
 
     @property
@@ -271,9 +257,6 @@ class ExecutionContext:
             message: Optional message; truncated to ``PROGRESS_MESSAGE_MAX_CHARS``.
         """
         callback_url = self._request.callback_url if self._request is not None else None
-        # Engine-issued orchestrator URL, deliberately NOT run through an
-        # SSRF policy: the engine legitimately lives on private/loopback
-        # addresses in-cluster.
         callback_url = callback_url.rstrip("/") if callback_url else None
         if not callback_url or not self._execution_id:
             return

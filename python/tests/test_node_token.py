@@ -20,9 +20,7 @@ class TestMintNodeToken:
     def test_round_trip_preserves_claims(self) -> None:
         token = mint_node_token("run-1", "node-a", KEY, ttl_seconds=300, now=1_000_000)
         claims = verify_node_token(token, KEY, now=1_000_100)
-        assert claims == NodeTokenClaims(
-            run_id="run-1", node_id="node-a", iat=1_000_000, exp=1_000_300
-        )
+        assert claims == NodeTokenClaims(run_id="run-1", node_id="node-a", iat=1_000_000, exp=1_000_300)
 
     def test_token_has_scheme_prefix(self) -> None:
         token = mint_node_token("run-1", "node-a", KEY, ttl_seconds=60, now=0)
@@ -44,9 +42,7 @@ class TestMintNodeToken:
             ("run-1", "node-a", KEY, -10),
         ],
     )
-    def test_invalid_arguments_raise(
-        self, run_id: str, node_id: str, key: str, ttl: int
-    ) -> None:
+    def test_invalid_arguments_raise(self, run_id: str, node_id: str, key: str, ttl: int) -> None:
         with pytest.raises(ValueError):
             mint_node_token(run_id, node_id, key, ttl_seconds=ttl, now=0)
 
@@ -72,16 +68,13 @@ class TestVerifyNodeToken:
     def test_tampered_payload_returns_none(self) -> None:
         token = mint_node_token("run-9", "node-z", KEY, ttl_seconds=100, now=1_000)
         payload_segment, signature_segment = token[len(NODE_TOKEN_PREFIX) :].split(".")
-        # Decode, mutate run_id, re-encode (signature now stale).
         import base64
         import json
 
         padded = payload_segment + "=" * (-len(payload_segment) % 4)
         claims = json.loads(base64.urlsafe_b64decode(padded))
         claims["run_id"] = "run-evil"
-        mutated = base64.urlsafe_b64encode(
-            json.dumps(claims).encode()
-        ).rstrip(b"=").decode()
+        mutated = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
         tampered = f"{NODE_TOKEN_PREFIX}{mutated}.{signature_segment}"
         assert verify_node_token(tampered, KEY, now=1_050) is None
 
@@ -101,24 +94,25 @@ class TestVerifyNodeToken:
         assert verify_node_token(f"{NODE_TOKEN_PREFIX}only-one-part", KEY) is None
 
     def test_valid_json_but_wrong_shape_returns_none(self) -> None:
-        # Self-signed with the right key but claims missing node_id.
         import base64
         import json
 
         claims = {"run_id": "run-1", "iat": 0, "exp": 9_999_999_999}
-        payload = base64.urlsafe_b64encode(
-            json.dumps(claims).encode()
-        ).rstrip(b"=").decode()
+        payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
         import hashlib
         import hmac as hmac_mod
 
-        signature = base64.urlsafe_b64encode(
-            hmac_mod.new(
-                KEY.encode(),
-                (NODE_TOKEN_PREFIX + payload).encode(),
-                hashlib.sha256,
-            ).digest()
-        ).rstrip(b"=").decode()
+        signature = (
+            base64.urlsafe_b64encode(
+                hmac_mod.new(
+                    KEY.encode(),
+                    (NODE_TOKEN_PREFIX + payload).encode(),
+                    hashlib.sha256,
+                ).digest()
+            )
+            .rstrip(b"=")
+            .decode()
+        )
         token = f"{NODE_TOKEN_PREFIX}{payload}.{signature}"
         assert verify_node_token(token, KEY, now=1) is None
 
