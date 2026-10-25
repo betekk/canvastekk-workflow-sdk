@@ -24,6 +24,7 @@ jobs:
     name: Build & publish SDK (prod finals only)
     needs: [release]
     if: github.ref_name == 'prod' && needs.release.outputs.new_tag != ''
+    # documented pick-runner exception (Tier H): sub-minute job — picker overhead exceeds the saving
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
