@@ -51,5 +51,5 @@ None.
 ## Trace
 
 LOG Exit gate (ticket): full — CI/release configuration and the cross-module reusable-release consumer are critical-area anchors.
-GATE 6a39869 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+GATE e947140 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG Full-gate evidence: TS lint, source/test typechecks, build, and 435 tests passed; Python Ruff, wheel/sdist build, and 952 tests passed; three YAML parses, skill-mirror diff, and exact three-line scoped-diff assertion passed. E2E not applicable (no frontend change). Local setup required Poetry keyring disablement for the host's Python 3.14/keyring error; no project fix was needed.
