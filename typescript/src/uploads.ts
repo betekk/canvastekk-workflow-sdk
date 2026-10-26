@@ -5,18 +5,23 @@ import { uploadViaSession } from "./multipart.js";
 import { NodeIOError } from "./exceptions.js";
 
 /**
- * Engine-provided multipart upload-session descriptor (DA-2886).
+ * Engine-provided multipart upload descriptor: legacy session or
+ * stateless capability (#196).
  *
- * Wire contract (snake_case, matching the execute-request wire):
+ * Shared wire contract (snake_case):
  * - `initiate`  POST `{"size", "content_type"}` → `{"upload_id", "part_size", "part_urls": [...]}`
- * - `complete`  POST `{"upload_id", "parts": [{"part_number", "etag"}]}`
- * - `abort`     POST `{"upload_id"}` (best-effort)
- * - `status`    GET → `{"upload_id", "uploaded_parts": [...]}`
+ *   (array uploads add `element: {index, suffix}` on both contracts)
+ * - `complete`  POST `{"upload_id", "parts": [...]}`; capability arrays add `element`
+ * - `abort`     POST `{"upload_id"}`; capability arrays add `element` (best-effort)
+ * - `status`    GET `?upload_id=...` for capabilities (arrays add `index`/`suffix`);
+ *   legacy sessions keep the bare GET
  *
  * Mirrors the python SDK's `UploadSession` model (uploads.py).
  */
 export const UploadSessionDescriptorSchema = z.object({
-  kind: z.literal("multipart-upload-session").default("multipart-upload-session"),
+  kind: z
+    .enum(["multipart-upload-session", "multipart-upload-capability"])
+    .default("multipart-upload-session"),
   session_token: z.string(),
   initiate_url: z.string().url(),
   complete_url: z.string().url(),

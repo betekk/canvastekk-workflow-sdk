@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  NodeExecutionRequestSchema,
-} from "../src/request.js";
+import { NodeExecutionRequestSchema } from "../src/request.js";
+import { UploadSessionDescriptorSchema } from "../src/uploads.js";
 
 describe("NodeExecutionRequestSchema", () => {
   it("parses a full request", () => {
@@ -106,6 +105,44 @@ describe("NodeExecutionRequest output_upload_url targets (DA-3314)", () => {
       const target = parsed.data.output_upload_url?.["frag_file"];
       expect(typeof target).toBe("object");
     }
+  });
+
+  it("parses a capability descriptor and defaults omitted kind to legacy", () => {
+    const fields = {
+      session_token: "tok",
+      initiate_url: "https://engine/initiate",
+      complete_url: "https://engine/complete",
+      abort_url: "https://engine/abort",
+      status_url: "https://engine/status",
+    };
+    const capability = NodeExecutionRequestSchema.safeParse({
+      run_id: "run-1",
+      node_id: "n1",
+      inputs: {},
+      output_upload_url: {
+        frag_file: { kind: "multipart-upload-capability", ...fields },
+      },
+    });
+    expect(capability.success).toBe(true);
+    expect(capability.data?.output_upload_url?.frag_file).toMatchObject({
+      kind: "multipart-upload-capability",
+    });
+
+    const legacyDefault = UploadSessionDescriptorSchema.safeParse(fields);
+    expect(legacyDefault.success).toBe(true);
+    expect(legacyDefault.data?.kind).toBe("multipart-upload-session");
+  });
+
+  it("rejects an unknown descriptor kind", () => {
+    const parsed = UploadSessionDescriptorSchema.safeParse({
+      kind: "multipart-upload-unknown",
+      session_token: "tok",
+      initiate_url: "https://engine/initiate",
+      complete_url: "https://engine/complete",
+      abort_url: "https://engine/abort",
+      status_url: "https://engine/status",
+    });
+    expect(parsed.success).toBe(false);
   });
 
   it("still parses legacy string targets and null", () => {

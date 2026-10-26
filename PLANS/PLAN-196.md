@@ -49,18 +49,21 @@ The inbound request files are explicit parse-seam consumers per `LEARNINGS/anti-
 
 ### Phase 2: TypeScript parity
 
-- [ ] **2.1** Widen `UploadSessionDescriptorSchema.kind` to the same two values with the same legacy default and update its wire documentation
+- [x] **2.1** Widen `UploadSessionDescriptorSchema.kind` to the same two values with the same legacy default and update its wire documentation
     — **Why:** zod parses `output_upload_url` before the uploader runs, so schema parity is mandatory rather than a type-only change
     — **Done when:** `NodeExecutionRequestSchema` accepts a complete capability descriptor, omitted kind defaults to legacy, and unknown kinds fail parsing
     — **Consumers affected:** `request.ts`, exported descriptor schema, `multipart.ts`, Express `/execute`
-- [ ] **2.2** Implement the same capability-only complete/abort element bodies and status query construction in `multipart.ts`, leaving legacy request bodies and URLs unchanged
+    — **Done:** UploadSessionDescriptorSchema kind widened to the two engine values with legacy default; request schema capability/default/unknown tests green; files: typescript/src/uploads.ts, typescript/tests/request.test.ts; fixes: none
+- [x] **2.2** Implement the same capability-only complete/abort element bodies and status query construction in `multipart.ts`, leaving legacy request bodies and URLs unchanged
     — **Why:** both SDK stacks must speak identical engine contracts in the same release; URL `searchParams` preserves correct encoding without string concatenation
     — **Done when:** TypeScript produces the same operation table as Python for capability single/array and legacy single/array flows
     — **Consumers affected:** TypeScript node uploads against both engine paths; no public option/signature changes
-- [ ] **2.3** Mirror the Python parsing and raw-wire tests in `request.test.ts`, `multipart.test.ts`, and the existing array uploader coverage
+    — **Done:** multipart derives capability-only controlElement/statusUrl; complete/abort add element only for capabilities and status uses URL searchParams; legacy requests unchanged; files: typescript/src/multipart.ts; fixes: none
+- [x] **2.3** Mirror the Python parsing and raw-wire tests in `request.test.ts`, `multipart.test.ts`, and the existing array uploader coverage
     — **Why:** the repo's feature-parity rule requires mirrored behavioral evidence, not merely equivalent source
     — **Done when:** all new and existing TypeScript request/upload/multipart tests pass, with raw JSON and query assertions for both contracts
     — **Consumers affected:** TypeScript CI and the release's parity evidence
+    — **Done:** mirrored raw-wire tests cover capability single replay/status, parameterized array complete/status/abort by kind, and legacy query/body regressions; affected 39 and full 443 tests green; files: typescript/tests/multipart.test.ts, typescript/tests/request.test.ts; fixes: restored and retained the pre-existing zero-part-URL test
 
 ### Phase 3: Migration documentation + ticket exit gate
 
@@ -112,4 +115,7 @@ Version files stay frozen: release CI stamps versions ephemerally from the tag (
 ## Trace
 LOG full-gate escalation: Phase 1 changed the public Pydantic schema and multipart client with cross-module/fleet consumers
 LOG Phase 1 commands: Ruff check + scoped format, compileall, full pytest (959 passed), poetry build (wheel + sdist); E2E n.a (SDK transport, no frontend)
-GATE pending-phase1 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+GATE c955145 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG full-gate escalation: Phase 2 changed the exported zod schema and multipart client with cross-module/fleet consumers
+LOG Phase 2 commands: npm lint, npm typecheck + typecheck:tests, full vitest (443 passed), npm build; E2E n.a (SDK transport, no frontend)
+GATE pending-phase2 tier=full lint=t typecheck=t build=t unit=t e2e=n.a

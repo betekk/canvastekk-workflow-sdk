@@ -6,8 +6,9 @@ import type { UploadSessionDescriptor } from "./uploads.js";
 import { NodeExecutionError, NodeIOError } from "./exceptions.js";
 
 /**
- * Multipart upload-session client (DA-2886) — TypeScript port of the python
- * SDK's `multipart.py`. Redeems an engine-provided session descriptor:
+ * Multipart upload client for engine upload descriptors (DA-2886; dual
+ * contract #196: legacy session or stateless capability) — TypeScript port
+ * of the python SDK's `multipart.py`. Redeems an engine-provided descriptor:
  *
  *   1. Lazy initiate: POST `initiate_url` with the file size → the engine
  *      creates the S3 multipart upload and mints exactly
@@ -22,11 +23,13 @@ import { NodeExecutionError, NodeIOError } from "./exceptions.js";
  *      transient-only rule).
  *   4. One reconcile-resume round: on a post-retry part failure, GET
  *      `status_url` (server truth of uploaded parts) and re-attempt only
- *      the unconfirmed parts.
- *   5. POST `complete_url` with all etags sorted by part number.
+ *      the unconfirmed parts. Capabilities send `upload_id` (and array
+ *      element coordinates) in that query; legacy sends the bare GET.
+ *   5. POST `complete_url` with all etags sorted by part number;
+ *      capability arrays carry their element ref.
  *   6. Abort (best-effort) on part/resume/local-I/O failure — never on
  *      complete failure (parts are already valid in S3; complete is
- *      idempotent).
+ *      idempotent). Capability arrays carry their element ref on abort.
  */
 
 const CONTROL_TIMEOUT_MS = 30_000;
@@ -54,6 +57,12 @@ interface InitiateBundle {
 interface CompletedPart {
   part_number: number;
   etag: string;
+}
+
+/** tracker#3969 / #196: array-element coordinates carried on control calls. */
+interface ElementRef {
+  index: number;
+  suffix: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -196,7 +205,7 @@ async function initiate(
   session: UploadSessionDescriptor,
   size: number,
   contentType: string,
-  element?: { index: number; suffix: string },
+  element?: ElementRef,
 ): Promise<InitiateBundle> {
   const raw = await controlRequest("POST", session.initiate_url, {
     size,
@@ -218,9 +227,16 @@ async function initiate(
   return bundle as InitiateBundle;
 }
 
-async function abortSession(session: UploadSessionDescriptor, uploadId: string): Promise<void> {
+async function abortSession(
+  session: UploadSessionDescriptor,
+  uploadId: string,
+  element?: ElementRef,
+): Promise<void> {
   try {
-    await controlRequest("POST", session.abort_url, { upload_id: uploadId });
+    await controlRequest("POST", session.abort_url, {
+      upload_id: uploadId,
+      ...(element ? { element } : {}),
+    });
   } catch (err) {
     console.warn(
       `multipart abort failed (best-effort): ${err instanceof Error ? err.message : String(err)}`,
@@ -237,8 +253,8 @@ export async function uploadViaSession(
   session: UploadSessionDescriptor,
   filePath: string,
   options: MultipartUploadOptions & {
-    /** tracker#3969: element ref for array-session redemption. */
-    element?: { index: number; suffix: string };
+    /** tracker#3969 / #196: element ref for array redemption (capability control calls). */
+    element?: ElementRef;
   } = {},
 ): Promise<void> {
   const contentType = options.contentType ?? "application/octet-stream";
@@ -248,6 +264,16 @@ export async function uploadViaSession(
 
   const size = statSync(filePath).size;
   const bundle = await initiate(session, size, contentType, options.element);
+  const capability = session.kind === "multipart-upload-capability";
+  const controlElement = capability ? options.element : undefined;
+  const statusUrl = new URL(session.status_url);
+  if (capability) {
+    statusUrl.searchParams.set("upload_id", bundle.upload_id);
+    if (controlElement) {
+      statusUrl.searchParams.set("index", String(controlElement.index));
+      statusUrl.searchParams.set("suffix", controlElement.suffix);
+    }
+  }
   const partUrls = bundle.part_urls;
   const partSize = bundle.part_size;
   const totalParts = partUrls.length;
@@ -326,7 +352,7 @@ export async function uploadViaSession(
       }
       if (round === resumeAttempts) break;
 
-      const statusRaw = await controlRequest("GET", session.status_url);
+      const statusRaw = await controlRequest("GET", statusUrl.toString());
       const uploaded = new Set(
         ((statusRaw as { uploaded_parts?: Array<{ part_number?: number }> })?.uploaded_parts ?? [])
           .map((p) => p?.part_number)
@@ -339,13 +365,13 @@ export async function uploadViaSession(
     }
 
       if (remaining.length > 0 || etags.size !== totalParts) {
-        await abortSession(session, bundle.upload_id);
+        await abortSession(session, bundle.upload_id, controlElement);
         throw new NodeIOError(
           `multipart upload incomplete for ${filePath}: ${etags.size}/${totalParts} parts confirmed after retries + resume`,
         );
       }
     } catch (err) {
-      await abortSession(session, bundle.upload_id);
+      await abortSession(session, bundle.upload_id, controlElement);
       throw err;
     } finally {
       await fileHandle.close();
@@ -354,6 +380,10 @@ export async function uploadViaSession(
     const parts: CompletedPart[] = [...etags.entries()]
       .map(([part_number, etag]) => ({ part_number, etag }))
       .sort((a, b) => a.part_number - b.part_number);
-    await controlRequest("POST", session.complete_url, { upload_id: bundle.upload_id, parts });
+    await controlRequest("POST", session.complete_url, {
+      upload_id: bundle.upload_id,
+      parts,
+      ...(controlElement ? { element: controlElement } : {}),
+    });
     console.info(`Multipart session upload complete file=${filePath} parts=${totalParts}`);
 }
