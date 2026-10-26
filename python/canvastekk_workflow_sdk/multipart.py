@@ -337,7 +337,8 @@ def upload_via_session(
     if is_capability:
         status_params = {"upload_id": upload_id}
         if control_element is not None:
-            status_params.update(control_element)
+            status_params["index"] = control_element["index"]
+            status_params["suffix"] = control_element["suffix"]
     part_size: int = bundle["part_size"]
     part_urls: list[str] = bundle["part_urls"]
     part_numbers = list(range(1, len(part_urls) + 1))

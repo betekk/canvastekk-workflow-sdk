@@ -123,4 +123,7 @@ LOG Phase 2 commands: npm lint, npm typecheck + typecheck:tests, full vitest (44
 GATE 998c929 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG full-gate escalation: Phase 3 is the ticket exit gate (unconditional full) over both release stacks
 LOG exit-gate evidence: Python Ruff + compileall + 959 tests + poetry build; TypeScript ESLint + typechecks + 443 tests + tsup; E2E n.a (SDK transport, no frontend)
-GATE pending-exit tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+GATE ad1f638 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG review-fix round 1 (Minor): Python status params now set only index/suffix explicitly, matching TypeScript and preventing extra element keys from leaking into the status query
+LOG review-fix re-gate: Python Ruff + compileall + 959 tests + wheel/sdist; TypeScript ESLint + typechecks + 443 tests + tsup; E2E n.a (SDK transport, no frontend)
+GATE pending-reviewfix tier=full lint=t typecheck=t build=t unit=t e2e=n.a
