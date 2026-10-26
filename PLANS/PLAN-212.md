@@ -5,9 +5,9 @@
 **Base**: dev
 
 ## Acceptance Criteria
-- [ ] The SDK prod release dispatch sends CWN `environment: "uat"` instead of `"prod"`.
-- [ ] CWN’s own branches and promotion flow remain untouched; the SDK only changes the dispatch payload.
-- [ ] `release.yml` parses as YAML and the implementation diff is limited to the single dispatch environment value.
+- [x] The SDK prod release dispatch sends CWN `environment: "uat"` instead of `"prod"`.
+- [x] CWN’s own branches and promotion flow remain untouched; the SDK only changes the dispatch payload.
+- [x] `release.yml` parses as YAML and the implementation diff is limited to the single dispatch environment value.
 
 ## Dependency & Consumer Map
 
@@ -18,10 +18,11 @@
 ## Implementation Phases
 
 ### Phase 1: Route SDK release dispatches to CWN UAT
-- [ ] **1.1** Change the Notify Nodes dispatch payload in `.github/workflows/release.yml` from `"environment": "prod"` to `"environment": "uat"`.
+- [x] **1.1** Change the Notify Nodes dispatch payload in `.github/workflows/release.yml` from `"environment": "prod"` to `"environment": "uat"`.
     — **Why:** CWN resolves its deployment environment from `client_payload.environment || github.ref_name`, so the current prod payload forces a forbidden prod request from CWN’s dev branch; UAT is the allowed target.
     — **Done when:** the dispatch payload contains `"environment": "uat"`, no other workflow behavior changes, and the scoped diff is exactly one line.
     — **Consumers affected:** CWN `sdk-released` dispatch handling deploys to UAT; CWN prod promotion remains manual and unchanged.
+    — **Done:** changed only the Notify Nodes dispatch environment value from prod to uat; parsed-payload and one-line scoped-diff assertions passed; files: `.github/workflows/release.yml`; fixes: forbidden CWN prod deployment request
 
 ## Technical Notes
 CWN’s `deploy-lambda.yml` already enforces the branch policy; the SDK is the component violating intent by overriding the branch default with prod. The fix is intentionally SDK-only. Local executable checks are YAML parsing plus a parsed-payload assertion that the Notify Nodes client payload targets UAT. PR CI and a future SDK prod release provide the runtime confirmation; the existing failed CWN run 40300454678 is the baseline.
@@ -35,3 +36,6 @@ None.
 - Workflow syntax drift: parse `release.yml` and require a one-line scoped diff.
 
 ## Trace
+
+LOG Exit gate (ticket): full — release/deploy configuration is a critical-area anchor.
+LOG Full-gate evidence: parsed YAML proves the Notify Nodes client payload targets uat and the scoped workflow diff is exactly one line; TS lint, source/test typechecks, build, and 443 tests passed; Python Ruff, wheel/sdist build, and 959 tests passed. E2E not applicable (no frontend change).
