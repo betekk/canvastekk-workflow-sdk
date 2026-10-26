@@ -5,10 +5,10 @@
 **Base**: dev
 
 ## Acceptance Criteria
-- [ ] Missing or invalid app credentials no longer fail `pick-runner` in either PR CI workflow; the existing probe emits `labels=["ubuntu-24.04"]` so downstream quality gates can run.
-- [ ] Authenticated local-if-idle routing and every existing `needs`, `runs-on`, and output contract remain unchanged.
-- [ ] `reusable-release.yml` has the same graceful degradation when automatic runner selection cannot mint an app token.
-- [ ] All three workflow files parse as YAML, and the implementation diff is limited to their three `app-token` steps.
+- [x] Missing or invalid app credentials no longer fail `pick-runner` in either PR CI workflow; the existing probe emits `labels=["ubuntu-24.04"]` so downstream quality gates can run.
+- [x] Authenticated local-if-idle routing and every existing `needs`, `runs-on`, and output contract remain unchanged.
+- [x] `reusable-release.yml` has the same graceful degradation when automatic runner selection cannot mint an app token.
+- [x] All three workflow files parse as YAML, and the implementation diff is limited to their three `app-token` steps.
 
 ## Dependency & Consumer Map
 
@@ -21,18 +21,21 @@
 ## Implementation Phases
 
 ### Phase 1: Let runner selection reach its hosted fallback
-- [ ] **1.1** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/ci-typescript.yml` without changing the probe or downstream jobs.
+- [x] **1.1** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/ci-typescript.yml` without changing the probe or downstream jobs.
     — **Why:** Dependabot cannot read `GH_APP_PRIVATE_KEY`; allowing the token step to fail lets the existing empty-token probe path select `ubuntu-24.04` instead of skipping TypeScript gates.
     — **Done when:** the `app-token` step has `continue-on-error: true`, and the `pick` step plus `typecheck-test-build` routing are unchanged.
     — **Consumers affected:** TypeScript CI consumers retain the same `pick-runner.outputs.labels` contract and gain a working no-secret fallback.
-- [ ] **1.2** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/ci-python.yml` without changing the probe or downstream jobs.
+    — **Done:** made only the TypeScript `app-token` step non-blocking; probe and downstream routing unchanged; files: `.github/workflows/ci-typescript.yml`; fixes: none
+- [x] **1.2** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/ci-python.yml` without changing the probe or downstream jobs.
     — **Why:** Python Dependabot PRs hit the same missing-secret failure and need the existing hosted fallback to reach lint, tests, schema, and mirror gates.
     — **Done when:** the `app-token` step has `continue-on-error: true`, and the `pick` step plus all three dependent jobs are unchanged.
     — **Consumers affected:** Python CI consumers retain the same labels contract and gain a working no-secret fallback.
-- [ ] **1.3** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/reusable-release.yml` without changing release routing.
+    — **Done:** made only the Python `app-token` step non-blocking; probe and all three dependent jobs unchanged; files: `.github/workflows/ci-python.yml`; fixes: none
+- [x] **1.3** Add `continue-on-error: true` to the `app-token` step in `.github/workflows/reusable-release.yml` without changing release routing.
     — **Why:** automatic release runner selection has the same token-before-failure gap; the existing probe already defines the intended hosted degradation.
     — **Done when:** the `app-token` step has `continue-on-error: true`, and the `pick` step, `release` condition, and `runs-on` expression are unchanged.
     — **Consumers affected:** `.github/workflows/release.yml` retains its reusable-workflow interface and gains graceful hosted degradation.
+    — **Done:** made only the reusable-release `app-token` step non-blocking; release conditions and runner expressions unchanged; files: `.github/workflows/reusable-release.yml`; fixes: none
 
 ## Technical Notes
 The workflows already retry a failed org-runner probe three times and then emit `labels=["ubuntu-24.04"]`. With no app token, `gh api` cannot query the org runner list, so that existing path supplies the fallback. This change adds no action, dependency, secret, or new fallback logic. YAML parsing, scoped invariants, and diff review are the local executable checks; PR CI and a rebased Dependabot PR provide the authoritative runtime checks.
@@ -46,3 +49,7 @@ None.
 - Release behavior could change beyond fallback: inspect the scoped diff to confirm that no `needs`, `runs-on`, output, or release condition changes.
 
 ## Trace
+
+LOG Exit gate (ticket): full — CI/release configuration and the cross-module reusable-release consumer are critical-area anchors.
+GATE 6a39869 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Full-gate evidence: TS lint, source/test typechecks, build, and 435 tests passed; Python Ruff, wheel/sdist build, and 952 tests passed; three YAML parses, skill-mirror diff, and exact three-line scoped-diff assertion passed. E2E not applicable (no frontend change). Local setup required Poetry keyring disablement for the host's Python 3.14/keyring error; no project fix was needed.
