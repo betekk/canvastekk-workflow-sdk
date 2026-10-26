@@ -83,6 +83,7 @@ jobs:
         node-version: ['24']
 
     steps:
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Node.js ${{ matrix.node-version }}
