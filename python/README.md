@@ -452,9 +452,25 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 
 ### Output Upload
 
-The engine provides upload targets via the `output_upload_url` field in the request. The SDK uploads file outputs automatically after successful execution. The target is a **multipart upload-session descriptor** — the only target since SDK 0.36.0 (DA-3340): the SDK lazily redeems the session token, PUTs parts in bounded parallel batches with per-part `Content-MD5`, retries per part, resumes from server-side upload status after a failure, and aborts cleanly. No size ceiling beyond the engine's own part policy; node code needs **zero changes** (the router, not the developer, performs uploads). A legacy presigned-PUT string reaching the SDK raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — there is no fallback; the fix is upgrading the engine (DA-3338/DA-2887).
+The engine provides upload targets via the `output_upload_url` field in the request. The SDK uploads file outputs automatically after successful execution and accepts both descriptor kinds:
 
-Session descriptor wire contract (snake_case, matching the execute wire):
+- `multipart-upload-session` — the original Postgres-backed session contract and the engine default.
+- `multipart-upload-capability` — the stateless `cwup_v1.` capability contract (engine #971). The SDK feature-detects `kind`; node code needs **zero changes**.
+
+Both contracts use the same initiate/part-PUT/complete flow and S3 `ListParts`-backed resume. A legacy presigned-PUT string reaching the SDK raises `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — there is no fallback; the fix is upgrading the engine (DA-3338/DA-2887).
+
+| Operation | Legacy session | Capability single-file | Capability array |
+|-----------|----------------|------------------------|------------------|
+| Initiate | `{"size", "content_type"}`; arrays add `element` | Same | Same |
+| Complete | `{"upload_id", "parts"}` | Same | Adds `element` |
+| Abort | `{"upload_id"}` | Same | Adds `element` |
+| Status | Bare GET | `?upload_id=...` | `?upload_id=...&index=...&suffix=...` |
+
+Array outputs still upload one MPU per element, and `element.suffix` must match `^(\.[A-Za-z0-9_-]{1,15})?$` on both contracts. Replay differs by contract: a second legacy single-file initiate receives the engine's `409`, while a capability may mint a fresh MPU and has no 409 expectation — the SDK does not convert replay into success, and the engine's 7-day incomplete-MPU lifecycle remains the orphan backstop.
+
+**Rollout rule:** old SDKs reject capability descriptors at request parsing. Upgrade every node in an environment to this dual-contract SDK **before** the engine's `upload_capability_enabled` flag is turned on there. Legacy remains supported after the flip, so flip-back needs no node change.
+
+Session descriptor example (legacy shown; capabilities differ only in `kind`):
 
 ```json
 {

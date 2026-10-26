@@ -411,7 +411,18 @@ override async execute(
 
 ### Output Upload
 
-The engine provides multipart upload-session descriptors via the `output_upload_url` field in the request — the only target since SDK 0.36.0 (DA-3340). The SDK uploads file outputs automatically after successful execution (initiate → parallel part PUTs → complete, with per-part retry and resume). If execution fails (`status: "fail"`), the upload is skipped. A legacy presigned-PUT string reaching the SDK throws `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — the fix is upgrading the engine (DA-3338/DA-2887), not node changes.
+The engine provides upload targets via the `output_upload_url` field in the request, and the SDK accepts both descriptor kinds by feature-detecting `kind`: `multipart-upload-session` (the engine default) and `multipart-upload-capability` (the stateless `cwup_v1.` contract from engine #971). The SDK uploads file outputs automatically after successful execution (initiate → parallel part PUTs → complete, with per-part retry and S3 `ListParts`-backed resume). If execution fails (`status: "fail"`), the upload is skipped. A legacy presigned-PUT string reaching the SDK throws `NodeIOError` ("engine sent deprecated presigned target — upgrade the engine") — the fix is upgrading the engine (DA-3338/DA-2887), not node changes.
+
+| Operation | Legacy session | Capability single-file | Capability array |
+|-----------|----------------|------------------------|------------------|
+| Initiate | `{"size", "content_type"}`; arrays add `element` | Same | Same |
+| Complete | `{"upload_id", "parts"}` | Same | Adds `element` |
+| Abort | `{"upload_id"}` | Same | Adds `element` |
+| Status | Bare GET | `?upload_id=...` | `?upload_id=...&index=...&suffix=...` |
+
+Array outputs still upload one MPU per element, and `element.suffix` must match `^(\.[A-Za-z0-9_-]{1,15})?$` on both contracts. Replay differs by contract: a second legacy single-file initiate receives the engine's `409`, while a capability may mint a fresh MPU and has no 409 expectation — the SDK does not convert replay into success, and the engine's 7-day incomplete-MPU lifecycle remains the orphan backstop.
+
+**Rollout rule:** old SDKs reject capability descriptors at request parsing. Upgrade every node in an environment to this dual-contract SDK **before** the engine's `upload_capability_enabled` flag is turned on there. Legacy remains supported after the flip, so flip-back needs no node change.
 
 ### Complete Example
 

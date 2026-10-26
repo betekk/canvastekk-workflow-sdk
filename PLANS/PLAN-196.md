@@ -5,9 +5,9 @@
 **Base**: dev
 
 ## Acceptance Criteria
-- [ ] Legacy descriptor handling remains unchanged on the wire in both SDKs (same JSON fields and status query shape), including array uploads and resume/abort calls
-- [ ] Both SDKs accept `multipart-upload-capability` at their inbound request schemas and execute its initiate/complete/abort/status contract in contract tests
-- [ ] Replay and array semantics are documented for node authors, including the legacy single-initiate 409 versus capability replay behavior
+- [x] Legacy descriptor handling remains unchanged on the wire in both SDKs (same JSON fields and status query shape), including array uploads and resume/abort calls
+- [x] Both SDKs accept `multipart-upload-capability` at their inbound request schemas and execute its initiate/complete/abort/status contract in contract tests
+- [x] Replay and array semantics are documented for node authors, including the legacy single-initiate 409 versus capability replay behavior
 - [ ] A final SDK release with wheel and TypeScript assets is published and its exact version recorded for the node bumps (post-merge release phase)
 
 ## Dependency & Consumer Map
@@ -67,14 +67,16 @@ The inbound request files are explicit parse-seam consumers per `LEARNINGS/anti-
 
 ### Phase 3: Migration documentation + ticket exit gate
 
-- [ ] **3.1** Update both README output-upload sections with descriptor feature detection, the operation table, one-MPU-per-array-element behavior, capability replay/no-409 semantics, S3 ListParts resume, and the upgrade-before-engine-flip rule
+- [x] **3.1** Update both README output-upload sections with descriptor feature detection, the operation table, one-MPU-per-array-element behavior, capability replay/no-409 semantics, S3 ListParts resume, and the upgrade-before-engine-flip rule
     — **Why:** node authors need zero handler changes, but operators must not emit capabilities to older SDKs; replay differences otherwise look like legacy 409 regressions
     — **Done when:** both READMEs state that legacy remains supported, old SDKs cannot parse capability descriptors, and nodes must upgrade before the per-env engine flip
     — **Consumers affected:** node adoption tickets #370/#583/#324/#190 and per-env rollout owners
-- [ ] **3.2** Run the full Python and TypeScript gates (Ruff + full pytest + wheel/sdist build; ESLint + source/test typechecks + full Vitest + tsup build), tick all pre-release ACs, and append the final-SHA `GATE <sha> tier=full` memo and evidence to Trace
+    — **Done:** both READMEs now document dual kinds, operation matrix, one-MPU-per-element arrays, legacy-409 vs capability replay, ListParts resume, and upgrade-before-flip; files: python/README.md, typescript/README.md; fixes: none
+- [x] **3.2** Run the full Python and TypeScript gates (Ruff + full pytest + wheel/sdist build; ESLint + source/test typechecks + full Vitest + tsup build), tick all pre-release ACs, and append the final-SHA `GATE <sha> tier=full` memo and evidence to Trace
     — **Why:** this is a cross-module public-contract change in both release artifacts; the ticket exit gate is unconditionally full and PR creation cites this memo
     — **Done when:** every check is green on the final implementation tree and the pushed PLAN records the gate SHA and exact commands/results
     — **Consumers affected:** PR gate citation and downstream release consumers
+    — **Done:** full two-stack gate green on final implementation tree — Python Ruff/compileall/959 tests/wheel+sdist; TypeScript ESLint/source+test typechecks/443 tests/tsup build; first three ACs ticked, final-release AC left for Phase 4; files: PLANS/PLAN-196.md; fixes: none
 
 ### Phase 4: Post-merge final release (not part of the implementation PR gate)
 
@@ -118,4 +120,7 @@ LOG Phase 1 commands: Ruff check + scoped format, compileall, full pytest (959 p
 GATE c955145 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG full-gate escalation: Phase 2 changed the exported zod schema and multipart client with cross-module/fleet consumers
 LOG Phase 2 commands: npm lint, npm typecheck + typecheck:tests, full vitest (443 passed), npm build; E2E n.a (SDK transport, no frontend)
-GATE pending-phase2 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+GATE 998c929 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG full-gate escalation: Phase 3 is the ticket exit gate (unconditional full) over both release stacks
+LOG exit-gate evidence: Python Ruff + compileall + 959 tests + poetry build; TypeScript ESLint + typechecks + 443 tests + tsup; E2E n.a (SDK transport, no frontend)
+GATE pending-exit tier=full lint=t typecheck=t build=t unit=t e2e=n.a
