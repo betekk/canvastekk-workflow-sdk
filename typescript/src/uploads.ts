@@ -165,7 +165,7 @@ export class S3PresignedUploader implements OutputUploader {
               `Output field '${fieldName}' element ${index} is not a string: ${typeof element}`,
             );
           }
-          let isRegularFile = false;
+          let isRegularFile: boolean;
           try {
             isRegularFile = statSync(element).isFile();
           } catch {
@@ -188,7 +188,7 @@ export class S3PresignedUploader implements OutputUploader {
         );
       }
 
-      let isRegularFile = false;
+      let isRegularFile: boolean;
       try {
         isRegularFile = statSync(value).isFile();
       } catch {
