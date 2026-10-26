@@ -61,7 +61,7 @@
     "eslint": "^10",
     "express": "^5.3",
     "supertest": "^7",
-    "tsup": "^8",
+    "tsup": "^9",
     "typescript": "^5.8",
     "typescript-eslint": "^8",
     "vite": "^8",
