@@ -300,7 +300,7 @@ jobs:
           client-payload: |
             {
               "sdk_version": "${{ needs.release.outputs.new_tag }}",
-              "environment": "prod",
+              "environment": "uat",
               "breaking": ${{ steps.detect-breaking.outputs.breaking }},
               "breaking_changes": ${{ steps.detect-breaking.outputs.breaking_changes_json || '[]' }},
               "released_at": "${{ github.run_id }}"
