@@ -10,6 +10,7 @@
 - [rebase-branch-arg-switches-worktree](solutions/rebase-branch-arg-switches-worktree.md) — DA-3340: `git rebase <upstream> <branch>` checks `<branch>` out in the CURRENT worktree; rebase inside the branch's worktree or switch back before `git worktree add`
 
 ## patterns
+- [dual-descriptor-contract-derive-extras-once](patterns/dual-descriptor-contract-derive-extras-once.md) — one discriminator decision at the client boundary masks legacy from contract extras; named status-query keys only; raw-wire tests parameterized over both kinds (#196)
 - [manifest-field-three-producer-rule](patterns/manifest-field-three-producer-rule.md) — a WorkflowNodeManifest field lives in three producers: registry payload (omit), /manifest dump (always), export re-add block (re-add or overrides drop)
 - [derived-bound-as-plain-property](patterns/derived-bound-as-plain-property.md) — derived bounds are plain @property, never @computed_field; the wire carries only declared inputs
 - [finally-side-defensive-helper](patterns/finally-side-defensive-helper.md) — finally-called helpers must be exception-proof by construction

@@ -22,26 +22,25 @@ logger = logging.getLogger(__name__)
 
 
 class UploadSession(BaseModel):
-    """Engine-provided multipart upload-session descriptor (DA-2886).
+    """Engine-provided multipart upload descriptor (session or capability).
 
-    When the engine (DA-2887) supports multipart output uploads it may
-    send this descriptor as an upload target instead of a plain presigned
-    URL string. The SDK redeems the session lazily: it POSTs the file
-    size to ``initiate_url`` only when an upload actually starts, then
-    PUTs parts in bounded parallel batches and finalizes via
-    ``complete_url``. See ``multipart.py`` for the machinery.
+    The SDK feature-detects ``kind`` and redeems either contract lazily:
+    POST the file size to ``initiate_url``, PUT parts in bounded parallel
+    batches, then finalize via ``complete_url``. Legacy sessions keep the
+    original wire shape. For ``multipart-upload-capability`` descriptors,
+    complete/abort carry the array element ref and status carries
+    ``upload_id`` (plus ``index``/``suffix`` for arrays), because the engine
+    has no session binding to consult. See ``multipart.py`` for the flow.
 
-    Wire contract (snake_case, matching the execute-request wire):
-    ``initiate`` POST ``{"size", "content_type"}`` →
-    ``{"upload_id", "part_size", "part_urls": [...]}``;
-    ``complete`` POST ``{"upload_id", "parts": [{"part_number", "etag"}]}``;
-    ``abort`` POST ``{"upload_id"}`` (best-effort);
-    ``status`` GET → ``{"upload_id", "uploaded_parts": [...]}``.
+    Shared wire contract (snake_case): ``initiate`` POST
+    ``{"size", "content_type"}`` → ``{"upload_id", "part_size",
+    "part_urls": [...]}``; array initiation also carries
+    ``element: {"index", "suffix"}`` on both contracts.
     """
 
-    kind: Literal["multipart-upload-session"] = Field(
+    kind: Literal["multipart-upload-session", "multipart-upload-capability"] = Field(
         default="multipart-upload-session",
-        description="Discriminator; always 'multipart-upload-session'.",
+        description="Engine contract discriminator; omitted means legacy session.",
     )
     session_token: str = Field(description="Opaque, TTL-bound engine token.")
     initiate_url: str
