@@ -85,6 +85,7 @@ jobs:
         python-version: ['3.12', '3.13']
 
     steps:
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -211,6 +212,7 @@ jobs:
       run:
         working-directory: ${{ github.workspace }}
     steps:
+      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: diff -r .agents/skills vs python/canvastekk_workflow_sdk/data/skills
         run: diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills
