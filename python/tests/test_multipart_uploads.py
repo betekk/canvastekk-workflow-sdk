@@ -43,6 +43,23 @@ class TestSessionHandshake:
         )
         assert req.output_upload_url["legacy"] == "https://presigned"
         assert isinstance(req.output_upload_url["modern"], UploadSession)
+        assert sess.kind == "multipart-upload-session"
+
+    def test_capability_descriptor_validates(self):
+        sess = _session(kind="multipart-upload-capability")
+        req = NodeExecutionRequest(
+            run_id="r1",
+            node_id="n1",
+            node_inputs={},
+            output_upload_url={"modern": sess.model_dump()},
+        )
+        target = req.output_upload_url["modern"]
+        assert isinstance(target, UploadSession)
+        assert target.kind == "multipart-upload-capability"
+
+    def test_unknown_descriptor_kind_rejects(self):
+        with pytest.raises(Exception):
+            _session(kind="multipart-upload-unknown")
 
     def test_plain_string_only_still_validates(self):
         req = NodeExecutionRequest(
@@ -264,6 +281,172 @@ class TestMachinery:
             {"part_number": 1, "etag": "server-e1"},
             {"part_number": 2, "etag": "e2"},
         ]
+
+    def test_capability_single_status_complete_and_replay(self, tmp_path, monkeypatch):
+        """Capability status carries upload_id; replay initiates again without a legacy 409."""
+        f = tmp_path / "big.bin"
+        f.write_bytes(b"c" * 8)
+        sess = _session(kind="multipart-upload-capability")
+        status_urls: list[str] = []
+        complete_bodies: list[dict] = []
+        initiate_calls = 0
+        part_one_attempts = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal initiate_calls, part_one_attempts
+            path = request.url.path
+            if path.endswith("/initiate"):
+                initiate_calls += 1
+                return httpx.Response(
+                    200,
+                    json={
+                        "upload_id": "uid-c",
+                        "part_size": 4,
+                        "part_urls": ["https://s3/c1", "https://s3/c2"],
+                    },
+                )
+            if str(request.url) == "https://s3/c1":
+                part_one_attempts += 1
+                if part_one_attempts == 1:
+                    return httpx.Response(500, text="response lost")
+                return httpx.Response(200, headers={"ETag": '"e1"'})
+            if str(request.url) == "https://s3/c2":
+                return httpx.Response(200, headers={"ETag": '"e2"'})
+            if path.endswith("/status"):
+                status_urls.append(str(request.url))
+                return httpx.Response(
+                    200,
+                    json={"upload_id": "uid-c", "uploaded_parts": [{"part_number": 1, "etag": "server-e1"}]},
+                )
+            if path.endswith("/complete"):
+                import json as _json
+
+                complete_bodies.append(_json.loads(request.read()))
+                return httpx.Response(200)
+            raise AssertionError(f"unexpected call: {request.url}")
+
+        self._wire(monkeypatch, handler)
+        for _ in range(2):
+            upload_via_session(
+                sess,
+                str(f),
+                max_parallel_parts=1,
+                retry_attempts=1,
+                resume_attempts=1,
+            )
+
+        assert initiate_calls == 2
+        assert status_urls == ["https://engine/sessions/tok-1/status?upload_id=uid-c"]
+        assert len(complete_bodies) == 2
+        assert all("element" not in body for body in complete_bodies)
+        assert complete_bodies[0]["parts"] == [
+            {"part_number": 1, "etag": "server-e1"},
+            {"part_number": 2, "etag": "e2"},
+        ]
+
+    @pytest.mark.parametrize("kind", ["multipart-upload-session", "multipart-upload-capability"])
+    def test_array_complete_contract_by_kind(self, tmp_path, monkeypatch, kind):
+        """Only capability arrays add element to complete; initiation stays shared."""
+        f = tmp_path / "big.bin"
+        f.write_bytes(b"a" * 8)
+        sess = _session(kind=kind, array=True)
+        element = {"index": 3, "suffix": ".frag"}
+        initiate_bodies: list[dict] = []
+        complete_bodies: list[dict] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            if path.endswith("/initiate"):
+                import json as _json
+
+                initiate_bodies.append(_json.loads(request.read()))
+                return httpx.Response(
+                    200,
+                    json={
+                        "upload_id": "uid-array",
+                        "part_size": 4,
+                        "part_urls": ["https://s3/p1", "https://s3/p2"],
+                    },
+                )
+            if request.url.host == "s3":
+                etag = request.url.path.rsplit("/", 1)[-1]
+                return httpx.Response(200, headers={"ETag": f'"{etag}"'})
+            if path.endswith("/complete"):
+                import json as _json
+
+                complete_bodies.append(_json.loads(request.read()))
+                return httpx.Response(200)
+            raise AssertionError(f"unexpected call: {request.url}")
+
+        self._wire(monkeypatch, handler)
+        upload_via_session(sess, str(f), element=element, max_parallel_parts=1)
+
+        assert initiate_bodies == [{"size": 8, "content_type": "application/octet-stream", "element": element}]
+        expected = {
+            "upload_id": "uid-array",
+            "parts": [
+                {"part_number": 1, "etag": "p1"},
+                {"part_number": 2, "etag": "p2"},
+            ],
+        }
+        if kind == "multipart-upload-capability":
+            expected["element"] = element
+        assert complete_bodies == [expected]
+
+    @pytest.mark.parametrize("kind", ["multipart-upload-session", "multipart-upload-capability"])
+    def test_array_status_and_abort_contract_by_kind(self, tmp_path, monkeypatch, kind):
+        """Capability arrays carry element + upload_id; legacy arrays keep bare status/abort."""
+        f = tmp_path / "big.bin"
+        f.write_bytes(b"x" * 8)
+        sess = _session(kind=kind, array=True)
+        element = {"index": 3, "suffix": ".frag"}
+        status_queries: list[str] = []
+        abort_bodies: list[dict] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            if path.endswith("/initiate"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "upload_id": "uid-abort",
+                        "part_size": 4,
+                        "part_urls": ["https://s3/bad", "https://s3/ok"],
+                    },
+                )
+            if str(request.url) == "https://s3/bad":
+                return httpx.Response(500, text="part boom")
+            if str(request.url) == "https://s3/ok":
+                return httpx.Response(200, headers={"ETag": '"e2"'})
+            if path.endswith("/status"):
+                status_queries.append(request.url.query.decode())
+                return httpx.Response(200, json={"upload_id": "uid-abort", "uploaded_parts": []})
+            if path.endswith("/abort"):
+                import json as _json
+
+                abort_bodies.append(_json.loads(request.read()))
+                return httpx.Response(200)
+            if path.endswith("/complete"):
+                raise AssertionError("complete must not be reached")
+            raise AssertionError(f"unexpected call: {request.url}")
+
+        self._wire(monkeypatch, handler)
+        with pytest.raises(NodeIOError, match="S3 PUT failed"):
+            upload_via_session(
+                sess,
+                str(f),
+                element=element,
+                max_parallel_parts=1,
+                retry_attempts=1,
+                resume_attempts=1,
+            )
+
+        expected_query = "upload_id=uid-abort&index=3&suffix=.frag" if kind.endswith("capability") else ""
+        assert status_queries == [expected_query]
+        expected_abort = {"upload_id": "uid-abort"}
+        if kind == "multipart-upload-capability":
+            expected_abort["element"] = element
+        assert abort_bodies == [expected_abort]
 
     def test_status_upload_id_mismatch_aborts_and_reraises_original(self, tmp_path, monkeypatch):
         f = tmp_path / "big.bin"

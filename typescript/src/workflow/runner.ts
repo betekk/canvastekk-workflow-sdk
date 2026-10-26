@@ -102,10 +102,10 @@ export class WorkflowRunner {
       autoCreated = true;
     }
 
-    let status = "failed";
-    let final_outputs: Record<string, unknown> = {};
-    let duration_ms = 0;
-    let result_output_dir: string | null = null;
+    let status: string;
+    let final_outputs: Record<string, unknown>;
+    let duration_ms: number;
+    let result_output_dir: string | null;
 
     try {
       const startNodes = spec.nodes.filter((n) => n.slug === "__start__");
