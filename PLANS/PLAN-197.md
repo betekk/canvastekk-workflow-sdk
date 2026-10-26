@@ -8,7 +8,7 @@
 - [x] Missing or invalid app credentials no longer fail `pick-runner` in either PR CI workflow; the existing probe emits `labels=["ubuntu-24.04"]` so downstream quality gates can run.
 - [x] Authenticated local-if-idle routing and every existing `needs`, `runs-on`, and output contract remain unchanged.
 - [x] `reusable-release.yml` has the same graceful degradation when automatic runner selection cannot mint an app token.
-- [x] All three workflow files parse as YAML, and the implementation diff is limited to their three `app-token` steps.
+- [x] All three workflow files parse as YAML, every job setup action resolves while the repository is public, and pre-checkout workspace healing remains available without the private `betekk/betekk-gha` dependency.
 
 ## Dependency & Consumer Map
 
@@ -37,8 +37,22 @@
     — **Consumers affected:** `.github/workflows/release.yml` retains its reusable-workflow interface and gains graceful hosted degradation.
     — **Done:** made only the reusable-release `app-token` step non-blocking; release conditions and runner expressions unchanged; files: `.github/workflows/reusable-release.yml`; fixes: none
 
+### Phase 2: Make pre-checkout healing public-repository compatible
+- [x] **2.1** Replace the private `heal-workspace` action in `.github/workflows/ci-typescript.yml` with the identical inline shell implementation.
+    — **Why:** the repository is public and `betekk/betekk-gha` is private, so GitHub fails job setup while resolving the action; step-level conditions cannot intercept that download failure.
+    — **Done when:** no private action reference remains, the inline script matches the internal action, and the script passes the disposable skip-worktree recovery check.
+    — **Consumers affected:** TypeScript CI retains pre-checkout healing on self-hosted runners and can start jobs while the repository is public.
+    — **Done:** inlined the exact v1.17.0 heal script; private action reference removed; YAML and disposable recovery checks passed; files: `.github/workflows/ci-typescript.yml`; fixes: public-repository action-resolution failure
+- [x] **2.2** Replace both private `heal-workspace` action references in `.github/workflows/ci-python.yml` with the same inline shell implementation.
+    — **Why:** Python lint/test and skill-mirror jobs fail in the same setup phase and need the existing healing behavior without changing repository visibility.
+    — **Done when:** both jobs use byte-identical inline scripts, no private action reference remains, and YAML/script checks pass.
+    — **Consumers affected:** Python CI and skill-mirror consumers retain pre-checkout healing and can start jobs while the repository is public.
+    — **Done:** inlined byte-identical v1.17.0 heal scripts in lint/test and mirror jobs; private action references removed; YAML and disposable recovery checks passed; files: `.github/workflows/ci-python.yml`; fixes: public-repository action-resolution failure
+
 ## Technical Notes
 The workflows already retry a failed org-runner probe three times and then emit `labels=["ubuntu-24.04"]`. With no app token, `gh api` cannot query the org runner list, so that existing path supplies the fallback. This change adds no action, dependency, secret, or new fallback logic. YAML parsing, scoped invariants, and diff review are the local executable checks; PR CI and a rebased Dependabot PR provide the authoritative runtime checks.
+
+The first PR run proved `pick-runner` green but exposed a separate setup blocker: the currently public repository cannot resolve private `betekk/betekk-gha` actions. Phase 2 inlines the existing v1.17.0 heal script verbatim instead of removing its protection or changing repository visibility. The inline copies are compared through parsed YAML and exercised in a disposable git repository.
 
 ## Dependencies
 None.
@@ -53,3 +67,4 @@ None.
 LOG Exit gate (ticket): full — CI/release configuration and the cross-module reusable-release consumer are critical-area anchors.
 GATE e947140 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG Full-gate evidence: TS lint, source/test typechecks, build, and 435 tests passed; Python Ruff, wheel/sdist build, and 952 tests passed; three YAML parses, skill-mirror diff, and exact three-line scoped-diff assertion passed. E2E not applicable (no frontend change). Local setup required Poetry keyring disablement for the host's Python 3.14/keyring error; no project fix was needed.
+LOG Red-fix round 1: PR #198 runs 40285584171/40285584198 passed pick-runner but failed job setup because the public repository could not resolve private betekk/betekk-gha. Replaced all three uses with exact inline v1.17.0 scripts; source-equivalence and disposable skip-worktree recovery checks passed. Re-ran the full gate: TS lint/typechecks/build/435 tests and Python Ruff/build/952 tests green; skill-mirror diff green.
