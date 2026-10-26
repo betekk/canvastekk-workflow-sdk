@@ -51,6 +51,7 @@
 - [full-pytest-needs-fastapi-extra](conventions/full-pytest-needs-fastapi-extra.md) — fresh venv: poetry install -E fastapi (ci-python.yml:106) before pytest; fastapi collection errors are environmental (#144)
 
 ## anti-patterns
+- [dispatch-payload-environment-overrides-receiver-branch](anti-patterns/dispatch-payload-environment-overrides-receiver-branch.md) — a hardcoded dispatch environment beats the receiver’s branch default; send uat/omit it or dev branches request forbidden prod
 - [rebase-helper-without-fail-fast-pushes-conflict-head](anti-patterns/rebase-helper-without-fail-fast-pushes-conflict-head.md) — a conflicted rebase leaves HEAD at base; a following force-push publishes base over the PR and Dependabot closes it
 - [mirror-schema-shape-fix-input-output-sides](anti-patterns/mirror-schema-shape-fix-input-output-sides.md) — an S.1-class shape rule fixed inputs-only leaves outputs blind; array-mode node passed with zero uploads, downstream 404 (#3971 follow-up)
 - [public-repo-cannot-call-private-reusable](anti-patterns/public-repo-cannot-call-private-reusable.md) — public repo + private reusable = "workflow was not found" at any ref; check .private on both sides FIRST; same-repo vendored copy is the escape hatch
