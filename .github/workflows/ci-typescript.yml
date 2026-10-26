@@ -85,6 +85,7 @@ jobs:
 
     steps:
       - name: Heal runner workspace
+        working-directory: ${{ github.workspace }}
         run: |
           set -uo pipefail
           if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
