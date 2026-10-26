@@ -1,6 +1,8 @@
 # LEARNINGS Index — canvastekk-workflow-sdk
 
 ## solutions
+- [public-repo-pre-checkout-inline-action](solutions/public-repo-pre-checkout-inline-action.md) — public repos must inline private pre-checkout composite actions; step ifs and local actions cannot bypass setup-time resolution
+- [dependabot-missing-secret-app-token-fallback](solutions/dependabot-missing-secret-app-token-fallback.md) — secret-less Dependabot token steps need continue-on-error so the existing probe can emit hosted runner labels
 - [additive-field-crosses-extra-forbid-rides-freeform-dict](solutions/additive-field-crosses-extra-forbid-rides-freeform-dict.md) — ship manifest-field top-level, cross the wire inside constraints; the receiver promotes it in its own widening
 - [verify-reindent-with-git-diff-w](solutions/verify-reindent-with-git-diff-w.md) — collapse reindent-heavy diffs to the semantic delta before reviewing
 - [tsup-dts-node-prefix-builtin-import-fails](solutions/tsup-dts-node-prefix-builtin-import-fails.md) — dts pass rejects `node:async_hooks` named imports while `node:fs` works; use the bare builtin name

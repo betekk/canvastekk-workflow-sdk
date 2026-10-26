@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         id: app-token
+        continue-on-error: true
         with:
           client-id: ${{ vars.GH_APP_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
@@ -83,7 +84,23 @@ jobs:
         node-version: ['24']
 
     steps:
-      - uses: betekk/betekk-gha/.github/actions/heal-workspace@v1.17.0
+      - name: Heal runner workspace
+        run: |
+          set -uo pipefail
+          if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "heal-workspace: no workspace yet — nothing to do"
+            exit 0
+          fi
+          git ls-files -v | awk '$1=="S"{print $2}' | xargs -r git update-index --no-skip-worktree >/dev/null 2>&1 || true
+          git sparse-checkout disable >/dev/null 2>&1 || true
+          git reset --hard HEAD -q >/dev/null 2>&1 || true
+          git clean -q -ffdx >/dev/null 2>&1 || true
+          if [ -n "$(git status --porcelain 2>/dev/null)" ] || ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+            echo "::warning::heal-workspace: workspace unhealable (partial-clone class) — removing for fresh re-clone"
+            rm -rf .git
+          else
+            echo "heal-workspace: healthy"
+          fi
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Node.js ${{ matrix.node-version }}
