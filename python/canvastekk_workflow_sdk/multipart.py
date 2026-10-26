@@ -193,6 +193,7 @@ def _reconcile_resume(
     upload_id: str,
     part_numbers: set[int],
     failure: Exception,
+    status_params: dict[str, object] | None = None,
 ) -> tuple[list[dict[str, Any]], list[int]]:
     """Reconcile in-flight progress against server-side upload status.
 
@@ -208,6 +209,8 @@ def _reconcile_resume(
             parts are ignored, not trusted).
         failure: The original part failure; re-raised whenever
             reconciliation is impossible.
+        status_params: Capability status query (``upload_id`` plus array
+            element coordinates). ``None`` preserves the legacy bare GET.
 
     Returns:
         ``(confirmed, remaining)`` — confirmed part descriptors (sorted by
@@ -220,7 +223,7 @@ def _reconcile_resume(
     """
     try:
         with httpx.Client(timeout=_CONTROL_TIMEOUT) as client:
-            res = client.get(status_url)
+            res = client.get(status_url, params=status_params)
             res.raise_for_status()
             status = res.json()
     except Exception as exc:
@@ -246,15 +249,19 @@ def _reconcile_resume(
     return confirmed, remaining
 
 
-def _abort_session(abort_url: str, upload_id: str) -> None:
+def _abort_session(abort_url: str, upload_id: str, element: dict[str, object] | None = None) -> None:
     """Best-effort abort — documented as never-raising.
 
     A failure here is logged, never propagated: the caller is already on
-    an error path and the original exception must survive.
+    an error path and the original exception must survive. Capability
+    arrays include their element ref; legacy calls keep the original body.
     """
+    body: dict[str, object] = {"upload_id": upload_id}
+    if element is not None:
+        body["element"] = element
     try:
         with httpx.Client(timeout=_CONTROL_TIMEOUT) as client:
-            res = client.post(abort_url, json={"upload_id": upload_id})
+            res = client.post(abort_url, json=body)
             res.raise_for_status()
     except Exception:
         logger.exception(
@@ -288,10 +295,12 @@ def upload_via_session(
            parallel (DA-2882)
         4. On a post-retry part failure: reconcile against server-side
            status and re-attempt only unconfirmed parts, up to
-           ``resume_attempts`` rounds (DA-2881)
-        5. POST ``complete_url`` with all etags sorted by part number
+           ``resume_attempts`` rounds (DA-2881). Capability status carries
+           ``upload_id`` and any array element coordinates in the query.
+        5. POST ``complete_url`` with all etags sorted by part number;
+           capability arrays also carry their element ref.
         6. On exhausted/impossible resume or local I/O failure: abort via
-           ``abort_url`` (best-effort), re-raise the original error
+           ``abort_url`` (best-effort, same element rule), re-raise the original error
         7. On complete failure: do NOT abort (parts are already valid in
            S3; complete is idempotent)
 
@@ -322,6 +331,13 @@ def upload_via_session(
     size = _file_size(file_path)
     bundle = _initiate(session, size, content_type, element=element)
     upload_id: str = bundle["upload_id"]
+    is_capability = session.kind == "multipart-upload-capability"
+    control_element = element if is_capability else None
+    status_params: dict[str, object] | None = None
+    if is_capability:
+        status_params = {"upload_id": upload_id}
+        if control_element is not None:
+            status_params.update(control_element)
     part_size: int = bundle["part_size"]
     part_urls: list[str] = bundle["part_urls"]
     part_numbers = list(range(1, len(part_urls) + 1))
@@ -389,6 +405,7 @@ def upload_via_session(
                     upload_id=upload_id,
                     part_numbers=set(part_numbers),
                     failure=part_failure,
+                    status_params=status_params,
                 )
                 etags = confirmed
                 if not remaining:
@@ -398,7 +415,7 @@ def upload_via_session(
             "multipart session upload failed (upload_id=%s) — aborting",
             upload_id,
         )
-        _abort_session(session.abort_url, upload_id)
+        _abort_session(session.abort_url, upload_id, element=control_element)
         raise
 
     etags = sorted(
@@ -410,11 +427,11 @@ def upload_via_session(
         total_parts,
         upload_id,
     )
+    complete_body: dict[str, Any] = {"upload_id": upload_id, "parts": etags}
+    if control_element is not None:
+        complete_body["element"] = control_element
     with httpx.Client(timeout=_CONTROL_TIMEOUT) as client:
-        res = client.post(
-            session.complete_url,
-            json={"upload_id": upload_id, "parts": etags},
-        )
+        res = client.post(session.complete_url, json=complete_body)
         res.raise_for_status()
 
 

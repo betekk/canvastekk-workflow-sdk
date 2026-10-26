@@ -5,7 +5,7 @@
 **Base**: dev
 
 ## Acceptance Criteria
-- [ ] Legacy descriptor handling remains byte-compatible at the HTTP boundary in both SDKs, including array uploads and resume/abort calls
+- [ ] Legacy descriptor handling remains unchanged on the wire in both SDKs (same JSON fields and status query shape), including array uploads and resume/abort calls
 - [ ] Both SDKs accept `multipart-upload-capability` at their inbound request schemas and execute its initiate/complete/abort/status contract in contract tests
 - [ ] Replay and array semantics are documented for node authors, including the legacy single-initiate 409 versus capability replay behavior
 - [ ] A final SDK release with wheel and TypeScript assets is published and its exact version recorded for the node bumps (post-merge release phase)
@@ -31,18 +31,21 @@ The inbound request files are explicit parse-seam consumers per `LEARNINGS/anti-
 
 ### Phase 1: Python dual contract
 
-- [ ] **1.1** Widen `UploadSession.kind` to the two engine discriminators, keep `multipart-upload-session` as the default, and document the operation-level legacy/capability differences in the descriptor contract
+- [x] **1.1** Widen `UploadSession.kind` to the two engine discriminators, keep `multipart-upload-session` as the default, and document the operation-level legacy/capability differences in the descriptor contract
     — **Why:** Pydantic request parsing must admit the new engine descriptor before the multipart client can feature-detect it; the default preserves existing descriptors constructed without `kind`
     — **Done when:** `NodeExecutionRequest` accepts a complete capability descriptor, an omitted kind still resolves to `multipart-upload-session`, and malformed/unknown kinds remain rejected
     — **Consumers affected:** `request.py`, public `UploadSession`, `multipart.py`, node `/execute` parsing
-- [ ] **1.2** Thread capability-only control data through the existing multipart flow: complete and abort add the array element ref only for capabilities; status adds `upload_id` for every capability plus `index`/`suffix` for capability arrays; legacy calls add no body fields or query parameters
+    — **Done:** UploadSession.kind now accepts session/capability with legacy default; NodeExecutionRequest capability parse, omitted-kind default, and unknown-kind rejection proven; files: python/canvastekk_workflow_sdk/uploads.py, python/tests/test_multipart_uploads.py; fixes: none
+- [x] **1.2** Thread capability-only control data through the existing multipart flow: complete and abort add the array element ref only for capabilities; status adds `upload_id` for every capability plus `index`/`suffix` for capability arrays; legacy calls add no body fields or query parameters
     — **Why:** Engine #971 has no server-side session binding on the capability path, while legacy endpoints still require their existing bound-session shapes; one `element if capability else None` value prevents legacy array drift
     — **Done when:** capability single/array flows and legacy single/array flows produce exactly the contract table in Technical Notes, including resume status and best-effort abort
     — **Consumers affected:** Python node uploads against both engine paths; no public method signature changes
-- [ ] **1.3** Add Python wire-contract tests for descriptor parsing, capability single-file status/complete/replay, capability array complete/abort/status, and explicit legacy no-new-fields regressions
+    — **Done:** multipart now derives capability-only control element/status params; complete/abort add array element only for capabilities and status adds upload_id plus array coordinates; legacy bodies/URLs unchanged; files: python/canvastekk_workflow_sdk/multipart.py; fixes: none
+- [x] **1.3** Add Python wire-contract tests for descriptor parsing, capability single-file status/complete/replay, capability array complete/abort/status, and explicit legacy no-new-fields regressions
     — **Why:** the acceptance criteria require proof at the HTTP boundary, not just model construction; mirrored legacy assertions catch accidental element/query leakage
     — **Done when:** the new tests and all existing Python upload/multipart/request tests pass, with assertions on raw JSON bodies and URL query parameters
     — **Consumers affected:** Python CI and the release's contract evidence
+    — **Done:** raw-wire tests cover capability single resume/complete/replay and parameterized legacy/capability array complete/status/abort; affected run 54 passed, full suite 959 passed; files: python/tests/test_multipart_uploads.py; fixes: Ruff formatting only
 
 ### Phase 2: TypeScript parity
 
@@ -107,3 +110,6 @@ Version files stay frozen: release CI stamps versions ephemerally from the tag (
 - **Release remains a dev prerelease without assets** → Phase 4 requires the prod promotion and verifies the three final assets before unblocking nodes.
 
 ## Trace
+LOG full-gate escalation: Phase 1 changed the public Pydantic schema and multipart client with cross-module/fleet consumers
+LOG Phase 1 commands: Ruff check + scoped format, compileall, full pytest (959 passed), poetry build (wheel + sdist); E2E n.a (SDK transport, no frontend)
+GATE pending-phase1 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
