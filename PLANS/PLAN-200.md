@@ -45,3 +45,4 @@ None.
 
 LOG Exit gate (ticket): full — CI configuration change plus the fresh-hosted startup failure is a critical-area anchor.
 LOG Full-gate evidence: parsed-step comparison proved exactly two heal steps gained workspace-root working-directory and no other run step moved; TS lint, source/test typechecks, build, and 435 tests passed; Python Ruff, wheel/sdist build, and 952 tests passed; skill-mirror diff passed. E2E not applicable (no frontend change).
+GATE c4ea5b7 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
