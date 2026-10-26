@@ -39,3 +39,4 @@ None.
 
 LOG Exit gate (ticket): full — release/deploy configuration is a critical-area anchor.
 LOG Full-gate evidence: parsed YAML proves the Notify Nodes client payload targets uat and the scoped workflow diff is exactly one line; TS lint, source/test typechecks, build, and 443 tests passed; Python Ruff, wheel/sdist build, and 959 tests passed. E2E not applicable (no frontend change).
+GATE c416fb8 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
