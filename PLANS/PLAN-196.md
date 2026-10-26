@@ -126,4 +126,4 @@ LOG exit-gate evidence: Python Ruff + compileall + 959 tests + poetry build; Typ
 GATE ad1f638 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG review-fix round 1 (Minor): Python status params now set only index/suffix explicitly, matching TypeScript and preventing extra element keys from leaking into the status query
 LOG review-fix re-gate: Python Ruff + compileall + 959 tests + wheel/sdist; TypeScript ESLint + typechecks + 443 tests + tsup; E2E n.a (SDK transport, no frontend)
-GATE pending-reviewfix tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+GATE 827d6c2 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
