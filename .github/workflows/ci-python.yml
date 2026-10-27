@@ -118,7 +118,7 @@ jobs:
         run: python -m poetry install --no-interaction -E fastapi
 
       - name: Lint with Ruff
-        run: python -m poetry run ruff check canvastekk_workflow_sdk/ tests/
+        run: python -m poetry run ruff check canvastekk_workflow_sdk/ tests/ scripts/
 
       - name: Run tests with coverage
         run: python -m poetry run pytest -v --cov=canvastekk_workflow_sdk --cov-report=term-missing --cov-report=xml
