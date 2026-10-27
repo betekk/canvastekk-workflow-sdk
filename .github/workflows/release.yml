@@ -291,7 +291,6 @@ jobs:
           repositories: canvastekk-workflow-nodes
 
       - name: Notify Nodes repo of SDK release (dispatch rebuild)
-        continue-on-error: true
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ steps.nodes-token.outputs.token }}
@@ -300,7 +299,6 @@ jobs:
           client-payload: |
             {
               "sdk_version": "${{ needs.release.outputs.new_tag }}",
-              "environment": "uat",
               "breaking": ${{ steps.detect-breaking.outputs.breaking }},
               "breaking_changes": ${{ steps.detect-breaking.outputs.breaking_changes_json || '[]' }},
               "released_at": "${{ github.run_id }}"
