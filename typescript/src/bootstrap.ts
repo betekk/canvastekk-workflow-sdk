@@ -34,9 +34,11 @@ export function createAuthedApp(node: BaseNode, opts: AuthedAppOptions = {}): Ap
       "createAuthedApp does not support extraRoutes — SDK mounts them without the auth middleware",
     );
   }
+  // Auth is APPENDED to caller-supplied dependencies (python create_node_app semantics) —
+  // never a spread-overwrite, which would silently drop caller middleware.
   return createNodeApp(node, {
     ...rest,
-    dependencies: [NodeAuth.central({ legacyKeyEnvVar })],
+    dependencies: [NodeAuth.central({ legacyKeyEnvVar }), ...(rest.dependencies ?? [])],
   });
 }
 

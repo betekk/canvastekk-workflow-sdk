@@ -51,6 +51,27 @@ describe("createAuthedApp", () => {
     expect(res.status).toBe(200);
   });
 
+  it("APPENDS auth to caller-supplied dependencies (never drops them)", async () => {
+    process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
+    delete process.env.CWE_API_BASE_URL;
+    const seen: string[] = [];
+    const app = createAuthedApp(new TestNode(), {
+      legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY",
+      dependencies: [
+        (_req, _res, next) => {
+          seen.push("caller-dep");
+          next();
+        },
+      ],
+    });
+    const res = await request(app)
+      .post("/execute")
+      .set("X-API-Key", "static-key-1")
+      .send({ run_id: "r1", node_id: "n1", inputs: { message: "hi" } });
+    expect(res.status).toBe(200);
+    expect(seen).toEqual(["caller-dep"]); // caller middleware ran alongside auth
+  });
+
   it("rejects extraRoutes (mounted without the auth middleware)", () => {
     expect(() => createAuthedApp(new TestNode(), { extraRoutes: [express.Router()] })).toThrow(
       /extraRoutes/,

@@ -111,3 +111,4 @@ GATE 111e7ad tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a (Phase
 GATE 111e7ad tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a (Phase 2: bootstrap module + tests 9 passed; scoped ruff ^0.17.2 clean; carries Phase-1 ticks — script fault noted above)
 GATE e86f724 tier=light lint=t typecheck=t build=t unit=t e2e=n.a (Phase 3: TS parity — vitest 448, tsc x2, eslint, tsup all green)
 GATE 6025cfb tier=full lint=t typecheck=t build=t unit=t e2e=n.a (ticket exit gate: python 968 passed + ruff clean; TS 448 + tsc x2 + eslint + tsup; final tree = 6025cfb + docs/PLAN-only deltas)
+GATE 3b1b3d3 tier=full lint=t typecheck=t build=t unit=t e2e=n.a (review-fix re-gate: TS deps-append fix + regression test — 449 TS / 968 py / ruff / tsc x2 / eslint / tsup green on fixed tree)
