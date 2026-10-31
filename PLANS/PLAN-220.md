@@ -64,14 +64,16 @@
     — **Done:** 9 tests in tests/test_bootstrap.py mirroring test_app.py conventions — all green (9 passed); files: tests/test_bootstrap.py; fixes: response-shape assertion (outputs), sourceIp in synthetic event
 
 ### Phase 3: TypeScript parity
-- [ ] **3.1** Mirror the generic parts in TS: `createAuthedApp(node, opts?)` delegating to the TS app factory with central auth (auth.ts `central` exists — 1 caller today) and `mountNode(root, node, {prefix})` on the express face (`typescript/src/express.ts`); NO TS lambda face (documented python-only exception in the ADR + both READMEs' parity note)
+- [x] **3.1** Mirror the generic parts in TS: `createAuthedApp(node, opts?)` delegating to the TS app factory with central auth (auth.ts `central` exists — 1 caller today) and `mountNode(root, node, {prefix})` on the express face (`typescript/src/express.ts`); NO TS lambda face (documented python-only exception in the ADR + both READMEs' parity note)
     — **Why:** the SDK's parity rule ships both stacks in the same change; mount semantics are generic, the Mangum face is python-runtime-specific
     — **Done when:** TS tests mirror the python mount/dual-purpose assertions; parity exception documented
     — **Consumers affected:** TS consumers, parity checkers
-- [ ] **3.2** TS build + tests green (the repo's TS toolchain — discover from `typescript/package.json` scripts)
+    — **Done:** typescript/src/bootstrap.ts — createAuthedApp (central-only default, legacyKeyEnvVar) + mountNode (express app.use prefix; no lifespan concept needed — python-only hazard); exported via ./express subpath; extraRoutes guard parity; NO TS lambda face (documented exception); files: typescript/src/bootstrap.ts, typescript/src/express.ts, typescript/tests/bootstrap.test.ts; fixes: Application vs Express return type (1)
+- [x] **3.2** TS build + tests green (the repo's TS toolchain — discover from `typescript/package.json` scripts)
     — **Why:** parity that doesn't build is prose
     — **Done when:** TS test runner + build pass locally
     — **Consumers affected:** CI
+    — **Done:** vitest 448 passed (27 files, incl. 5 new bootstrap tests); typecheck + typecheck:tests + eslint + tsup build all green; files: (none beyond 3.1); fixes: none
 
 ### Phase 4: Contract doc + CWN shim + exit gate
 - [ ] **4.1** Update `docs/NODE-TOKEN-CONTRACT.md` to name `create_authed_app` as the canonical factory (central-only default, legacy kwarg semantics, mount/lambda-face references + the layout ADR link); README examples updated to the one-liner
@@ -104,3 +106,4 @@ None (root of node chain). Consumers: CLS #448 (blocked-by this), #449, CWN shim
 
 GATE 111e7ad tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a (Phase 1: ADR/docs only; ticks ride the Phase-2 commit — script fault, trace-only lag)
 GATE 111e7ad tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a (Phase 2: bootstrap module + tests 9 passed; scoped ruff ^0.17.2 clean; carries Phase-1 ticks — script fault noted above)
+GATE e86f724 tier=light lint=t typecheck=t build=t unit=t e2e=n.a (Phase 3: TS parity — vitest 448, tsc x2, eslint, tsup all green)
