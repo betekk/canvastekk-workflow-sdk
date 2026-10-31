@@ -569,6 +569,22 @@ files = [
 referencing = ">=0.31.0"
 
 [[package]]
+name = "mangum"
+version = "0.22.0"
+description = "AWS Lambda support for ASGI applications"
+optional = false
+python-versions = ">=3.10"
+groups = ["main", "dev"]
+files = [
+    {file = "mangum-0.22.0-py3-none-any.whl", hash = "sha256:a0595e3cc7a8091b22d8b3997bab5b2ad6aae7a5e40865e19c2015f5c959a93b"},
+    {file = "mangum-0.22.0.tar.gz", hash = "sha256:701936891aaed8ed66479b871c2bda87ba288fd01c7d5dd6ba6c8e9ba1c239d1"},
+]
+markers = {main = "extra == \"lambda\""}
+
+[package.dependencies]
+typing-extensions = "*"
+
+[[package]]
 name = "opentelemetry-api"
 version = "1.45.1"
 description = "OpenTelemetry Python API"
@@ -1100,7 +1116,6 @@ files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
 ]
-markers = {dev = "python_version == \"3.12\""}
 
 [[package]]
 name = "typing-inspection"
@@ -1141,9 +1156,10 @@ standard = ["httptools (>=0.8.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "
 fastapi = ["fastapi"]
 jwt = ["PyJWT"]
 keycloak = ["PyJWT", "cryptography"]
+lambda = ["mangum"]
 serve = ["uvicorn"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "9d5c3b5e9d084c5c63cce72e885c0d7e7db622769cb986734e4210bf13832f97"
+content-hash = "63e28d2f0731601b9cd72a88bcaab3e0bb932ec1039be2d57c47dcb54ad191b5"

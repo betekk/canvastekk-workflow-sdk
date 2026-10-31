@@ -183,8 +183,11 @@ __all__ = [
     "WorkflowValidationError",
     "build_registry_payload",
     "configure_logging",
+    "create_authed_app",
+    "create_lambda_handler",
     "create_multi_node_app",
     "create_node_app",
+    "mount_node",
     "export_definition",
     "get_default_uploader",
     "get_node_logger",
@@ -201,6 +204,9 @@ _LAZY_SERVER_EXPORTS = {
     "create_multi_node_app": "canvastekk_workflow_sdk.router",
     "NodeAuth": "canvastekk_workflow_sdk.auth",
     "SDKVersionMiddleware": "canvastekk_workflow_sdk._server_middleware",
+    "create_authed_app": "canvastekk_workflow_sdk.bootstrap",
+    "mount_node": "canvastekk_workflow_sdk.bootstrap",
+    "create_lambda_handler": "canvastekk_workflow_sdk.bootstrap",
 }
 
 
