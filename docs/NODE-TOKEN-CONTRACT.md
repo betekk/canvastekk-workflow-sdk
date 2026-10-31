@@ -77,6 +77,17 @@ Missing header → 401. Definitive invalid → 401. No verdict available
 (engine unreachable, timeout, protocol violation) → **503**. There is no
 path where an unverifiable request is accepted.
 
+## Canonical bootstrap (sdk#220)
+
+`create_authed_app` is the blessed factory wrapping `create_node_app` +
+`NodeAuth.central()` — central-only by default (`legacy_key_env_var=None`).
+Dual-purpose services mount the node under a prefix on their own app via
+`mount_node`; lambda-hosted services dispatch dual events via
+`create_lambda_handler` (python-only — parity exception). Layered layout
+standard and engine-contract decisions (serverless health, long-run
+execution): [`NODE-SERVICE-LAYOUT.md`](NODE-SERVICE-LAYOUT.md). Python and
+TypeScript ship the factory + mount in the same change.
+
 ## Dual-accept transition (rollout window)
 
 `NodeAuth.central()` (default `legacy_key_env_var="CANVASTEKK_API_KEY"`)
