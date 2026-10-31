@@ -19,8 +19,9 @@ Normative contract: ``docs/NODE-TOKEN-CONTRACT.md``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Any, Callable
+from typing import Any
 
 from canvastekk_workflow_sdk.base import BaseNode
 
@@ -100,7 +101,6 @@ def mount_node(
     Returns:
         ``root_app`` (for chaining/uvicorn ``app = mount_node(...)``).
     """
-    from fastapi import FastAPI
 
     sub_app = create_authed_app(node, legacy_key_env_var=legacy_key_env_var, **kwargs)
     root_app.mount(prefix, sub_app)
