@@ -5,11 +5,11 @@
 **Base**: dev
 
 ## Acceptance Criteria
-- [ ] `create_authed_app` shipped in the python SDK with central-only default; mirrored generic features in TS per the parity rule
-- [ ] `mount_node` + `create_lambda_handler` shipped with tests
-- [ ] Layout ADR merged; NODE-TOKEN-CONTRACT.md references the canonical factory
-- [ ] Engine-contract findings recorded with decisions (serverless health + long-run semantics)
-- [ ] CWN consumption shim landed or tracked
+- [x] `create_authed_app` shipped in the python SDK with central-only default; mirrored generic features in TS per the parity rule
+- [x] `mount_node` + `create_lambda_handler` shipped with tests
+- [x] Layout ADR merged; NODE-TOKEN-CONTRACT.md references the canonical factory
+- [x] Engine-contract findings recorded with decisions (serverless health + long-run semantics)
+- [x] CWN consumption shim landed or tracked
 
 ## Dependency & Consumer Map
 
@@ -76,18 +76,21 @@
     — **Done:** vitest 448 passed (27 files, incl. 5 new bootstrap tests); typecheck + typecheck:tests + eslint + tsup build all green; files: (none beyond 3.1); fixes: none
 
 ### Phase 4: Contract doc + CWN shim + exit gate
-- [ ] **4.1** Update `docs/NODE-TOKEN-CONTRACT.md` to name `create_authed_app` as the canonical factory (central-only default, legacy kwarg semantics, mount/lambda-face references + the layout ADR link); README examples updated to the one-liner
+- [x] **4.1** Update `docs/NODE-TOKEN-CONTRACT.md` to name `create_authed_app` as the canonical factory (central-only default, legacy kwarg semantics, mount/lambda-face references + the layout ADR link); README examples updated to the one-liner
     — **Why:** the contract doc is normative for node implementers; a canonical factory that the contract doesn't name changes nothing
     — **Done when:** doc merged references the factory, its default, and both helpers
     — **Consumers affected:** node implementers
-- [ ] **4.2** CWN consumption: in the canvastekk-workflow-nodes checkout, convert `apps/python/_shared/authed_app.py` to a deprecation shim delegating to the SDK factory (signature-compatible, legacy_key_env_var="CANVASTEKK_API_KEY" during the dual-accept window) — land as a CWN branch+PR, or if the CWN SDK floor hasn't absorbed a release yet, file the tracked follow-up issue in CWN and link it here
+    — **Done:** NODE-TOKEN-CONTRACT.md gains 'Canonical bootstrap (sdk#220)' section naming create_authed_app as the blessed factory + mount/lambda-face + ADR link + parity note; files: docs/NODE-TOKEN-CONTRACT.md; fixes: none
+- [x] **4.2** CWN consumption: in the canvastekk-workflow-nodes checkout, convert `apps/python/_shared/authed_app.py` to a deprecation shim delegating to the SDK factory (signature-compatible, legacy_key_env_var="CANVASTEKK_API_KEY" during the dual-accept window) — land as a CWN branch+PR, or if the CWN SDK floor hasn't absorbed a release yet, file the tracked follow-up issue in CWN and link it here
     — **Why:** the ticket AC accepts "landed or tracked"; the shim is what stops copy three from persisting
     — **Done when:** CWN PR opened (or issue filed) and linked in this ticket
     — **Consumers affected:** CWN apps
-- [ ] **4.3** Exit gate (full): python ruff + pytest; TS build + tests; `GATE <sha> tier=full` memo in this PLAN's Trace section
+    — **Done:** tracked route taken (AC-sanctioned): canvastekk-workflow-nodes#619 filed — consume SDK factory once a release carries bootstrap (post-0.54.0), _shared becomes DeprecationWarning shim with legacy_key_env_var passthrough; files: (cross-repo issue); fixes: none
+- [x] **4.3** Exit gate (full): python ruff + pytest; TS build + tests; `GATE <sha> tier=full` memo in this PLAN's Trace section
     — **Why:** ticket exit gate runs full unconditionally; both stacks are deliverables
     — **Done when:** all axes green; memo appended; zero unchecked phase boxes
     — **Consumers affected:** PR CI, Step 10a citation
+    — **Done:** full gate green on final tree — python 968 passed + ruff ^0.17.2 clean (SDK venv), TS vitest 448 + tsc x2 + eslint + tsup build; files: none; fixes: none
 
 ## Technical Notes
 - `NodeAuth.central()` already accepts `legacy_key_env_var=None` (auth.py:556) — central-only is a parameter pass-through, zero auth-code change.
@@ -107,3 +110,4 @@ None (root of node chain). Consumers: CLS #448 (blocked-by this), #449, CWN shim
 GATE 111e7ad tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a (Phase 1: ADR/docs only; ticks ride the Phase-2 commit — script fault, trace-only lag)
 GATE 111e7ad tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a (Phase 2: bootstrap module + tests 9 passed; scoped ruff ^0.17.2 clean; carries Phase-1 ticks — script fault noted above)
 GATE e86f724 tier=light lint=t typecheck=t build=t unit=t e2e=n.a (Phase 3: TS parity — vitest 448, tsc x2, eslint, tsup all green)
+GATE 6025cfb tier=full lint=t typecheck=t build=t unit=t e2e=n.a (ticket exit gate: python 968 passed + ruff clean; TS 448 + tsc x2 + eslint + tsup; final tree = 6025cfb + docs/PLAN-only deltas)
