@@ -6,12 +6,12 @@
 
 ## Acceptance Criteria
 
-- [ ] `auth/core.py` imports clean with fastapi uninstalled (CI test), zero fastapi/starlette imports
-- [ ] `auth/fastapi.py` is adapter-only; `auth/__init__.py` preserves `NodeAuth` lazy gate + adds eager `TekkNodeAuth`
-- [ ] All censused HTTPException raise sites (19 by full census; ticket said 17) map to `TekkAuth*`; adapter responses byte-identical to v0.60.0 (status + detail)
-- [ ] `Tekk*` aliases exported python + TS; consumer-import freeze test green
-- [ ] TS: express absent from `dependencies`; pack-test green
-- [ ] ADR amended; python + TS suites green
+- [x] `auth/core.py` imports clean with fastapi uninstalled (CI test), zero fastapi/starlette imports
+- [x] `auth/fastapi.py` is adapter-only; `auth/__init__.py` preserves `NodeAuth` lazy gate + adds eager `TekkNodeAuth`
+- [x] All censused HTTPException raise sites (19 by full census; ticket said 17) map to `TekkAuth*`; adapter responses byte-identical to v0.60.0 (status + detail)
+- [x] `Tekk*` aliases exported python + TS; consumer-import freeze test green
+- [x] TS: express absent from `dependencies`; pack-test green
+- [x] ADR amended; python + TS suites green
 
 ## Dependency & Consumer Map
 
@@ -91,11 +91,11 @@
 
 ### Phase 4: ADR amendment
 
-- [ ] **4.1** `docs/NODE-SERVICE-LAYOUT.md`: add the framework-free law — root = framework-free core including auth; framework face = extra (python) / subpath + optional peer (TS); new auth features land framework-free in both planes first, adapters second; aliases never removed before a major
+- [x] **4.1** `docs/NODE-SERVICE-LAYOUT.md`: add the framework-free law — root = framework-free core including auth; framework face = extra (python) / subpath + optional peer (TS); new auth features land framework-free in both planes first, adapters second; aliases never removed before a major
     — **Why:** AC 6 — the ADR is what stops the next drift.
     — **Done when:** section present, states the four clauses, references auth/core.py + src/auth.ts as the anchors.
     — **Consumers affected:** documentation only.
-- [ ] **4.2** Exit gate (full): ruff + python suite + tsc + eslint + vitest + build + pack-test; write `tier=full` memo
+- [x] **4.2** Exit gate (full): ruff + python suite + tsc + eslint + vitest + build + pack-test; write `tier=full` memo
     — **Why:** ticket exit gate is full-tier per the verification-loop contract; Step 10a cites this memo.
     — **Done when:** every gate command green on the final tree; `GATE <sha> tier=full` line appended to this PLAN's Trace.
     — **Consumers affected:** none (verification step).
@@ -128,3 +128,4 @@
 - GATE e0654aa tier=light phase1 — ruff clean; pytest 967 passed / 1 skipped (compat proof: zero test edits)
 - GATE 2304418 tier=light phase2 — ruff clean; pytest 973 passed / 1 skipped (+6 guards: freeze×2, no-fastapi probe ext, static scan, taxonomy×3)
 - GATE 8160a6f tier=light phase3 — tsc OK; eslint OK; vitest 450 passed; build OK; pack-test OK (root imports w/o express; ./express fails naming express)
+- GATE b5ff200 tier=full EXIT — ruff OK; pytest 973P/1S; tsc OK; eslint OK; vitest 450P; build OK; pack-test OK
