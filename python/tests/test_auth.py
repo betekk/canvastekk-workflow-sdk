@@ -729,3 +729,82 @@ class TestCentralAuth:
             assert exc.value.status_code == 503
         finally:
             server.shutdown()
+
+
+class TestTekkAuthErrorTaxonomy:
+    """The SDK-defined auth error contract (#225): stable codes + statuses."""
+
+    EXPECTED = [
+        ("TekkAuthError", 401, "auth_error"),
+        ("TekkAuthNotConfigured", 401, "auth_not_configured"),
+        ("TekkAuthMissingCredential", 401, "auth_missing_credential"),
+        ("TekkAuthInvalidCredential", 401, "auth_invalid_credential"),
+        ("TekkAuthTokenExpired", 401, "auth_token_expired"),
+        ("TekkAuthUnavailable", 503, "auth_unavailable"),
+    ]
+
+    def test_statuses_and_codes_are_stable(self) -> None:
+        from canvastekk_workflow_sdk.auth import core as auth_core
+
+        for name, status, code in self.EXPECTED:
+            cls = getattr(auth_core, name)
+            assert issubclass(cls, Exception), name
+            assert cls.status == status, f"{name}.status drifted: {cls.status} != {status}"
+            assert cls.code == code, f"{name}.code drifted: {cls.code} != {code}"
+
+    def test_detail_string_is_the_message(self) -> None:
+        from canvastekk_workflow_sdk.auth import TekkAuthUnavailable
+
+        exc = TekkAuthUnavailable("Token validator unavailable")
+        assert str(exc) == "Token validator unavailable"
+        assert exc.detail == "Token validator unavailable"
+
+    def test_core_raised_errors_carry_v060_details_through_adapter(self) -> None:
+        import os
+
+        from fastapi import HTTPException
+
+        from canvastekk_workflow_sdk.auth import NodeAuth
+        from canvastekk_workflow_sdk.auth.core import (
+            TekkApiKeyAuth,
+            TekkAuthInvalidCredential,
+            TekkAuthMissingCredential,
+            TekkAuthNotConfigured,
+            TekkCentralAuth,
+        )
+
+        class MockRequest:
+            def __init__(self, headers: dict[str, str]) -> None:
+                self.headers = headers
+
+        saved = {k: os.environ.pop(k, None) for k in ("CANVASTEKK_API_KEY", "CANVASTEKK_API_KEY_NEXT", "CANVASTEKK_DEV_MODE")}
+        try:
+            cases = [
+                # (backend factory, X-API-Key value, expected detail)
+                (NodeAuth.api_key, "", "Authentication not configured"),  # env unset -> not configured
+                (NodeAuth.central, "", "Missing API key"),
+            ]
+            for factory, credential, expected_detail in cases:
+                backend = factory()
+                with pytest.raises(HTTPException) as exc:
+                    backend.authenticate(MockRequest({"X-API-Key": credential}))
+                assert exc.value.status_code == 401
+                assert exc.value.detail == expected_detail
+
+            # core-side: same rejections are TekkAuth* subclasses
+            with pytest.raises(TekkAuthNotConfigured):
+                TekkApiKeyAuth().verify("")
+            with pytest.raises(TekkAuthMissingCredential):
+                TekkCentralAuth(verify_base_url_env_var="CWE_API_BASE_URL").verify("")
+            central = TekkCentralAuth(verify_base_url_env_var="_FREEZE_TEST_BASE_URL")
+            central._remote_verify = lambda token, base_url: (False, None)  # definitive engine rejection
+            os.environ["_FREEZE_TEST_BASE_URL"] = "http://127.0.0.1:9"
+            try:
+                with pytest.raises(TekkAuthInvalidCredential):
+                    central.verify("cwnt_v1.nope")
+            finally:
+                os.environ.pop("_FREEZE_TEST_BASE_URL", None)
+        finally:
+            for key, value in saved.items():
+                if value is not None:
+                    os.environ[key] = value

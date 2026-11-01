@@ -1,6 +1,6 @@
 # ADR: Node-Service Layout & Bootstrap (the layered standard)
 
-**Status:** accepted (sdk#220, 2026-10-31) · **Supersedes:** ad-hoc per-repo bootstrap · **Normative for:** every deployable node service (CLS #448/#449, CWN apps, future)
+**Status:** accepted (sdk#220, 2026-10-31; framework-free law added by sdk#225, 2026-11-01) · **Supersedes:** ad-hoc per-repo bootstrap · **Normative for:** every deployable node service (CLS #448/#449, CWN apps, future)
 
 ## The layout
 
@@ -55,6 +55,34 @@ from canvastekk_workflow_sdk import create_authed_app, mount_node, create_lambda
 
 Normative token contract: `NODE-TOKEN-CONTRACT.md` (this factory is the
 blessed `create_node_app` wrapper named there).
+
+## Framework-free law (sdk#225)
+
+The SDK lets the end user choose the deployment framework — it never
+decides for them. Four clauses:
+
+1. **Root = framework-free core, including auth.** The verify standard
+   (credential contract, verdict cache, fail-closed 503, dual-accept,
+   JWKS rotation) lives at the root with zero framework imports:
+   `python/canvastekk_workflow_sdk/auth/core.py` (CI-enforced — see
+   `tests/test_lazy_server.py`) and `typescript/src/auth.ts`.
+2. **The framework face is an add-on, never the default.** Python: the
+   FastAPI adapter (`auth/fastapi.py`, `NodeAuth`) sits behind the
+   `[fastapi]` extra. TypeScript: the express adapter is the
+   `./express` subpath with express as an **optional peer** — never a
+   `dependency` (`scripts/pack-test.sh` enforces the artifact shape).
+3. **New auth features land framework-free in both planes first**,
+   adapters second. A feature that only exists behind a framework
+   import is a placement bug, not a feature.
+4. **Aliases are never removed before a major.** `Tekk*` is the
+   canonical prefix for public auth classes (`TekkNodeAuth`); the old
+   names (`NodeAuth`, …) keep working as aliases so multi-auth hosts
+   recognize SDK symbols across either generation.
+
+Auth failures are the SDK-defined `TekkAuth*` taxonomy
+(`TekkAuthError` base with stable `.status`/`.code`), never
+string-typed framework exceptions — adapters map the taxonomy to
+byte-identical framework responses.
 
 ## Engine-contract decisions (evidence: canvastekk-workflow-engine dev 2026-10-31)
 

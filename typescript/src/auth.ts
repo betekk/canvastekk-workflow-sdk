@@ -467,3 +467,10 @@ export class NodeAuth {
     });
   }
 }
+
+/**
+ * Tekk-prefixed canonical name for {@link NodeAuth} — the SDK's
+ * multi-auth recognition prefix. Alias only; `NodeAuth` keeps working
+ * and is never removed before a major.
+ */
+export const TekkNodeAuth = NodeAuth;
