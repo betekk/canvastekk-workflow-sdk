@@ -68,23 +68,23 @@
 
 ### Phase 3: TS plane
 
-- [ ] **3.1** `typescript/package.json`: remove `express` from `dependencies` (peer + peerDependenciesMeta + devDependencies stay)
+- [x] **3.1** `typescript/package.json`: remove `express` from `dependencies` (peer + peerDependenciesMeta + devDependencies stay)
     — **Why:** the packaging bug — dependency entry defeats the optional peer and ships a framework to every install.
     — **Done when:** `dependencies` contains only `ajv`, `zod`; `npm ci && npm run build && npx vitest run` green (devDependencies still provides express for tests/build).
     — **Consumers affected:** ifc apps/node (own express, verified safe), all future installs.
-- [ ] **3.2** `src/auth.ts`: `export const TekkNodeAuth = NodeAuth;` alias; `src/index.ts`: re-export `TekkNodeAuth` alongside `NodeAuth`
+- [x] **3.2** `src/auth.ts`: `export const TekkNodeAuth = NodeAuth;` alias; `src/index.ts`: re-export `TekkNodeAuth` alongside `NodeAuth`
     — **Why:** Tekk* canonical naming on both planes (AC 4).
     — **Done when:** typecheck+lint+tests green; `import { TekkNodeAuth } from "@betekk/canvastekk-workflow-sdk"` resolves in dist.
     — **Consumers affected:** additive; ifc optional adoption.
-- [ ] **3.3** `tests/auth.test.ts`: alias-identity assertions (`TekkNodeAuth === NodeAuth`, static methods present)
+- [x] **3.3** `tests/auth.test.ts`: alias-identity assertions (`TekkNodeAuth === NodeAuth`, static methods present)
     — **Why:** alias is load-bearing (same object), pin it.
     — **Done when:** vitest green.
     — **Consumers affected:** none.
-- [ ] **3.4** Add `typescript/scripts/pack-test.sh`: build → `npm pack` → temp dir → install tgz (no express) → dynamic-import root (assert ok, ajv/zod resolved) → dynamic-import `./express` (assert rejection naming `express`); wire as a CI step in `ci-typescript.yml` after Build
+- [x] **3.4** Add `typescript/scripts/pack-test.sh`: build → `npm pack` → temp dir → install tgz (no express) → dynamic-import root (assert ok, ajv/zod resolved) → dynamic-import `./express` (assert rejection naming `express`); wire as a CI step in `ci-typescript.yml` after Build
     — **Why:** AC 5 — proves the pack artifact is installable without express and fails clearly, not just the source tree.
     — **Done when:** script exits 0 locally and in CI; reintroducing express to `dependencies` would still pass install but the test would no longer be proving absence (absence itself is asserted by 3.1's file shape).
     — **Consumers affected:** CI.
-- [ ] **3.5** Gate: npm ci, tsc --noEmit, eslint, vitest run, build, pack-test
+- [x] **3.5** Gate: npm ci, tsc --noEmit, eslint, vitest run, build, pack-test
     — **Why:** the TS changes span packaging + source + CI; one combined gate proves the plane end-to-end.
     — **Done when:** all five commands exit 0 in typescript/.
     — **Consumers affected:** none (verification step).
@@ -127,3 +127,4 @@
 
 - GATE e0654aa tier=light phase1 — ruff clean; pytest 967 passed / 1 skipped (compat proof: zero test edits)
 - GATE 2304418 tier=light phase2 — ruff clean; pytest 973 passed / 1 skipped (+6 guards: freeze×2, no-fastapi probe ext, static scan, taxonomy×3)
+- GATE 8160a6f tier=light phase3 — tsc OK; eslint OK; vitest 450 passed; build OK; pack-test OK (root imports w/o express; ./express fails naming express)
