@@ -53,15 +53,15 @@
 
 ### Phase 2: Guard tests (python)
 
-- [ ] **2.1** Extend `test_lazy_server.py` probe: `import canvastekk_workflow_sdk.auth.core` with fastapi+starlette blocked; `sdk.TekkNodeAuth` eager without fastapi; `from canvastekk_workflow_sdk.auth import NodeAuth` gated with `[fastapi]`-naming ImportError; static source scan — `auth/core.py` contains no fastapi/starlette import lines
+- [x] **2.1** Extend `test_lazy_server.py` probe: `import canvastekk_workflow_sdk.auth.core` with fastapi+starlette blocked; `sdk.TekkNodeAuth` eager without fastapi; `from canvastekk_workflow_sdk.auth import NodeAuth` gated with `[fastapi]`-naming ImportError; static source scan — `auth/core.py` contains no fastapi/starlette import lines
     — **Why:** AC 1 is CI-enforced, not aspirational.
     — **Done when:** probe subprocess exits 0 on those assertions; breaking core.py with a fastapi import fails the scan.
     — **Consumers affected:** CI only.
-- [ ] **2.2** Add `test_consumer_import_freeze.py` — census table of every enumerated consumer import (CWN root/exceptions/definition/testing/contracts/create_authed_app; CLS root `NodeAuth` + `app.create_node_app` ×2 + BaseNode/definition; engine `registry.build_registry_payload`, `node_token.*`, `_version.__version__`, `workflow.models`, `definition.SDK_SERVED_CONTRACT_ROUTES`; ifc-equivalent root names) resolved via importlib+getattr
+- [x] **2.2** Add `test_consumer_import_freeze.py` — census table of every enumerated consumer import (CWN root/exceptions/definition/testing/contracts/create_authed_app; CLS root `NodeAuth` + `app.create_node_app` ×2 + BaseNode/definition; engine `registry.build_registry_payload`, `node_token.*`, `_version.__version__`, `workflow.models`, `definition.SDK_SERVED_CONTRACT_ROUTES`; ifc-equivalent root names) resolved via importlib+getattr
     — **Why:** freezes the import surface the Wave-2 zero-change gate depends on.
     — **Done when:** all table rows resolve with fastapi installed; removing any frozen name fails the test.
     — **Consumers affected:** CI only; contract guard for Wave 2.
-- [ ] **2.3** Add taxonomy assertions to `test_auth.py`: each TekkAuth* class carries its v0.60.0 status + stable code + default detail string
+- [x] **2.3** Add taxonomy assertions to `test_auth.py`: each TekkAuth* class carries its v0.60.0 status + stable code + default detail string
     — **Why:** the error taxonomy is a public contract (`.code` stability).
     — **Done when:** assertions pass; a status/detail drift fails them.
     — **Consumers affected:** none (additive tests).
@@ -126,3 +126,4 @@
 ## Trace
 
 - GATE e0654aa tier=light phase1 — ruff clean; pytest 967 passed / 1 skipped (compat proof: zero test edits)
+- GATE 2304418 tier=light phase2 — ruff clean; pytest 973 passed / 1 skipped (+6 guards: freeze×2, no-fastapi probe ext, static scan, taxonomy×3)

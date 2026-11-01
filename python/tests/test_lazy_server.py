@@ -47,6 +47,28 @@ _PROBE = textwrap.dedent(
     else:
         raise SystemExit("expected guided ImportError for NodeAuth")
 
+    # --- Wave 1 (#225): auth core is framework-free ----------------------
+    import canvastekk_workflow_sdk.auth.core as auth_core
+
+    assert callable(auth_core.TekkNodeAuth)
+    assert callable(auth_core.TekkCentralAuth)
+    assert issubclass(auth_core.TekkAuthUnavailable, auth_core.TekkAuthError)
+    assert auth_core.TekkAuthUnavailable.status == 503
+
+    # Tekk* eager at the root package too — no fastapi needed
+    assert canvastekk_workflow_sdk.TekkNodeAuth is auth_core.TekkNodeAuth
+    assert issubclass(canvastekk_workflow_sdk.TekkAuthError, Exception)
+
+    # The auth package gate mirrors the root gate for adapter names
+    import canvastekk_workflow_sdk.auth as auth_pkg
+
+    try:
+        auth_pkg.NodeAuth
+    except ImportError as exc:
+        assert "[fastapi]" in str(exc), f"unguided error: {exc}"
+    else:
+        raise SystemExit("expected guided ImportError for auth.NodeAuth")
+
     print("ok")
     """
 )
@@ -69,3 +91,15 @@ def test_lazy_symbols_resolve_with_fastapi_installed() -> None:
     assert callable(sdk.create_node_app)
     assert callable(sdk.create_multi_node_app)
     assert callable(sdk.NodeAuth)
+
+
+def test_auth_core_source_has_no_framework_imports() -> None:
+    """Static CI enforcement: auth/core.py must not import fastapi/starlette."""
+    import canvastekk_workflow_sdk.auth.core as auth_core
+
+    source = auth_core.__file__
+    assert source, "auth.core has no __file__"
+    with open(source, encoding="utf-8") as handle:
+        text = handle.read()
+    for forbidden in ("import fastapi", "from fastapi", "import starlette", "from starlette"):
+        assert forbidden not in text, f"auth/core.py must stay framework-free: found {forbidden!r}"
