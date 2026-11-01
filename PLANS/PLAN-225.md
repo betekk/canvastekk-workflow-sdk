@@ -30,23 +30,23 @@
 
 ### Phase 1: Python auth split (core / fastapi adapter / compat package)
 
-- [ ] **1.1** Create `auth/core.py` — framework-free: `TekkAuthError` base (`.status`, stable `.code`) + `TekkAuthNotConfigured`/`TekkAuthMissingCredential`/`TekkAuthInvalidCredential`/`TekkAuthTokenExpired` (401) + `TekkAuthUnavailable` (503); `_is_dev_mode`; `_VerifyUnavailableError` sentinel; `TekkAuthBackend` ABC + `TekkApiKeyAuth`/`TekkCentralAuth`/`TekkJwtAuth`/`TekkKeycloakAuth` with `verify(<header value>) -> dict` (logic moved verbatim from v0.60.0 backends, HTTPException sites → TekkAuth* with byte-identical detail strings); `TekkNodeAuth` factory (same signatures, minus the fastapi globals hack)
+- [x] **1.1** Create `auth/core.py` — framework-free: `TekkAuthError` base (`.status`, stable `.code`) + `TekkAuthNotConfigured`/`TekkAuthMissingCredential`/`TekkAuthInvalidCredential`/`TekkAuthTokenExpired` (401) + `TekkAuthUnavailable` (503); `_is_dev_mode`; `_VerifyUnavailableError` sentinel; `TekkAuthBackend` ABC + `TekkApiKeyAuth`/`TekkCentralAuth`/`TekkJwtAuth`/`TekkKeycloakAuth` with `verify(<header value>) -> dict` (logic moved verbatim from v0.60.0 backends, HTTPException sites → TekkAuth* with byte-identical detail strings); `TekkNodeAuth` factory (same signatures, minus the fastapi globals hack)
     — **Why:** the framework-free verify standard is the deliverable; everything else hangs off it.
     — **Done when:** module imports with zero fastapi/starlette (stdlib + lazy PyJWT only); every v0.60.0 raise site has a mapped TekkAuth* raise.
     — **Consumers affected:** fastapi.py (1.2), __init__.py (1.3), root __init__ (1.4); future non-FastAPI hosts.
-- [ ] **1.2** Create `auth/fastapi.py` — top-level `from fastapi import HTTPException, Request`; `_AuthBackend` ABC (`authenticate(request)` abstract, `as_dependency`, `__call__`); `_ApiKeyAuth`/`_CentralAuth`/`_JwtAuth`/`_KeycloakAuth` as **subclasses of the core Tekk backends** adding only `authenticate(request)` = header extraction → `self.verify(...)` → TekkAuthError-to-HTTPException mapping (`status_code=exc.status, detail=str(exc)`); `NodeAuth` factory (same four staticmethods, same signatures)
+- [x] **1.2** Create `auth/fastapi.py` — top-level `from fastapi import HTTPException, Request`; `_AuthBackend` ABC (`authenticate(request)` abstract, `as_dependency`, `__call__`); `_ApiKeyAuth`/`_CentralAuth`/`_JwtAuth`/`_KeycloakAuth` as **subclasses of the core Tekk backends** adding only `authenticate(request)` = header extraction → `self.verify(...)` → TekkAuthError-to-HTTPException mapping (`status_code=exc.status, detail=str(exc)`); `NodeAuth` factory (same four staticmethods, same signatures)
     — **Why:** adapter-only seam; subclassing preserves class-level monkeypatch targets (`type(auth)._remote_verify`) the existing tests use.
     — **Done when:** `test_auth.py` passes unmodified except the private-import surface still resolving via the package.
     — **Consumers affected:** `app.py` (unchanged), all FastAPI consumers (byte-identical responses).
-- [ ] **1.3** Convert `auth.py` → `auth/__init__.py` — eager `from .core import ...` (Tekk* + errors + `_is_dev_mode`); module `__getattr__` serving `NodeAuth`, `_AuthBackend`, `_ApiKeyAuth`, `_CentralAuth`, `_JwtAuth`, `_KeycloakAuth`, `_VerifyUnavailableError` from `.fastapi` behind the same guided fastapi ImportError as root (`[fastapi]` in message)
+- [x] **1.3** Convert `auth.py` → `auth/__init__.py` — eager `from .core import ...` (Tekk* + errors + `_is_dev_mode`); module `__getattr__` serving `NodeAuth`, `_AuthBackend`, `_ApiKeyAuth`, `_CentralAuth`, `_JwtAuth`, `_KeycloakAuth`, `_VerifyUnavailableError` from `.fastapi` behind the same guided fastapi ImportError as root (`[fastapi]` in message)
     — **Why:** compat layer — every existing importer path (`from canvastekk_workflow_sdk.auth import NodeAuth`, app.py:31, tests) keeps resolving; core stays importable without fastapi.
     — **Done when:** `python -c "from canvastekk_workflow_sdk.auth import NodeAuth, _ApiKeyAuth, _is_dev_mode"` succeeds with fastapi installed; `import canvastekk_workflow_sdk.auth.core` succeeds with fastapi blocked.
     — **Consumers affected:** app.py, bootstrap.py, tests, CLS.
-- [ ] **1.4** Root `__init__.py`: eager-export `TekkNodeAuth` + the five error classes from `.auth.core` (add to `__all__`, import after `_version`); `_LAZY_SERVER_EXPORTS` unchanged
+- [x] **1.4** Root `__init__.py`: eager-export `TekkNodeAuth` + the five error classes from `.auth.core` (add to `__all__`, import after `_version`); `_LAZY_SERVER_EXPORTS` unchanged
     — **Why:** "Tekk* aliases exported python" AC; eager import is fastapi-free so the lazy contract holds.
     — **Done when:** `from canvastekk_workflow_sdk import TekkNodeAuth, TekkAuthError` works; `test_lazy_server.py` probe still passes (core import blocked-env clean).
     — **Consumers affected:** all root importers (additive only).
-- [ ] **1.5** Gate: ruff + full python suite (existing tests are the compat proof)
+- [x] **1.5** Gate: ruff + full python suite (existing tests are the compat proof)
     — **Why:** existing tests are the compat proof for the split; running them immediately catches migration slips at the smallest diff.
     — **Done when:** ruff clean and full pytest suite green in the fresh venv.
     — **Consumers affected:** none (verification step).
@@ -122,3 +122,7 @@
 - **Missed consumer import** → freeze test (2.2) enumerates the audited census; CWN/CLS/ifc suites re-run against artifacts in #226's gate.
 - **Monkeypatch-target breakage in tests** → adapters subclass core backends; class-level patches keep landing on the class the tests see.
 - **TS install breakage for silent express dependents** → only known TS consumer (ifc) declares own express (verified 2026-11-01); pack-test proves the artifact shape; #423 re-proves on real bump.
+
+## Trace
+
+- GATE e0654aa tier=light phase1 — ruff clean; pytest 967 passed / 1 skipped (compat proof: zero test edits)
