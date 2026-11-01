@@ -12,3 +12,5 @@
  */
 export { createNodeApp, createMultiNodeApp } from "./app.js";
 export type { CreateNodeAppOptions } from "./app.js";
+export { createAuthedApp, mountNode } from "./bootstrap.js";
+export type { AuthedAppOptions, MountNodeOptions } from "./bootstrap.js";
