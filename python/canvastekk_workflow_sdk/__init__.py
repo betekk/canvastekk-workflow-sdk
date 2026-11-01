@@ -38,6 +38,15 @@ Philosophy:
     Nodes can "eject" by copying SDK code if true independence is needed.
 """
 
+from canvastekk_workflow_sdk.auth.core import (
+    TekkAuthError,
+    TekkAuthInvalidCredential,
+    TekkAuthMissingCredential,
+    TekkAuthNotConfigured,
+    TekkAuthTokenExpired,
+    TekkAuthUnavailable,
+    TekkNodeAuth,
+)
 from canvastekk_workflow_sdk.base import BaseNode
 from canvastekk_workflow_sdk.context import ExecutionContext
 from canvastekk_workflow_sdk.contracts import (
@@ -168,6 +177,13 @@ __all__ = [
     "UploadTarget",
     "SDKVersionMiddleware",
     "StructuredJsonFormatter",
+    "TekkAuthError",
+    "TekkAuthInvalidCredential",
+    "TekkAuthMissingCredential",
+    "TekkAuthNotConfigured",
+    "TekkAuthTokenExpired",
+    "TekkAuthUnavailable",
+    "TekkNodeAuth",
     "TimingMiddleware",
     "ValidationResult",
     "WorkflowBuilder",

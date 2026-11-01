@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NODE_TOKEN_PREFIX, isNodeToken } from "../src/node-token.js";
-import { NodeAuth } from "../src/auth.js";
+import { NodeAuth, TekkNodeAuth } from "../src/auth.js";
 import type { AuthRequest, AuthMiddleware } from "../src/auth.js";
 
 function makeReq(key?: string): AuthRequest {
@@ -209,5 +209,15 @@ describe("NodeAuth.apiKey (regression)", () => {
     const middleware = NodeAuth.apiKey();
     const res = await run(middleware, makeReq("wrong"));
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("TekkNodeAuth alias (#225)", () => {
+  it("is the same object as NodeAuth with the same factories", () => {
+    expect(TekkNodeAuth).toBe(NodeAuth);
+    expect(typeof TekkNodeAuth.apiKey).toBe("function");
+    expect(typeof TekkNodeAuth.central).toBe("function");
+    expect(typeof TekkNodeAuth.jwt).toBe("function");
+    expect(typeof TekkNodeAuth.keycloak).toBe("function");
   });
 });

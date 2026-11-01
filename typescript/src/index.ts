@@ -87,7 +87,7 @@ export {
   type ExecutionMetric,
 } from "./observability.js";
 export { BaseNode } from "./base-node.js";
-export { NodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
+export { NodeAuth, TekkNodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
 export type { AuthMiddleware, AuthResult } from "./auth.js";
 export { NODE_TOKEN_PREFIX, isNodeToken } from "./node-token.js";
 export type { NodeTokenClaims } from "./node-token.js";
