@@ -231,7 +231,10 @@ describe("probeManifest value domain (DA-2603 review)", () => {
 
 describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   const realFetch = globalThis.fetch;
-  beforeAll(() => writeFileSync(manifestPath, JSON.stringify(canonicalManifest)));
+  const diffDir = mkdtempSync(join(tmpdir(), "sdk-cli-diff-"));
+  const diffManifestPath = join(diffDir, "manifest.json");
+  beforeAll(() => writeFileSync(diffManifestPath, JSON.stringify(canonicalManifest)));
+  afterAll(() => rmSync(diffDir, { recursive: true, force: true }));
   afterEach(() => {
     globalThis.fetch = realFetch;
     vi.unstubAllEnvs();
@@ -340,6 +343,6 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("cliMain probe --engine-url exits 1 on same-version drift", async () => {
     vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "ctk_x");
     globalThis.fetch = engine(published("1.0.0", 3600));
-    expect(await cliMain(["probe", "--manifest", manifestPath, "--engine-url", "https://eng"])).toBe(1);
+    expect(await cliMain(["probe", "--manifest", diffManifestPath, "--engine-url", "https://eng"])).toBe(1);
   });
 });
