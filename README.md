@@ -109,6 +109,14 @@ Offline validation without starting the server (also checks that `input_schema` 
 python -m canvastekk_workflow_sdk validate my_node.handler:definition --json
 ```
 
+### Registration Pre-flight (registry diff)
+
+`ctk probe` runs the offline registration probes and — with `--engine-url` — additionally fetches the published definition by name and applies the engine's registration gate locally (#233): same-version data drift (the deploy-time 409 `node_version_immutable`) and version downgrades fail in seconds instead of at minute 20 of a deploy. Requires `CANVASTEKK_NODE_REGISTRATION_KEY` (or `CANVASTEKK_REGISTRY_TOKEN`) in the environment; without the flag, the credential, or with the engine unreachable, the registry diff is skipped with a warning and the offline probes stay authoritative. The bump level (major/minor/patch) is never judged — that stays the author's declaration.
+
+```bash
+python -m canvastekk_workflow_sdk probe my_node.handler:definition --engine-url https://cwe-dev.canvastekk.com --json
+```
+
 ### Manifest Diff (breaking-change classification)
 
 Classify changes between two manifest exports before publishing a new version:

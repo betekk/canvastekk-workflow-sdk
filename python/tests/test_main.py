@@ -433,3 +433,140 @@ class TestProbeHostCeiling:
         report = self._probe(self._manifest(timeout_seconds=86401, hard_max=100000))
         assert report["valid"] is False
         assert any("86400" in e for e in report["errors"])
+
+
+class TestProbeRegistryDiff:
+    """#233: the probe's registry diff mirrors the engine's registration gate.
+
+    Matrix: new-node / unchanged / same-version-changed / newer-version /
+    bumped-but-identical / older-version — plus the three skip paths (no
+    flag, no credential, unreachable engine) that must never fail a probe.
+    """
+
+    def _manifest(self, *, version: str = "1.9.1", timeout_seconds: int = 7200):
+        from canvastekk_workflow_sdk import WorkflowNodeManifest
+
+        return WorkflowNodeManifest(
+            slug="echo",
+            version=version,
+            name="Echo",
+            description="Test",
+            input_schema={"type": "object"},
+            output_schema={"type": "object"},
+            timeout_seconds=timeout_seconds,
+        )
+
+    def _probe(self, manifest, *, engine_url=None, token=None):
+        from canvastekk_workflow_sdk.__main__ import _probe_definition
+
+        return _probe_definition(manifest, engine_url=engine_url, token=token)
+
+    @staticmethod
+    def _published(version: str, timeout_seconds: int = 3600) -> dict:
+        return {
+            "name": "echo",
+            "version": version,
+            "timeout_seconds": timeout_seconds,
+            "description": "Test",
+            "input_schema": {"type": "object"},
+            "output_schema": {"type": "object"},
+        }
+
+    @staticmethod
+    def _engine(published: dict | None):
+        from unittest.mock import patch
+
+        class _Resp:
+            def __init__(self, payload):
+                self.status_code = 404 if payload is None else 200
+                self._payload = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._payload or {}
+
+        return patch(
+            "canvastekk_workflow_sdk.registry.httpx.get",
+            return_value=_Resp(published),
+        )
+
+    def test_no_engine_url_skips_with_warning(self) -> None:
+        report = self._probe(self._manifest())
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "skipped"
+        assert any("no --engine-url" in w for w in report["warnings"])
+
+    def test_missing_token_skips_with_warning(self) -> None:
+        report = self._probe(self._manifest(), engine_url="https://cwe.example.com")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "skipped"
+        assert any("CANVASTEKK_NODE_REGISTRATION_KEY" in w for w in report["warnings"])
+
+    def test_new_node_passes(self) -> None:
+        with self._engine(None):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "new-node"
+
+    def test_same_version_identical_data_passes_unchanged(self) -> None:
+        with self._engine(self._published("1.9.1", timeout_seconds=7200)):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "unchanged"
+
+    def test_same_version_changed_data_fails_naming_fields(self) -> None:
+        with self._engine(self._published("1.9.1", timeout_seconds=3600)):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is False
+        assert report["registry_diff"]["status"] == "changed"
+        assert report["registry_diff"]["changed_fields"] == ["timeout_seconds"]
+        assert any("timeout_seconds" in e and "bump the version" in e for e in report["errors"])
+
+    def test_newer_version_changed_data_passes(self) -> None:
+        with self._engine(self._published("1.9.0", timeout_seconds=3600)):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "newer-version"
+
+    def test_newer_version_identical_data_warns_but_passes(self) -> None:
+        with self._engine(self._published("1.9.0", timeout_seconds=7200)):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "newer-version"
+        assert any("identical — intentional?" in w for w in report["warnings"])
+
+    def test_older_version_fails(self) -> None:
+        with self._engine(self._published("2.0.0")):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is False
+        assert report["registry_diff"]["status"] == "older-version"
+        assert any("older than published" in e for e in report["errors"])
+
+    def test_unreachable_engine_skips_without_failing(self) -> None:
+        from unittest.mock import patch
+
+        import httpx as _httpx
+
+        with patch(
+            "canvastekk_workflow_sdk.registry.httpx.get",
+            side_effect=_httpx.ConnectError("engine unreachable"),
+        ):
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "skipped"
+        assert any("engine error" in w for w in report["warnings"])
+
+    def test_bump_level_is_never_asserted(self) -> None:
+        """A breaking schema change under a patch bump stays the author's call."""
+        manifest = self._manifest(version="1.9.2")
+        manifest.input_schema = {
+            "type": "object",
+            "required": ["new_mandatory"],
+            "properties": {"new_mandatory": {"type": "string"}},
+        }
+        with self._engine(self._published("1.9.1")):
+            report = self._probe(manifest, engine_url="https://cwe.example.com", token="ctk_x")
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "newer-version"

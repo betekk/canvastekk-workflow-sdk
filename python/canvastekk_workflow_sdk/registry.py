@@ -371,6 +371,108 @@ def _extract_node_data(payload: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+_ENGINE_BY_NAME_PATH = "/api/workflows/nodes/by-name/"
+
+#: Fields the engine assigns itself and excludes from its registration
+#: immutability diff (``workflow_node_service.NON_COMPARISON_FIELDS`` in
+#: canvastekk-workflow-engine). The probe diff mirrors this set so
+#: "passes locally ⇔ passes registration" holds field-for-field.
+ENGINE_NON_COMPARISON_FIELDS: frozenset[str] = frozenset(
+    {
+        "id",
+        "name",
+        "owner",
+        "source",
+        "registered_at",
+        "node_status",
+        "last_registered_by",
+    }
+)
+
+
+def fetch_published_definition(
+    engine_url: str,
+    name: str,
+    *,
+    token: str = "",
+    timeout: float = 10.0,
+) -> dict[str, Any] | None:
+    """Fetch the published node definition from the engine registry by name.
+
+    GETs ``{engine_url}/api/workflows/nodes/by-name/{name}`` — the same
+    route the deploy pipeline's verify-by-name step resolves. Intended for
+    pre-registration checks (``ctk probe --engine-url``) so node authors
+    can diff against registry truth before a deploy burns a CI cycle on a
+    409 ``node_version_immutable``.
+
+    Args:
+        engine_url: Engine base URL (e.g. ``"https://cwe-dev.canvastekk.com"``).
+            A trailing registry path is tolerated and stripped.
+        name: Node slug to look up.
+        token: Optional credential. A ``ctk_``-prefixed token rides
+            ``Authorization: Bearer`` (engine DA-1949) via
+            :func:`_registry_auth_header`; anything else rides
+            ``X-Service-Token`` (legacy bridge).
+        timeout: Request timeout in seconds.
+
+    Returns:
+        The published node definition dict, or ``None`` when the engine
+        answers 404 (name never published — the new-node case).
+
+    Raises:
+        httpx.HTTPError: Transport failure (unreachable engine) — callers
+            degrade to a skip note, never a hard failure.
+        httpx.HTTPStatusError: Any non-404 HTTP error status.
+    """
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if token:
+        auth_name, auth_value = _registry_auth_header(token)
+        headers[auth_name] = auth_value
+    base = engine_url.rstrip("/")
+    # Tolerate register-style full-endpoint URLs (``.../api/workflows/nodes``)
+    # so authors can paste the same URL both commands take.
+    for suffix in ("/api/workflows/nodes", "/api/workflows/nodes/"):
+        if base.endswith(suffix.rstrip("/")):
+            base = base[: -len(suffix.rstrip("/"))]
+            break
+    url = base + _ENGINE_BY_NAME_PATH + name
+    resp = httpx.get(url, headers=headers, timeout=timeout)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return _extract_node_data(resp.json())
+
+
+def diff_against_published(
+    local_payload: dict[str, Any],
+    published: dict[str, Any],
+) -> list[str]:
+    """Mirror the engine's registration-immutability diff, field for field.
+
+    Compares the fields a registration would carry against the published
+    definition using the engine's own rule: every shared field except
+    :data:`ENGINE_NON_COMPARISON_FIELDS` must be identical for a same-version
+    re-registration to succeed. Keys absent from either side are skipped —
+    the engine drops unknown incoming fields at validation and computed
+    response fields never reach its diff, so they cannot reach ours either.
+
+    Args:
+        local_payload: The registration payload (``build_registry_payload``
+            shape) the probe would send.
+        published: The published definition as served by
+            :func:`fetch_published_definition`.
+
+    Returns:
+        Sorted list of changed field names (empty when a same-version
+        re-registration would be accepted as ``unchanged``).
+    """
+    return sorted(
+        key
+        for key in local_payload
+        if key not in ENGINE_NON_COMPARISON_FIELDS and key in published and local_payload[key] != published[key]
+    )
+
+
 def register_node(
     node: BaseNode,
     registry_url: str,
