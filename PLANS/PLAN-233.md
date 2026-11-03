@@ -64,10 +64,11 @@ architecture review expected). No frontend files.
 
 ### Phase 3: docs
 
-- [ ] **3.1** Update the `probe` usage/help text in `__main__.py` and the README CLI section (if it documents `probe`) with `--engine-url`; note the degradation behavior
+- [x] **3.1** Update the `probe` usage/help text in `__main__.py` and the README CLI section (if it documents `probe`) with `--engine-url`; note the degradation behavior
     — **Why:** an undocumented flag is an unused flag; authors need to know CI can opt in
     — **Done when:** `ctk` help output and README (if applicable) mention the flag and offline default
     — **Consumers affected:** none (docs)
+    — **Done:** module docstring usage block gains the probe line, help text updated, README gains a "Registration Pre-flight (registry diff)" section with the credential requirement, degradation behavior and the never-judges-bump-level note; files: __main__.py, README.md; fixes: none
 
 ## Technical Notes
 
@@ -95,3 +96,5 @@ architecture review expected). No frontend files.
 GATE c7e6866 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 GATE 18a09d8 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 LOG 3 pre-existing failures in test_main.py (validate subprocess tests, /usr/bin/python3 lacks the package) — fail on clean tree too, environmental, not this change.
+GATE ae2e816 tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+LOG exit gate: full suite 994 passed after poetry install -E fastapi in the worktree env (6 collection errors and 3 subprocess failures were env gaps, not code). Pre-existing ruff-format drift in 3 untouched files left alone per scoped-lint rule.

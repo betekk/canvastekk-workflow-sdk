@@ -2,6 +2,7 @@
 
 Usage:
     python -m canvastekk_workflow_sdk validate <module_path> [--json]
+    python -m canvastekk_workflow_sdk probe <module_path> [--engine-url URL] [--json]
     python -m canvastekk_workflow_sdk registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH
     python -m canvastekk_workflow_sdk init [--agents-md] [--force]
 """
@@ -641,7 +642,9 @@ def main() -> None:
         print()
         print("Commands:")
         print("  validate <module:attribute> [--json]  Validate a node manifest definition")
-        print("  probe <module:attribute> [--json]     Offline registration probes (validate + engine mirror)")
+        print(
+            "  probe <module:attribute> [--engine-url URL] [--json]  Registration probes (offline mirror + optional registry diff)"
+        )
         print("  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]")
         print("                                        Publish the manifest to the engine registry")
         print("  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH")
