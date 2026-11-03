@@ -23,7 +23,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function versionTuple(version: string): [number, number, number] {
+export function versionTuple(version: string): [number, number, number] {
   const parts = version.split(".");
   if (parts.length !== 3 || !parts.every((p) => /^\d+$/.test(p))) {
     throw new Error(`version must be strict MAJOR.MINOR.PATCH, got '${version}'`);
@@ -31,7 +31,7 @@ function versionTuple(version: string): [number, number, number] {
   return [Number(parts[0]), Number(parts[1]), Number(parts[2])];
 }
 
-function compareVersionTuples(
+export function compareVersionTuples(
   a: [number, number, number],
   b: [number, number, number],
 ): number {

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { VERSION } from "../src/version.js";
 import { writeFileSync, rmSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildEngineRequest, probeManifest, cliMain } from "../src/cli.js";
+import { buildEngineRequest, probeManifest, cliMain, applyRegistryDiff } from "../src/cli.js";
 import { WorkflowNodeManifestSchema } from "../src/definition.js";
 
 const canonicalManifest = {
@@ -226,5 +226,123 @@ describe("probeManifest value domain (DA-2603 review)", () => {
         "--name-suffix", "bad suffix!",
       ]),
     ).toBe(2);
+  });
+});
+
+describe("applyRegistryDiff — probe --engine-url (#233)", () => {
+  const realFetch = globalThis.fetch;
+  const diffDir = mkdtempSync(join(tmpdir(), "sdk-cli-diff-"));
+  const diffManifestPath = join(diffDir, "manifest.json");
+  beforeAll(() => writeFileSync(diffManifestPath, JSON.stringify(canonicalManifest)));
+  afterAll(() => rmSync(diffDir, { recursive: true, force: true }));
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    vi.unstubAllEnvs();
+  });
+
+  function payload(version = "1.9.1", timeout_seconds = 7200) {
+    const manifest = { ...canonicalManifest, version, timeout_seconds };
+    return buildEngineRequest(parseManifest(manifest));
+  }
+
+  function engine(body: unknown | null) {
+    return vi.fn(async () =>
+      body === null ? new Response("{}", { status: 404 }) : new Response(JSON.stringify(body), { status: 200 }),
+    ) as unknown as typeof fetch;
+  }
+
+  function published(version: string, timeout_seconds = 3600) {
+    return {
+      name: "echo",
+      label: "Echo",
+      version,
+      timeout_seconds,
+      description: "Echo node",
+      input_schema: { type: "object" },
+      output_schema: { type: "object" },
+    };
+  }
+
+  it("no engine-url skips with warning", async () => {
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), undefined, "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.registry_diff?.status).toBe("skipped");
+    expect(report.warnings.some((w) => w.includes("no --engine-url"))).toBe(true);
+  });
+
+  it("missing token skips with warning", async () => {
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", undefined);
+    expect(report.valid).toBe(true);
+    expect(report.warnings.some((w) => w.includes("CANVASTEKK_NODE_REGISTRATION_KEY"))).toBe(true);
+  });
+
+  it("engine error skips without failing", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("boom");
+    }) as unknown as typeof fetch;
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.registry_diff?.status).toBe("skipped");
+    expect(report.warnings.some((w) => w.includes("engine error"))).toBe(true);
+  });
+
+  it("new node passes", async () => {
+    globalThis.fetch = engine(null);
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.registry_diff?.status).toBe("new-node");
+  });
+
+  it("same version, identical data passes unchanged", async () => {
+    globalThis.fetch = engine(published("1.9.1", 7200));
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.registry_diff?.status).toBe("unchanged");
+  });
+
+  it("same version, changed data fails naming fields", async () => {
+    globalThis.fetch = engine(published("1.9.1", 3600));
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(false);
+    expect(report.registry_diff?.status).toBe("changed");
+    expect(report.registry_diff?.changed_fields).toContain("timeout_seconds");
+    expect(report.errors.some((e) => e.includes("bump the version"))).toBe(true);
+  });
+
+  it("newer version with changed data passes", async () => {
+    globalThis.fetch = engine(published("1.9.0", 3600));
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.registry_diff?.status).toBe("newer-version");
+  });
+
+  it("newer version with identical data warns but passes", async () => {
+    globalThis.fetch = engine(published("1.9.0", 7200));
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(true);
+    expect(report.warnings.some((w) => w.includes("identical — intentional?"))).toBe(true);
+  });
+
+  it("older version fails", async () => {
+    globalThis.fetch = engine(published("2.0.0"));
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    expect(report.valid).toBe(false);
+    expect(report.registry_diff?.status).toBe("older-version");
+    expect(report.errors.some((e) => e.includes("older than published"))).toBe(true);
+  });
+
+  it("cliMain probe --engine-url exits 1 on same-version drift", async () => {
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "ctk_x");
+    globalThis.fetch = engine(published("1.0.0", 3600));
+    expect(await cliMain(["probe", "--manifest", diffManifestPath, "--engine-url", "https://eng"])).toBe(1);
   });
 });
