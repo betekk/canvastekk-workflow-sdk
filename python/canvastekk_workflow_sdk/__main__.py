@@ -255,7 +255,7 @@ def _apply_registry_diff(
         published = fetch_published_definition(engine_url, name, token=token)
     except httpx.HTTPError as exc:
         report["registry_diff"] = {"status": "skipped", "published_version": None, "changed_fields": []}
-        report["warnings"].append(f"registry diff skipped (engine unreachable: {exc})")
+        report["warnings"].append(f"registry diff skipped (engine error: {exc})")
         return
 
     if published is None:

@@ -87,6 +87,17 @@ class TestFetchPublishedDefinition:
             fetch_published_definition("https://cwe.example.com/", NAME)
         assert captured["url"] == f"https://cwe.example.com/api/workflows/nodes/by-name/{NAME}"
 
+    def test_register_style_full_endpoint_url_is_normalized(self) -> None:
+        captured: dict = {}
+
+        def fake_get(url: str, **_: object) -> _Resp:
+            captured["url"] = url
+            return _Resp(200, {"name": NAME})
+
+        with patch("canvastekk_workflow_sdk.registry.httpx.get", side_effect=fake_get):
+            fetch_published_definition("https://cwe.example.com/api/workflows/nodes/", NAME)
+        assert captured["url"] == f"https://cwe.example.com/api/workflows/nodes/by-name/{NAME}"
+
 
 class TestDiffAgainstPublished:
     LOCAL = {

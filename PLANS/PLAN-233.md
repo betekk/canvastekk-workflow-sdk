@@ -99,3 +99,5 @@ LOG 3 pre-existing failures in test_main.py (validate subprocess tests, /usr/bin
 GATE ae2e816 tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 LOG exit gate: full suite 994 passed after poetry install -E fastapi in the worktree env (6 collection errors and 3 subprocess failures were env gaps, not code). Pre-existing ruff-format drift in 3 untouched files left alone per scoped-lint rule.
 GATE 3a2285e tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+GATE c00aa20 tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+LOG Step 9 review fix (iteration 1/2): Major — fetch_published_definition now normalizes register-style full-endpoint URLs (docstring claim implemented + regression test); Minor — skip warning says "engine error" not "engine unreachable". Full re-gate: 995 passed.

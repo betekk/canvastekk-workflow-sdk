@@ -428,7 +428,14 @@ def fetch_published_definition(
     if token:
         auth_name, auth_value = _registry_auth_header(token)
         headers[auth_name] = auth_value
-    url = engine_url.rstrip("/") + _ENGINE_BY_NAME_PATH + name
+    base = engine_url.rstrip("/")
+    # Tolerate register-style full-endpoint URLs (``.../api/workflows/nodes``)
+    # so authors can paste the same URL both commands take.
+    for suffix in ("/api/workflows/nodes", "/api/workflows/nodes/"):
+        if base.endswith(suffix.rstrip("/")):
+            base = base[: -len(suffix.rstrip("/"))]
+            break
+    url = base + _ENGINE_BY_NAME_PATH + name
     resp = httpx.get(url, headers=headers, timeout=timeout)
     if resp.status_code == 404:
         return None

@@ -556,7 +556,7 @@ class TestProbeRegistryDiff:
             report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "skipped"
-        assert any("engine unreachable" in w for w in report["warnings"])
+        assert any("engine error" in w for w in report["warnings"])
 
     def test_bump_level_is_never_asserted(self) -> None:
         """A breaking schema change under a patch bump stays the author's call."""
