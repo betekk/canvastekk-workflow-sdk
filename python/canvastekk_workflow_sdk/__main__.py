@@ -247,6 +247,15 @@ def _apply_registry_diff(
         report["warnings"].append("registry diff skipped (no credential: set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return
 
+    from canvastekk_workflow_sdk.registry import invalid_ctk_reason
+
+    token_error = invalid_ctk_reason(token)
+    if token_error:
+        report["registry_diff"] = {"status": "invalid-credential", "published_version": None, "changed_fields": []}
+        report["valid"] = False
+        report["errors"].append(token_error)
+        return
+
     from canvastekk_workflow_sdk.diff import _version_tuple
     from canvastekk_workflow_sdk.registry import diff_against_published, fetch_published_definition
 
@@ -334,9 +343,10 @@ def _run_register(args: list[str]) -> int:
 
     Mirrors the proven service-identity path (deploy-lambda.yml): POST the
     mapped payload to ``{engine}/api/workflows/nodes/``, then verify via
-    ``by-name/{name}``. The credential's wire form follows its type (#133):
-    a ``ctk_`` token rides ``Authorization: Bearer`` (engine DA-1949); a
-    legacy service token rides ``X-Service-Token``.
+    ``by-name/{name}``. The credential is a ``ctk_`` API key riding
+    ``Authorization: Bearer`` (engine DA-1949), validated locally (#239) —
+    a legacy or malformed key exits 2 with a rotation/truncation hint
+    before any network call.
 
     Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx ·
     6 network. The token is read from ``CANVASTEKK_NODE_REGISTRATION_KEY`` and is
@@ -347,7 +357,7 @@ def _run_register(args: list[str]) -> int:
     import urllib.parse
     import urllib.request
 
-    from canvastekk_workflow_sdk.registry import _registry_auth_header
+    from canvastekk_workflow_sdk.registry import registry_auth_header
 
     def _usage() -> int:
         print(
@@ -369,6 +379,13 @@ def _run_register(args: list[str]) -> int:
     token = os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN", "")
     if not token:
         print("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)", file=sys.stderr)
+        return 2
+
+    from canvastekk_workflow_sdk.registry import invalid_ctk_reason
+
+    token_error = invalid_ctk_reason(token)
+    if token_error:
+        print(f"Error: {token_error}", file=sys.stderr)
         return 2
 
     name_suffix = _flag("--name-suffix") or ""
@@ -398,7 +415,7 @@ def _run_register(args: list[str]) -> int:
     def _request(method: str, url: str, body: bytes | None = None):
         req = urllib.request.Request(url, data=body, method=method)
         req.add_header("Content-Type", "application/json")
-        req.add_header(*_registry_auth_header(token))
+        req.add_header(*registry_auth_header(token))
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, resp.read()
 
@@ -638,14 +655,14 @@ def main() -> None:
     args = sys.argv[1:]
 
     if not args or args[0] == "--help":
-        print("Usage: python -m canvastekk_workflow_sdk <command> [options]")
+        print("Usage: ctk <command> [options]  (alias: python -m canvastekk_workflow_sdk)")
         print()
         print("Commands:")
         print("  validate <module:attribute> [--json]  Validate a node manifest definition")
         print(
-            "  probe <module:attribute> [--engine-url URL] [--json]  Registration probes (offline mirror + optional registry diff)"
+            "  probe <module:attribute | --manifest FILE> [--engine-url URL] [--json]  Registration probes (offline mirror + optional registry diff)"
         )
-        print("  register <module:attribute> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]")
+        print("  register <module:attribute | --manifest FILE> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]")
         print("                                        Publish the manifest to the engine registry")
         print("  registry-convergence --registry-base URL --invoke-base URL --slugs-file PATH")
         print(
@@ -728,23 +745,30 @@ def main() -> None:
         print(f"Unknown command: {args[0]}", file=sys.stderr)
         sys.exit(1)
 
-    if len(args) < 2 or args[1].startswith("--"):
-        print("Error: module path required (e.g., handler:definition)", file=sys.stderr)
-        sys.exit(2 if args[0] == "probe" else 1)
-
-    module_path = args[1]
     use_json = "--json" in args
-
     load_fail_code = 2 if args[0] == "probe" else 1
 
-    try:
-        definition = _load_definition(module_path)
-    except Exception as e:
-        if use_json:
-            print(json.dumps({"valid": False, "errors": [str(e)], "warnings": []}, indent=2))
-        else:
-            print(f"Error loading definition: {e}", file=sys.stderr)
-        sys.exit(load_fail_code)
+    manifest_source = _flag_value(args, "--manifest") if args[0] == "probe" else None
+    if manifest_source:
+        definition = _manifest_from_source(manifest_source)
+        if isinstance(definition, int):
+            sys.exit(definition)
+    else:
+        if len(args) < 2 or args[1].startswith("--"):
+            print(
+                "Error: module path or --manifest required (e.g., handler:definition, or --manifest manifest.json)",
+                file=sys.stderr,
+            )
+            sys.exit(load_fail_code)
+
+        try:
+            definition = _load_definition(args[1])
+        except Exception as e:
+            if use_json:
+                print(json.dumps({"valid": False, "errors": [str(e)], "warnings": []}, indent=2))
+            else:
+                print(f"Error loading definition: {e}", file=sys.stderr)
+            sys.exit(load_fail_code)
 
     try:
         if args[0] == "validate":

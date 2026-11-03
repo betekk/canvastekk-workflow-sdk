@@ -495,14 +495,17 @@ Defines what a node is. Maps to the engine's **registry-level node type** (`Work
 ## CLI: register + probe (v0.28+)
 
 ```bash
-canvastekk-workflow-sdk probe --manifest manifest.json [--engine-url URL]
-CANVASTEKK_NODE_REGISTRATION_KEY=<token> canvastekk-workflow-sdk register \
+ctk probe --manifest manifest.json [--engine-url URL]
+CANVASTEKK_NODE_REGISTRATION_KEY=<ctk_ key> ctk register \
   --manifest manifest.json --engine-url https://cwe.example.com \
   [--invoke-url URL] [--name-suffix -lambda]
 ```
 
-Same vocabulary mapping, auth (`X-Service-Token`), and exit codes as the python
-CLI. `GET /manifest` also serves `code_digest` (sha256
+Same vocabulary mapping, credential handling, and exit codes as the python
+CLI — both bins (`ctk` / `canvastekk-workflow-sdk`) are identical. Registry
+credentials are `ctk_` API keys (47 chars: `ctk_` + 43): treat yours like a
+password; the SDK validates its shape locally and fails fast with a rotation
+hint. `GET /manifest` also serves `code_digest` (sha256
 of the module calling `createNodeApp`, computed at startup, never author-settable).
 
 **Pre-flight registry diff (v0.63+, `probe --engine-url`):** with the engine URL
@@ -875,8 +878,7 @@ console.log(result.revision_id); // "rev-abc123"
 | `registryUrl` | `string` | Yes | Engine registry endpoint |
 | `invokeUrl` | `string` | No | URL where the node is reachable |
 | `invokeType` | `InvokeType` | No | `"http"`, `"lambda"`, `"sagemaker"`, or `"in-process"` (default: `"http"`) |
-| `apiKey` | `string` | No | API key auth (`X-API-Key` header) |
-| `serviceToken` | `string` | No | CI/CD auth (`X-Service-Token` header, takes precedence) |
+| `serviceToken` | `string` | Yes | Registry credential — a `ctk_` API key (`Authorization: Bearer`, validated locally; #239) |
 | `tags` | `string[]` | No | Searchable tags for the registry |
 
 ### `exportDefinition()`

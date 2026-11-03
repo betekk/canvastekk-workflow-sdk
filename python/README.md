@@ -1107,17 +1107,24 @@ Response from `POST /execute`:
 ```bash
 # Offline registration probes (validate + engine-request mirror)
 python -m canvastekk_workflow_sdk probe my_node.handler:definition
+# …or straight from a manifest file (same probes, no import needed)
+ctk probe --manifest manifest.json --engine-url https://cwe.example.com
 
 # Publish to the engine registry from CI (service identity)
-export CANVASTEKK_NODE_REGISTRATION_KEY=<service token>
-python -m canvastekk_workflow_sdk register my_node.handler:definition \
+export CANVASTEKK_NODE_REGISTRATION_KEY=<ctk_ key>
+ctk register my_node.handler:definition \
   --engine-url https://cwe.example.com [--invoke-url URL] [--name-suffix -lambda]
 ```
 
 `register` maps the manifest to the engine vocabulary (`name`=slug, `label`=display),
-authenticates via `X-Service-Token`, POSTs to `{engine}/api/workflows/nodes/`, and
+authenticates with your `ctk_` API key (`Authorization: Bearer`), POSTs to `{engine}/api/workflows/nodes/`, and
 verifies via `by-name/{name}`. Exit codes: 0 ok · 2 usage · 3 auth · 4 4xx · 5 5xx ·
 6 network. See the External Author Guide for the full contract.
+
+**Registry credentials are `ctk_` API keys** — your key starts with `ctk_` (47
+chars: `ctk_` + 43). Treat it like a password: never commit it, never paste it in
+issues. The SDK validates its shape locally and fails fast with a rotation hint
+(`ctk` is also the TypeScript bin name, so both lanes type the same command).
 
 `GET /manifest` also serves `code_digest` (sha256 of the handler module source,
 computed at startup, never author-settable) next to `sdk_version`/`mode`.
@@ -1225,13 +1232,11 @@ print(result["name"])        # dict-like access for backward compat
 | `registry_url` | `str` | Yes | Engine registry endpoint |
 | `invoke_url` | `str \| None` | No | URL where the node is reachable |
 | `invoke_type` | `InvokeType` | No | `"http"`, `"lambda"`, `"sagemaker"`, or `"in-process"` (default: `"http"`) |
-| `api_key` | `str \| None` | Yes* | API key auth (`X-API-Key` header) |
-| `service_token` | `str \| None` | Yes* | CI/CD auth (`X-Service-Token` header, takes precedence) |
+| `api_key` | `str \| None` | No | Node-invoke auth — used only by the optional `verify` probe; never authenticates the registry call |
+| `service_token` | `str \| None` | Yes | Registry credential — a `ctk_` API key (`Authorization: Bearer`, validated locally) |
 | `tags` | `list[str] \| None` | No | Searchable tags for the registry |
 | `invoke_config` | `dict \| None` | No | Extra invocation parameters (e.g., Lambda region) |
 | `timeout` | `int` | No | Request timeout in seconds (default: 30) |
-
-*Either `api_key` or `service_token` must be provided.
 
 ### `RegisterNodeResult`
 

@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { buildEngineRequest, probeManifest, cliMain, applyRegistryDiff } from "../src/cli.js";
 import { WorkflowNodeManifestSchema } from "../src/definition.js";
 
+/** Well-formed registry credential (DA-1948 shape: ctk_ + 43). */
+const CTK = "ctk_" + "x".repeat(43);
+
 const canonicalManifest = {
   slug: "echo",
   version: "1.0.0",
@@ -125,7 +128,7 @@ describe("cliMain register (DA-2603)", () => {
   }
 
   beforeEach(() => {
-    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "t0ps3cret");
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", CTK);
   });
 
   afterEach(() => {
@@ -141,6 +144,20 @@ describe("cliMain register (DA-2603)", () => {
 
   it("exit 2 without token", async () => {
     vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "");
+    expect(
+      await cliMain(["register", "--manifest", manifestPath, "--engine-url", "https://eng"]),
+    ).toBe(2);
+  });
+
+  it("exit 2 with rotation message for a legacy token (#239)", async () => {
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "t0ps3cret");
+    expect(
+      await cliMain(["register", "--manifest", manifestPath, "--engine-url", "https://eng"]),
+    ).toBe(2);
+  });
+
+  it("exit 2 with truncation hint for a malformed ctk_ key (#239)", async () => {
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "ctk_short");
     expect(
       await cliMain(["register", "--manifest", manifestPath, "--engine-url", "https://eng"]),
     ).toBe(2);
@@ -265,7 +282,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
 
   it("no engine-url skips with warning", async () => {
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), undefined, "ctk_x");
+    await applyRegistryDiff(report, payload(), undefined, CTK);
     expect(report.valid).toBe(true);
     expect(report.registry_diff?.status).toBe("skipped");
     expect(report.warnings.some((w) => w.includes("no --engine-url"))).toBe(true);
@@ -278,12 +295,28 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
     expect(report.warnings.some((w) => w.includes("CANVASTEKK_NODE_REGISTRATION_KEY"))).toBe(true);
   });
 
+  it("legacy token fails the report — never a skip (#239)", async () => {
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "svs_legacy");
+    expect(report.valid).toBe(false);
+    expect(report.registry_diff?.status).toBe("invalid-credential");
+    expect(report.errors.some((e) => e.includes("rotate"))).toBe(true);
+  });
+
+  it("malformed ctk_ token fails with the shape hint (#239)", async () => {
+    const report = probeManifest(canonicalManifest);
+    await applyRegistryDiff(report, payload(), "https://eng", "ctk_short");
+    expect(report.valid).toBe(false);
+    expect(report.registry_diff?.status).toBe("invalid-credential");
+    expect(report.errors.some((e) => e.includes("truncated"))).toBe(true);
+  });
+
   it("engine error skips without failing", async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new Error("boom");
     }) as unknown as typeof fetch;
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(true);
     expect(report.registry_diff?.status).toBe("skipped");
     expect(report.warnings.some((w) => w.includes("engine error"))).toBe(true);
@@ -292,7 +325,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("new node passes", async () => {
     globalThis.fetch = engine(null);
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(true);
     expect(report.registry_diff?.status).toBe("new-node");
   });
@@ -300,7 +333,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("same version, identical data passes unchanged", async () => {
     globalThis.fetch = engine(published("1.9.1", 7200));
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(true);
     expect(report.registry_diff?.status).toBe("unchanged");
   });
@@ -308,7 +341,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("same version, changed data fails naming fields", async () => {
     globalThis.fetch = engine(published("1.9.1", 3600));
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(false);
     expect(report.registry_diff?.status).toBe("changed");
     expect(report.registry_diff?.changed_fields).toContain("timeout_seconds");
@@ -318,7 +351,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("newer version with changed data passes", async () => {
     globalThis.fetch = engine(published("1.9.0", 3600));
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(true);
     expect(report.registry_diff?.status).toBe("newer-version");
   });
@@ -326,7 +359,7 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("newer version with identical data warns but passes", async () => {
     globalThis.fetch = engine(published("1.9.0", 7200));
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(true);
     expect(report.warnings.some((w) => w.includes("identical — intentional?"))).toBe(true);
   });
@@ -334,14 +367,14 @@ describe("applyRegistryDiff — probe --engine-url (#233)", () => {
   it("older version fails", async () => {
     globalThis.fetch = engine(published("2.0.0"));
     const report = probeManifest(canonicalManifest);
-    await applyRegistryDiff(report, payload(), "https://eng", "ctk_x");
+    await applyRegistryDiff(report, payload(), "https://eng", CTK);
     expect(report.valid).toBe(false);
     expect(report.registry_diff?.status).toBe("older-version");
     expect(report.errors.some((e) => e.includes("older than published"))).toBe(true);
   });
 
   it("cliMain probe --engine-url exits 1 on same-version drift", async () => {
-    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", "ctk_x");
+    vi.stubEnv("CANVASTEKK_NODE_REGISTRATION_KEY", CTK);
     globalThis.fetch = engine(published("1.0.0", 3600));
     expect(await cliMain(["probe", "--manifest", diffManifestPath, "--engine-url", "https://eng"])).toBe(1);
   });
