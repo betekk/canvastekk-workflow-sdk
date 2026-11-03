@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import re
 import shutil
 import sys
@@ -17,6 +18,7 @@ from importlib.resources import as_file
 from importlib.resources import files as pkg_files
 from pathlib import Path
 
+import httpx
 from jsonschema import Draft7Validator
 from jsonschema import exceptions as _jsonschema_exceptions
 
@@ -141,8 +143,20 @@ def _build_engine_request(definition, *, invoke_url: str | None = None, name_suf
     return payload
 
 
-def _probe_definition(definition, *, name_suffix: str = "") -> dict:
-    """Offline registration probes: 'passes locally ⇔ passes registration'.
+def _flag_value(args: list[str], name: str) -> str | None:
+    """Return the value of ``name`` in ``args`` (``--flag value`` or ``--flag=value``)."""
+    for i, a in enumerate(args):
+        if a == name and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def _probe_definition(
+    definition, *, name_suffix: str = "", engine_url: str | None = None, token: str | None = None
+) -> dict:
+    """Registration probes: 'passes locally ⇔ passes registration'.
 
     Runs the manifest probes from ``_validate_definition`` (model format,
     draft-7 schemas, file-field extensions) plus the engine-request mirror:
@@ -155,6 +169,14 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
     budgets above the node's own ``hard_max_runtime_seconds`` which the
     engine itself would accept, so passing here implies passing registration
     (not biconditional).
+
+    When ``engine_url`` and ``token`` are provided (#233), additionally
+    fetches the published definition by name and applies the registry diff:
+    same-version data drift (engine 409 ``node_version_immutable``) and
+    version downgrades (engine resource conflict) fail here instead of at
+    deploy time. Missing flag, missing credential, or an unreachable engine
+    degrades to a skip warning — the offline probes above stay authoritative
+    and the exit code is unaffected.
     """
     report = _validate_definition(definition)
     report["probes"] = ["manifest", "engine-request-mirror", "host-ceiling"]
@@ -186,7 +208,101 @@ def _probe_definition(definition, *, name_suffix: str = "") -> dict:
     if not re.fullmatch(_ENGINE_NAME_PATTERN, str(payload.get("name", ""))):
         report["valid"] = False
         report["errors"].append(f"engine name {payload.get('name')!r} does not match {_ENGINE_NAME_PATTERN}")
+    _apply_registry_diff(report, payload, engine_url=engine_url, token=token)
     return report
+
+
+def _apply_registry_diff(
+    report: dict,
+    payload: dict,
+    *,
+    engine_url: str | None,
+    token: str | None,
+) -> None:
+    """Apply the #233 registry diff to a probe report, in place.
+
+    Behavior matrix (never asserts the bump level — patch/minor/major stays
+    author intent):
+
+    - no ``--engine-url`` / no credential / unreachable engine → skip note
+      in ``warnings``, report validity unchanged (offline degradation);
+    - name not published → ``new-node`` status, pass;
+    - same version, identical data → ``unchanged`` status, pass
+      (re-registration is an idempotent no-op);
+    - same version, changed data → ``valid=False`` naming the changed
+      fields (mirrors the engine's 409 ``node_version_immutable``);
+    - higher version, changed data → ``newer-version`` status, pass;
+    - higher version, identical data → ``newer-version`` status, pass, plus
+      a "bumped but nothing changed" warning;
+    - lower version → ``valid=False`` (mirrors the engine's older-semver
+      resource conflict).
+    """
+    if not engine_url:
+        report["registry_diff"] = {"status": "skipped", "published_version": None, "changed_fields": []}
+        report["warnings"].append("registry diff skipped (no --engine-url — offline probes only)")
+        return
+    if not token:
+        report["registry_diff"] = {"status": "skipped", "published_version": None, "changed_fields": []}
+        report["warnings"].append("registry diff skipped (no credential: set CANVASTEKK_NODE_REGISTRATION_KEY)")
+        return
+
+    from canvastekk_workflow_sdk.diff import _version_tuple
+    from canvastekk_workflow_sdk.registry import diff_against_published, fetch_published_definition
+
+    name = str(payload.get("name", ""))
+    try:
+        published = fetch_published_definition(engine_url, name, token=token)
+    except httpx.HTTPError as exc:
+        report["registry_diff"] = {"status": "skipped", "published_version": None, "changed_fields": []}
+        report["warnings"].append(f"registry diff skipped (engine unreachable: {exc})")
+        return
+
+    if published is None:
+        report["registry_diff"] = {"status": "new-node", "published_version": None, "changed_fields": []}
+        return
+
+    published_version = str(published.get("version", ""))
+    local_version = str(payload.get("version", ""))
+    try:
+        older = _version_tuple(local_version) < _version_tuple(published_version)
+    except ValueError:
+        report["registry_diff"] = {"status": "skipped", "published_version": published_version, "changed_fields": []}
+        report["warnings"].append(
+            f"registry diff skipped (unparsable version pair {local_version!r} vs {published_version!r})"
+        )
+        return
+
+    changed = [f for f in diff_against_published(payload, published) if f != "version"]
+    if older:
+        report["registry_diff"] = {
+            "status": "older-version",
+            "published_version": published_version,
+            "changed_fields": changed,
+        }
+        report["valid"] = False
+        report["errors"].append(
+            f"version {local_version} is older than published {published_version} — "
+            "the engine rejects downgrades (publish a higher semver)"
+        )
+    elif local_version == published_version:
+        status = "unchanged" if not changed else "changed"
+        report["registry_diff"] = {"status": status, "published_version": published_version, "changed_fields": changed}
+        if changed:
+            report["valid"] = False
+            report["errors"].append(
+                f"definition data changed but version is still {local_version} "
+                f"(changed: {', '.join(changed)}) — bump the version before deploying"
+            )
+    else:
+        report["registry_diff"] = {
+            "status": "newer-version",
+            "published_version": published_version,
+            "changed_fields": changed,
+        }
+        if not changed:
+            report["warnings"].append(
+                f"version bumped {published_version} -> {local_version} but definition data is identical — intentional?"
+            )
 
 
 def _manifest_from_source(source: str):
@@ -241,12 +357,7 @@ def _run_register(args: list[str]) -> int:
         return 2
 
     def _flag(name: str) -> str | None:
-        for i, a in enumerate(args):
-            if a == name and i + 1 < len(args):
-                return args[i + 1]
-            if a.startswith(name + "="):
-                return a.split("=", 1)[1]
-        return None
+        return _flag_value(args, name)
 
     module_path = args[0] if args and not args[0].startswith("--") else None
     manifest_source = _flag("--manifest")
@@ -633,8 +744,14 @@ def main() -> None:
         sys.exit(load_fail_code)
 
     try:
-        report_fn = _validate_definition if args[0] == "validate" else _probe_definition
-        report = report_fn(definition)
+        if args[0] == "validate":
+            report = _validate_definition(definition)
+        else:
+            engine_url = _flag_value(args, "--engine-url")
+            token = (
+                os.environ.get("CANVASTEKK_NODE_REGISTRATION_KEY") or os.environ.get("CANVASTEKK_REGISTRY_TOKEN") or ""
+            )
+            report = _probe_definition(definition, engine_url=engine_url, token=token or None)
     except Exception as e:
         report = {"valid": False, "errors": [str(e)], "warnings": []}
 

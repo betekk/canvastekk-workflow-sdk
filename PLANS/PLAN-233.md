@@ -51,14 +51,16 @@ architecture review expected). No frontend files.
 
 ### Phase 2: probe wiring + behavior matrix
 
-- [ ] **2.1** Wire `--engine-url <url>` into the `probe` command in `__main__.py`; absent (or `CANVASTEKK_NODE_REGISTRATION_KEY`/`CANVASTEKK_REGISTRY_TOKEN` unset) → registry diff skipped with a `"registry diff skipped (no --engine-url / no credential)"` note, exit behavior unchanged
+- [x] **2.1** Wire `--engine-url <url>` into the `probe` command in `__main__.py`; absent (or `CANVASTEKK_NODE_REGISTRATION_KEY`/`CANVASTEKK_REGISTRY_TOKEN` unset) → registry diff skipped with a `"registry diff skipped (no --engine-url / no credential)"` note, exit behavior unchanged
     — **Why:** offline degradation is an AC; the flag is opt-in so plain CI stays unaffected
     — **Done when:** probe without `--engine-url` produces identical report to today plus the skip note; exit 0
     — **Consumers affected:** `ctk probe` users (additive flag)
-- [ ] **2.2** Extend `_probe_definition` with the registry diff producing the six-row matrix: new-node (published is None) → pass "new node"; same version + no diff → pass "unchanged"; same version + diff → `valid=False` naming changed fields; higher version + diff → pass; higher version + no diff → pass + warning "bumped but nothing changed"; lower version → `valid=False` "older than published latest". Report gains a `registry_diff` block `{status, published_version, changed_fields}`; unreachable engine → skip note, exit 0
+    — **Done:** `_flag_value` module helper (register's nested `_flag` now delegates — dedup at source); probe branch passes engine_url+env token; skip paths for missing flag and missing credential each carry a distinct warning and never touch validity; tests: both skip rows; files: __main__.py, tests/test_main.py; fixes: missing module-level `import os`, import-order autofix
+- [x] **2.2** Extend `_probe_definition` with the registry diff producing the six-row matrix: new-node (published is None) → pass "new node"; same version + no diff → pass "unchanged"; same version + diff → `valid=False` naming changed fields; higher version + diff → pass; higher version + no diff → pass + warning "bumped but nothing changed"; lower version → `valid=False` "older than published latest". Report gains a `registry_diff` block `{status, published_version, changed_fields}`; unreachable engine → skip note, exit 0
     — **Why:** the ticket's core behavior; fail-fast for the two states the engine rejects (409 immutability, older-version conflict)
     — **Done when:** unit tests cover all six rows + unreachable-engine skip; bump level never asserted anywhere
     — **Consumers affected:** `ctk probe` users (report gains a key; failures now possible pre-deploy)
+    — **Done:** `_apply_registry_diff` implements all six rows + unreachable-engine and unparsable-version skips; `version` field excluded from the newer-branch identical-data check; report carries the `registry_diff` block; 11 new tests incl. the bump-level-never-asserted row; files: __main__.py, tests/test_main.py; fixes: none
 
 ### Phase 3: docs
 
@@ -91,3 +93,5 @@ architecture review expected). No frontend files.
 ## Trace
 
 GATE c7e6866 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+GATE 18a09d8 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+LOG 3 pre-existing failures in test_main.py (validate subprocess tests, /usr/bin/python3 lacks the package) — fail on clean tree too, environmental, not this change.
