@@ -8,13 +8,13 @@
 
 From ticket #233:
 
-- [ ] `ctk validate`/`ctk probe` performs the registry diff when engine URL + `ctk_` key are present
-- [ ] All five matrix rows behave exactly as specified, with field names in the failure message
-- [ ] New-node case passes without false blocks
-- [ ] Identical re-registration passes (deploy-rerun idempotency preserved)
-- [ ] Offline / no-creds / unreachable-engine skips the diff with a warning and exit 0
-- [ ] Bump level (major/minor/patch) is never asserted
-- [ ] Unit tests cover all five rows + the offline skip
+- [x] `ctk validate`/`ctk probe` performs the registry diff when engine URL + `ctk_` key are present (surface confirmed as `probe --engine-url` in the requirements gate)
+- [x] All five matrix rows behave exactly as specified, with field names in the failure message (six rows with the confirmed older-version addition)
+- [x] New-node case passes without false blocks
+- [x] Identical re-registration passes (deploy-rerun idempotency preserved)
+- [x] Offline / no-creds / unreachable-engine skips the diff with a warning and exit 0
+- [x] Bump level (major/minor/patch) is never asserted
+- [x] Unit tests cover all five rows + the offline skip (six rows + all three skip paths, 21 tests total)
 
 AC1 amended at authoring and **confirmed by the user in the Step 7 requirements
 gate** (round 1/2): the diff surface is `ctk probe --engine-url <url>` —
@@ -98,3 +98,4 @@ GATE 18a09d8 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 LOG 3 pre-existing failures in test_main.py (validate subprocess tests, /usr/bin/python3 lacks the package) — fail on clean tree too, environmental, not this change.
 GATE ae2e816 tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 LOG exit gate: full suite 994 passed after poetry install -E fastapi in the worktree env (6 collection errors and 3 subprocess failures were env gaps, not code). Pre-existing ruff-format drift in 3 untouched files left alone per scoped-lint rule.
+GATE 3a2285e tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
