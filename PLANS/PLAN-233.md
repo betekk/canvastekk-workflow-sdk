@@ -38,14 +38,16 @@ architecture review expected). No frontend files.
 
 ### Phase 1: registry fetch + diff helpers
 
-- [ ] **1.1** Add `fetch_published_definition(engine_url, name, *, token, timeout=10.0) -> dict | None` to `registry.py` — GET `{engine_url}/api/workflows/nodes/by-name/{name}` with `_registry_auth_header(token)`; 404 returns `None` (new node); HTTP errors propagate to caller for degradation
+- [x] **1.1** Add `fetch_published_definition(engine_url, name, *, token, timeout=10.0) -> dict | None` to `registry.py` — GET `{engine_url}/api/workflows/nodes/by-name/{name}` with `_registry_auth_header(token)`; 404 returns `None` (new node); HTTP errors propagate to caller for degradation
     — **Why:** single engine-truth fetch every later step reuses; mirrors the engine's own `GET /by-name/{name}` route
     — **Done when:** function exists with docstring; unit test proves 200-parse, 404→None, and auth-header ride (`ctk_` → Bearer)
     — **Consumers affected:** none yet (new API)
-- [ ] **1.2** Add `diff_against_published(local_payload: dict, published: dict) -> list[str]` to `registry.py` — compares every local manifest key except the engine's `NON_COMPARISON_FIELDS` `{id, name, owner, source, registered_at, node_status, last_registered_by}` against `published.get(key)`; returns changed field names
+    — **Done:** implemented in registry.py (also tolerates trailing-slash base URLs); tests: 200-parse+Bearer, 404→None, X-Service-Token legacy, transport-error propagation, slash tolerance; files: registry.py, tests/test_registry_diff.py; fixes: ruff import-sort autofix
+- [x] **1.2** Add `diff_against_published(local_payload: dict, published: dict) -> list[str]` to `registry.py` — compares every local manifest key except the engine's `NON_COMPARISON_FIELDS` `{id, name, owner, source, registered_at, node_status, last_registered_by}` against `published.get(key)`; returns changed field names
     — **Why:** mirrors `workflow_node_service.diff_node_definitions` so "passes locally ⇔ passes registration" holds field-for-field
     — **Done when:** unit tests show changed detection, unchanged pass, and non-comparison fields ignored
     — **Consumers affected:** none yet (new API)
+    — **Done:** implemented as the shared-key intersection minus `ENGINE_NON_COMPARISON_FIELDS` (local-only keys skipped — engine drops them at validation, so its own diff never sees them); tests: changed/unchanged/engine-assigned-ignored/local-only-skipped/version-drift; files: registry.py, tests/test_registry_diff.py; fixes: none
 
 ### Phase 2: probe wiring + behavior matrix
 
@@ -85,3 +87,7 @@ architecture review expected). No frontend files.
 - Engine response shape drift vs `WorkflowNodeSchema` → diff ignores unknown keys on either side (compare local keys only), so engine-side additive fields never false-positive
 - Auth scopes: by-name GET currently unauthenticated on dev; probe still sends the Bearer so it works when auth tightens
 - CI adoption is per-repo (flag is opt-in) — no behavior change for existing pipelines
+
+## Trace
+
+GATE c7e6866 tier=light lint=t typecheck=n.a build=n.a unit=t e2e=n.a
