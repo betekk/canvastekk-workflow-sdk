@@ -11,20 +11,60 @@ export type InvokeType = "http" | "lambda" | "sagemaker" | "in-process";
 const VALID_INVOKE_TYPES: Set<string> = new Set(["http", "lambda", "sagemaker", "in-process"]);
 
 /**
- * Wire form for a registry credential (#135) — follows credential type.
+ * Registry credential shape, mirroring CDS ``ApiKeyUtil`` (DA-1948):
+ * ``ctk_`` + 43 chars of base62 minus lookalikes (``0 O I l``) = 47 total.
+ * A future CDS format change must touch this mirror and the Python
+ * ``registry_auth_header`` together — ``tests/test_parity.py`` pins them equal.
+ */
+export const CTK_PREFIX = "ctk_";
+export const CTK_BODY_LENGTH = 43;
+const CTK_BODY_ALPHABET: ReadonlySet<string> = new Set(
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789",
+);
+
+/**
+ * Return why ``token`` is not a usable registry credential, else ``null``.
  *
- * ``ctk_`` keys ride ``Authorization: Bearer <token>`` (the engine's
- * DA-1949 ctk_ dispatch — an ``X-Service-Token`` carrying a ctk_ value
- * never authenticates). Legacy service tokens keep ``X-Service-Token``
- * byte-identically (dated bridge; the engine's #699 sweep removes that
- * leg later). Mirror of the Python SDK's ``_registry_auth_header``
- * (#134, wheel v0.51.0).
+ * Local, offline validation (no network call): non-``ctk_`` credentials are
+ * rejected outright — the engine retired ``X-Service-Token``/``X-API-Key``
+ * registry auth (#3760), so sending one can only produce an unexplained 401;
+ * malformed ``ctk_`` keys (wrong length/alphabet) get a truncation hint.
+ * Mirror of the Python SDK's ``invalid_ctk_reason`` (#239).
+ */
+export function invalidCtkReason(token: string): string | null {
+  if (!token.startsWith(CTK_PREFIX)) {
+    return (
+      "registry credentials must be ctk_ API keys — the engine retired " +
+      "X-Service-Token registry auth (#3760); ask ops to rotate"
+    );
+  }
+  const body = token.slice(CTK_PREFIX.length);
+  if (body.length !== CTK_BODY_LENGTH || [...body].some((c) => !CTK_BODY_ALPHABET.has(c))) {
+    return (
+      `malformed ctk_ key: expected ${CTK_PREFIX.length + CTK_BODY_LENGTH} chars ` +
+      `(ctk_ + ${CTK_BODY_LENGTH}, DA-1948), got ${token.length} — looks truncated or mistyped`
+    );
+  }
+  return null;
+}
+
+/**
+ * Wire form for a registry credential (#239) — ``ctk_`` API keys only.
+ *
+ * A valid ``ctk_`` key rides ``Authorization: Bearer <token>`` (the engine's
+ * DA-1949 ctk_ dispatch). Anything else — legacy service tokens included —
+ * throws before any network call: the engine retired those registry legs
+ * (#3760), so the only honest outcome is a local error naming the fix.
+ * Mirror of the Python SDK's ``registry_auth_header``.
+ *
+ * @throws Error via {@link invalidCtkReason} when the token is not a
+ * well-formed ``ctk_`` key (rotation guidance for foreign tokens, a
+ * truncation hint for malformed ones).
  */
 export function registryAuthHeader(serviceToken: string): [string, string] {
-  if (serviceToken.startsWith("ctk_")) {
-    return ["Authorization", `Bearer ${serviceToken}`];
-  }
-  return ["X-Service-Token", serviceToken];
+  const reason = invalidCtkReason(serviceToken);
+  if (reason) throw new Error(reason);
+  return ["Authorization", `Bearer ${serviceToken}`];
 }
 
 /** Result from node registration. */
@@ -160,25 +200,20 @@ export async function registerNode(
   opts: {
     invokeUrl?: string;
     invokeType?: InvokeType;
-    apiKey?: string;
+    /** Registry credential — a ``ctk_`` API key (required; #239). */
     serviceToken?: string;
     tags?: string[];
     invokeConfig?: Record<string, unknown>;
     timeout?: number;
   } = {},
 ): Promise<RegisterNodeResult> {
-  const {
-    invokeUrl,
-    invokeType = "http",
-    apiKey,
-    serviceToken,
-    tags,
-    invokeConfig,
-    timeout = 30,
-  } = opts;
+  const { invokeUrl, invokeType = "http", serviceToken, tags, invokeConfig, timeout = 30 } = opts;
 
-  if (!apiKey && !serviceToken) {
-    throw new Error("Either 'apiKey' or 'serviceToken' must be provided for registration.");
+  if (!serviceToken) {
+    throw new Error(
+      "serviceToken (a ctk_ API key) is required for registration — " +
+        "the engine retired X-API-Key/X-Service-Token registry auth (#3760)",
+    );
   }
 
   if (!VALID_INVOKE_TYPES.has(invokeType)) {
@@ -198,12 +233,8 @@ export async function registerNode(
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (serviceToken) {
-    const [authName, authValue] = registryAuthHeader(serviceToken);
-    headers[authName] = authValue;
-  } else if (apiKey) {
-    headers["X-API-Key"] = apiKey;
-  }
+  const [authName, authValue] = registryAuthHeader(serviceToken);
+  headers[authName] = authValue;
 
   try {
     const resp = await fetch(registryUrl, {

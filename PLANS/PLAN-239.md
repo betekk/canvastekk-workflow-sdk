@@ -74,30 +74,35 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ### Phase 2: TypeScript — purge legacy auth + ctk_ hardening
 
-- [ ] **2.1** `typescript/src/registry.ts`: `registryAuthHeader` throws `Error` with the same rotation message on non-`ctk_` + same CDS shape validation with truncation hint; `registerNode` drops the `apiKey` registry leg (remove `X-API-Key` header branch + param; `serviceToken` required)
+- [x] **2.1** `typescript/src/registry.ts`: `registryAuthHeader` throws `Error` with the same rotation message on non-`ctk_` + same CDS shape validation with truncation hint; `registerNode` drops the `apiKey` registry leg (remove `X-API-Key` header branch + param; `serviceToken` required)
     — **Why:** the py/ts mirror is the house rule — the two runtimes must fail identically so CISA's two lanes behave the same
     — **Done when:** `registryAuthHeader("svs_x")` throws; `registerNode` without serviceToken throws naming it; zero `X-Service-Token`/`X-API-Key` literals in registry.ts beyond the rotation message
     — **Consumers affected:** TS library users, node-lane deploys (all send ctk_)
+    — **Done:** `invalidCtkReason` + strict `registryAuthHeader` + exported `CTK_PREFIX`/`CTK_BODY_LENGTH` (parity-test pins); registerNode requires serviceToken, apiKey param removed; files: registry.ts; fixes: none
 
-- [ ] **2.2** `typescript/src/cli.ts`: validate the credential before any fetch in `runRegister` (exit 2 + rotation message) and in the probe registry-diff path (`applyRegistryDiff`: non-ctk_ → report invalid with the rotation message, never a skip warning); refresh the header docs (usage line, auth note, `ctk` alias mention)
+- [x] **2.2** `typescript/src/cli.ts`: validate the credential before any fetch in `runRegister` (exit 2 + rotation message) and in the probe registry-diff path (`applyRegistryDiff`: non-ctk_ → report invalid with the rotation message, never a skip warning); refresh the header docs (usage line, auth note, `ctk` alias mention)
     — **Why:** the probe-diff path catches fetch errors into skips — without an early check, a bad token would masquerade as "engine error: skipped" instead of failing per the AC
     — **Done when:** probe with a `svs_` env token + `--engine-url` exits 1 with the rotation error; register exits 2 before any socket
     — **Consumers affected:** both bins' users
+    — **Done:** early validation in runRegister (exit 2) and applyRegistryDiff (`invalid-credential` status added to the union, report invalid); header docs + usage rewritten around `ctk`; files: cli.ts; fixes: none
 
-- [ ] **2.3** Add `"ctk": "./dist/cli.js"` to `typescript/package.json` `bin`
+- [x] **2.3** Add `"ctk": "./dist/cli.js"` to `typescript/package.json` `bin`
     — **Why:** bin parity with the python console script; docs then say exactly `ctk probe --engine-url …`
     — **Done when:** `npm pack` tarball lists both bins; `node dist/cli.js --help` unchanged
     — **Consumers affected:** npm installers
+    — **Done:** second bin entry added (same dist/cli.js); files: package.json; fixes: none
 
-- [ ] **2.4** `typescript/README.md`: fix L504 stale auth line ("auth (`X-Service-Token`)" → credential env var wording), L879 serviceToken row (drop the X-Service-Token mention), add the ctk_ prefix sentence + `ctk` bin mention in the CLI section
+- [x] **2.4** `typescript/README.md`: fix L504 stale auth line ("auth (`X-Service-Token`)" → credential env var wording), L879 serviceToken row (drop the X-Service-Token mention), add the ctk_ prefix sentence + `ctk` bin mention in the CLI section
     — **Why:** the stale line is actively wrong since #135/#3760 — worse than missing docs
     — **Done when:** zero `X-Service-Token` in typescript/README.md
     — **Consumers affected:** node authors reading the TS package docs
+    — **Done:** CLI section rewritten (ctk examples, credential sentence), registerNode table apiKey row removed, serviceToken row required/ctk_; files: typescript/README.md; fixes: none
 
-- [ ] **2.5** Update TS tests: auth-header rotation/shape tests (replacing the 5 legacy sites in `registry.test.ts`), register exit-2 test, probe-diff invalid-token-fails test
+- [x] **2.5** Update TS tests: auth-header rotation/shape tests (replacing the 5 legacy sites in `registry.test.ts`), register exit-2 test, probe-diff invalid-token-fails test
     — **Why:** mirror of 1.6 — identical contract, identical coverage
     — **Done when:** typecheck + typecheck:tests + eslint + vitest + tsup build green
     — **Consumers affected:** none (internal)
+    — **Done:** 7 net-new tests (throw matrix, no-fetch-before-error, missing-serviceToken, CLI exit 2 ×2, invalid-credential probe ×2); fixtures moved to 47-char shape; files: registry.test.ts, cli.test.ts; fixes: none (gate green first run)
 
 ### Phase 3: Parity guard + docs sweep + exit gate
 
@@ -139,4 +144,6 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ## Trace
 
+GATE ed30a7e tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 LOG phase1 full-tier: auth critical-area anchor (registry credential handling)
+LOG phase2 full-tier: auth critical-area anchor (py/ts mirror of the same credential gate)
