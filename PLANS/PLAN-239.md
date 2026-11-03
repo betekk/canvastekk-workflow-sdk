@@ -147,6 +147,7 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ## Trace
 
+GATE 04ac579 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 GATE ed30a7e tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
 GATE 75e9d0b tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG phase1 full-tier: auth critical-area anchor (registry credential handling)
