@@ -254,7 +254,7 @@ def invalid_ctk_reason(token: str) -> str | None:
     rejected outright — the engine retired ``X-Service-Token``/``X-API-Key``
     registry auth (#3760), so sending one can only produce an unexplained 401;
     malformed ``ctk_`` keys (wrong length/alphabet) get a truncation hint.
-    Mirror of the TypeScript ``credentialError`` and CDS ``isValidCtkFormat``
+    Mirror of the TypeScript ``invalidCtkReason`` and CDS ``isValidCtkFormat``
     (DA-1948).
     """
     if not token.startswith(CTK_PREFIX):

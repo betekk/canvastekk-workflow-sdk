@@ -153,3 +153,4 @@ GATE 75e9d0b tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG phase1 full-tier: auth critical-area anchor (registry credential handling)
 LOG phase2 full-tier: auth critical-area anchor (py/ts mirror of the same credential gate)
 LOG phase3 full-tier: ticket exit gate (unconditional)
+GATE e861ddd tier=full lint=t typecheck=n.a ts=green@04ac579-same-tree build=n.a unit=t e2e=n.a (review-fix re-gate)
