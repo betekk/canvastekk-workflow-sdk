@@ -283,3 +283,98 @@ export function exportDefinition(
   writeFileSync(outputPath, JSON.stringify(registryDict, null, 2) + "\n");
   return outputPath;
 }
+
+/**
+ * Fields the engine assigns itself and excludes from its registration
+ * immutability diff (``workflow_node_service.NON_COMPARISON_FIELDS`` in
+ * canvastekk-workflow-engine). The probe diff mirrors this set so
+ * "passes locally ⇔ passes registration" holds field-for-field.
+ * Mirror of the Python SDK's ``ENGINE_NON_COMPARISON_FIELDS`` (#233).
+ */
+export const ENGINE_NON_COMPARISON_FIELDS: ReadonlySet<string> = new Set([
+  "id",
+  "name",
+  "owner",
+  "source",
+  "registered_at",
+  "node_status",
+  "last_registered_by",
+]);
+
+/** Options for {@link fetchPublishedDefinition}. */
+export interface FetchPublishedOptions {
+  /** Credential; wire form per {@link registryAuthHeader}. */
+  token?: string;
+  /** Request timeout in milliseconds (default 10s). */
+  timeoutMs?: number;
+}
+
+/**
+ * Fetch the published node definition from the engine registry by name.
+ *
+ * GETs ``{engineUrl}/api/workflows/nodes/by-name/{name}`` — the same route
+ * registration verifies against. Register-style full-endpoint URLs
+ * (``.../api/workflows/nodes``) are tolerated and normalized. Intended for
+ * the pre-registration self-check (``probe --engine-url``, #233) so node
+ * authors can diff against registry truth before a deploy burns a CI cycle
+ * on a 409 ``node_version_immutable``.
+ *
+ * Returns ``null`` on 404 (name never published — the new-node case).
+ * Throws on transport failures and non-404 HTTP errors — callers degrade
+ * to a skip note, never a hard failure.
+ */
+export async function fetchPublishedDefinition(
+  engineUrl: string,
+  name: string,
+  options: FetchPublishedOptions = {},
+): Promise<Record<string, unknown> | null> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (options.token) {
+    const [authName, authValue] = registryAuthHeader(options.token);
+    headers[authName] = authValue;
+  }
+  let base = engineUrl.replace(/\/+$/, "");
+  const nodesPath = "/api/workflows/nodes";
+  if (base.endsWith(nodesPath)) base = base.slice(0, -nodesPath.length);
+  const resp = await fetch(`${base}${nodesPath}/by-name/${encodeURIComponent(name)}`, {
+    headers,
+    signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+  });
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`Engine error (HTTP ${resp.status})`);
+  return (await resp.json()) as Record<string, unknown>;
+}
+
+/** Canonical JSON form for structural comparison (sorted keys, no undefined). */
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`);
+  return `{${entries.join(",")}}`;
+}
+
+/**
+ * Mirror the engine's registration-immutability diff, field for field.
+ *
+ * Compares the fields a registration would carry against the published
+ * definition: every shared field except {@link ENGINE_NON_COMPARISON_FIELDS}
+ * must be identical for a same-version re-registration to succeed. Keys
+ * absent from either side are skipped — the engine drops unknown incoming
+ * fields at validation and computed response fields never reach its diff.
+ * Mirror of the Python SDK's ``diff_against_published`` (#233).
+ *
+ * Returns the sorted changed field names (empty when a same-version
+ * re-registration would be accepted as ``unchanged``).
+ */
+export function diffAgainstPublished(
+  localPayload: Record<string, unknown>,
+  published: Record<string, unknown>,
+): string[] {
+  return Object.keys(localPayload)
+    .filter((key) => !ENGINE_NON_COMPARISON_FIELDS.has(key) && key in published)
+    .filter((key) => canonical(localPayload[key]) !== canonical(published[key]))
+    .sort();
+}
