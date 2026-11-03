@@ -139,7 +139,7 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
             "https://engine.test/api/workflows/nodes/",
             invoke_url="http://node.test",
             invoke_type="http",
-            api_key="k",
+            service_token="ctk_" + "k" * 43,
             verify=True,
         )
     assert probe_paths == ["/manifest"]
@@ -179,7 +179,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
         "https://engine.test/api/workflows/nodes/",
         invoke_url="http://node.test",
         invoke_type="http",
-        api_key="k",
+        service_token="ctk_" + "k" * 43,
         verify=True,
     )
     assert "/health" in probe_calls
@@ -201,7 +201,7 @@ def test_register_node_verify_requires_invoke_url(monkeypatch) -> None:
             FakeNode(),  # type: ignore[arg-type]
             "https://engine.test/api/workflows/nodes/",
             invoke_type="http",
-            api_key="k",
+            service_token="ctk_" + "k" * 43,
             verify=True,
         )
 

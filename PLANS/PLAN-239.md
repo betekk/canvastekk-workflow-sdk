@@ -36,35 +36,41 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ### Phase 1: Python — purge legacy auth + ctk_ hardening
 
-- [ ] **1.1** Make `registry_auth_header` public and strict in `python/canvastekk_workflow_sdk/registry.py`: rename from `_registry_auth_header`, raise `ValueError` with the rotation message ("this SDK requires a ctk_ key — the engine retired X-Service-Token (#3760); ask ops to rotate") on non-`ctk_` tokens, and validate the ctk_ shape (mirror CDS `ApiKeyUtil` DA-1948: `ctk_` + 43 chars of `[A-HJ-NP-Za-km-z1-9]`, 47 total) with a truncation hint on malformed keys; update all internal callers (`register_node`, `fetch_published_definition`) and demote `register_node`'s `api_key` to invoke-verification only (registry auth requires `service_token`)
+- [x] **1.1** Make `registry_auth_header` public and strict in `python/canvastekk_workflow_sdk/registry.py`: rename from `_registry_auth_header`, raise `ValueError` with the rotation message ("this SDK requires a ctk_ key — the engine retired X-Service-Token (#3760); ask ops to rotate") on non-`ctk_` tokens, and validate the ctk_ shape (mirror CDS `ApiKeyUtil` DA-1948: `ctk_` + 43 chars of `[A-HJ-NP-Za-km-z1-9]`, 47 total) with a truncation hint on malformed keys; update all internal callers (`register_node`, `fetch_published_definition`) and demote `register_node`'s `api_key` to invoke-verification only (registry auth requires `service_token`)
     — **Why:** one shared guard at the choke point every registry call routes through; root cause of the "mystery 401" class, smallest diff covering register/probe/diff/convergence at once
     — **Done when:** `grep -rn "_registry_auth_header\|X-Service-Token" python/canvastekk_workflow_sdk/` returns only the rotation-message/docstring history notes; non-ctk_ token raises before any httpx call
     — **Consumers affected:** register_node, fetch_published_definition, convergence.py, __main__.py, the 7 consumer repos' deploy CLIs (all verified already sending ctk_ keys — audit in ticket)
+    — **Done:** strict public `registry_auth_header` + `invalid_ctk_reason` (DA-1948 mirror, rotation + truncation messages); register_node requires service_token, api_key demoted to verify-only, X-API-Key leg removed; files: registry.py; fixes: none (green first run after fixture shape updates)
 
-- [ ] **1.2** Route `convergence.py` `_get_json`/`_delete` through `registry_auth_header` (purge the two hard-coded raw `X-Service-Token` headers)
+- [x] **1.2** Route `convergence.py` `_get_json`/`_delete` through `registry_auth_header` (purge the two hard-coded raw `X-Service-Token` headers)
     — **Why:** these bypassed the shared fn and send a header the engine rejects — same bug class, must not survive the purge
     — **Done when:** convergence.py contains zero literal `X-Service-Token` strings and inherits the strict validation
     — **Consumers affected:** `registry-convergence` command (retired-slug sweeps)
+    — **Done:** both helpers build headers via registry_auth_header (Bearer); files: convergence.py; fixes: none
 
-- [ ] **1.3** `python/canvastekk_workflow_sdk/__main__.py`: add `--manifest <file.json>` to `probe` (JSON → `WorkflowNodeManifest.model_validate`, same pipeline as module:attribute; positional form unchanged); fail fast on non-ctk_/malformed tokens in both `register` (exit 2, rotation message) and the probe registry-diff path (report invalid, never a skip); update usage/help text
+- [x] **1.3** `python/canvastekk_workflow_sdk/__main__.py`: add `--manifest <file.json>` to `probe` (JSON → `WorkflowNodeManifest.model_validate`, same pipeline as module:attribute; positional form unchanged); fail fast on non-ctk_/malformed tokens in both `register` (exit 2, rotation message) and the probe registry-diff path (report invalid, never a skip); update usage/help text
     — **Why:** input parity with TS probe + the AC "fails locally, no network call" at the CLI layer where the message is actionable
     — **Done when:** `ctk probe --manifest m.json` passes offline; a `svs_`-style token exits 2 with the rotation message before any socket opens
     — **Consumers affected:** CLI users on every consumer repo; none broken (all send ctk_)
+    — **Done:** probe accepts --manifest (reuses register's `_manifest_from_source`); register + probe-diff validate credentials early (exit 2 / `invalid-credential` report status); usage text names `ctk` alias; files: __main__.py; fixes: none
 
-- [ ] **1.4** Add `[tool.poetry.scripts]` → `ctk = "canvastekk_workflow_sdk.__main__:main"` in `python/pyproject.toml`
+- [x] **1.4** Add `[tool.poetry.scripts]` → `ctk = "canvastekk_workflow_sdk.__main__:main"` in `python/pyproject.toml`
     — **Why:** the AC's bin alias; `main()` already exists and sys.exits — pure metadata
     — **Done when:** `poetry install` exposes a working `ctk --version` (verified in test via entry-point declaration, not PATH)
     — **Consumers affected:** wheel installers
+    — **Done:** console script declared; files: pyproject.toml; fixes: none
 
-- [ ] **1.5** Purge + update `python/README.md` auth sections (L1118 register description, L1229 service_token row) and add the one-sentence ctk_ prefix guidance ("your key starts with `ctk_` — treat it like a password; the SDK validates its shape locally")
+- [x] **1.5** Purge + update `python/README.md` auth sections (L1118 register description, L1229 service_token row) and add the one-sentence ctk_ prefix guidance ("your key starts with `ctk_` — treat it like a password; the SDK validates its shape locally")
     — **Why:** the zero-occurrence AC + the prefix-documentation decision (prefix is public by design — secret scanning needs it)
     — **Done when:** zero `X-Service-Token` in python/README.md; ctk_ sentence present in the auth section
     — **Consumers affected:** node authors reading the py package docs
+    — **Done:** register paragraph now Bearer/ctk_; param table api_key=verify-only, service_token=required ctk_; ctk_ guidance paragraph + `ctk` examples; files: python/README.md; fixes: none
 
-- [ ] **1.6** Update python tests: rewrite the legacy-header assertions (`test_registry.py` L104–141, L691–734; `test_registry_diff.py` L65–69) to assert the raise + rotation message + shape validation (truncation hint case included); add probe `--manifest` tests; add convergence-auth routing test; cover register_node's api_key demotion (api_key alone → ValueError naming service_token)
+- [x] **1.6** Update python tests: rewrite the legacy-header assertions (`test_registry.py` L104–141, L691–734; `test_registry_diff.py` L65–69) to assert the raise + rotation message + shape validation (truncation hint case included); add probe `--manifest` tests; add convergence-auth routing test; cover register_node's api_key demotion (api_key alone → ValueError naming service_token)
     — **Why:** tests are the durable spec of the new contract; the AC names the rotation behavior explicitly
     — **Done when:** `ruff check` + full pytest suite green; no test references `X-Service-Token` as an expected header
     — **Consumers affected:** none (internal)
+    — **Done:** 12 new/rewritten tests (rotation, truncation, Bearer routing, api_key-alone, CLI exit-2s, invalid-credential probe status, probe --manifest ×2 subprocess); all fake tokens moved to the 47-char DA-1948 shape; files: test_registry.py, test_registry_diff.py, test_main.py, test_cli_register.py, test_conformance.py, test_convergence.py; fixes: E402 import order, helper-indirection AttributeError, validate-message assertion update, svs_/api_key fixture updates across 4 files
 
 ### Phase 2: TypeScript — purge legacy auth + ctk_ hardening
 
@@ -133,4 +139,4 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ## Trace
 
-<!-- gate memo lines appended during execution -->
+LOG phase1 full-tier: auth critical-area anchor (registry credential handling)

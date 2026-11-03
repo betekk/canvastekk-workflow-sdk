@@ -34,6 +34,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from canvastekk_workflow_sdk.registry import registry_auth_header
+
 PAGE_SIZE = 100
 
 
@@ -170,13 +172,15 @@ def assert_staged(
 
 
 def _get_json(url: str, token: str) -> dict:
-    req = urllib.request.Request(url, headers={"X-Service-Token": token})
+    auth_name, auth_value = registry_auth_header(token)
+    req = urllib.request.Request(url, headers={auth_name: auth_value})
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
 def _delete(url: str, token: str) -> None:
-    req = urllib.request.Request(url, method="DELETE", headers={"X-Service-Token": token})
+    auth_name, auth_value = registry_auth_header(token)
+    req = urllib.request.Request(url, method="DELETE", headers={auth_name: auth_value})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             resp.read()

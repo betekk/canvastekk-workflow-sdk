@@ -25,6 +25,11 @@ include = [
     { path = "canvastekk_workflow_sdk/data/**/*", format = ["sdist", "wheel"] },
 ]
 
+[tool.poetry.scripts]
+# Short bin alias shared with the TypeScript package (npm bin "ctk") so docs
+# say exactly `ctk probe --engine-url …` on both lanes (#239).
+ctk = "canvastekk_workflow_sdk.__main__:main"
+
 [[tool.poetry.source]]
 name = "github"
 url = "https://pypi.pkg.github.com/betekk/"

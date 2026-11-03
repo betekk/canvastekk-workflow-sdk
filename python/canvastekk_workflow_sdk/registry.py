@@ -238,17 +238,62 @@ class RegisterNodeResult(BaseModel):
         return self.node.get(key, default)
 
 
-def _registry_auth_header(token: str) -> tuple[str, str]:
-    """Wire form for a registry credential (#133) — follows credential type.
+#: Registry credential shape, mirroring CDS ``ApiKeyUtil`` (DA-1948):
+#: ``ctk_`` + 43 chars of base62 minus lookalikes (``0 O I l``) = 47 total.
+#: A future CDS format change must touch this mirror and the TypeScript
+#: ``registryAuthHeader`` together — ``tests/test_parity.py`` pins them equal.
+CTK_PREFIX = "ctk_"
+CTK_BODY_LENGTH = 43
+CTK_BODY_ALPHABET = frozenset("ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789")
 
-    ``ctk_`` keys ride ``Authorization: Bearer <token>`` (the engine's
-    DA-1949 ctk_ dispatch — an ``X-Service-Token`` carrying a ctk_ value
-    never authenticates). Legacy service tokens keep ``X-Service-Token``
-    (dated bridge; the engine's #699 sweep removes that leg later).
+
+def invalid_ctk_reason(token: str) -> str | None:
+    """Return why ``token`` is not a usable registry credential, else ``None``.
+
+    Local, offline validation (no network call): non-``ctk_`` credentials are
+    rejected outright — the engine retired ``X-Service-Token``/``X-API-Key``
+    registry auth (#3760), so sending one can only produce an unexplained 401;
+    malformed ``ctk_`` keys (wrong length/alphabet) get a truncation hint.
+    Mirror of the TypeScript ``credentialError`` and CDS ``isValidCtkFormat``
+    (DA-1948).
     """
-    if token.startswith("ctk_"):
-        return "Authorization", f"Bearer {token}"
-    return "X-Service-Token", token
+    if not token.startswith(CTK_PREFIX):
+        return (
+            "registry credentials must be ctk_ API keys — the engine retired "
+            "X-Service-Token registry auth (#3760); ask ops to rotate"
+        )
+    body = token[len(CTK_PREFIX) :]
+    if len(body) != CTK_BODY_LENGTH or any(c not in CTK_BODY_ALPHABET for c in body):
+        return (
+            f"malformed ctk_ key: expected {len(CTK_PREFIX) + CTK_BODY_LENGTH} chars "
+            f"(ctk_ + {CTK_BODY_LENGTH}, DA-1948), got {len(token)} — looks truncated or mistyped"
+        )
+    return None
+
+
+def registry_auth_header(token: str) -> tuple[str, str]:
+    """Wire form for a registry credential (#239) — ``ctk_`` API keys only.
+
+    A valid ``ctk_`` key rides ``Authorization: Bearer <token>`` (the engine's
+    DA-1949 ctk_ dispatch). Anything else — legacy service tokens included —
+    raises before any network call: the engine retired those registry legs
+    (#3760), so the only honest outcome is a local error naming the fix.
+
+    Args:
+        token: The registry credential (a ``ctk_`` API key).
+
+    Returns:
+        ``(header_name, header_value)`` for the request.
+
+    Raises:
+        ValueError: When the token is not a well-formed ``ctk_`` key
+            (:func:`invalid_ctk_reason` carries the message — rotation
+            guidance for foreign tokens, a truncation hint for malformed ones).
+    """
+    reason = invalid_ctk_reason(token)
+    if reason:
+        raise ValueError(reason)
+    return "Authorization", f"Bearer {token}"
 
 
 def build_registry_payload(
@@ -409,10 +454,10 @@ def fetch_published_definition(
         engine_url: Engine base URL (e.g. ``"https://cwe-dev.canvastekk.com"``).
             A trailing registry path is tolerated and stripped.
         name: Node slug to look up.
-        token: Optional credential. A ``ctk_``-prefixed token rides
+        token: Optional credential — a ``ctk_`` API key riding
             ``Authorization: Bearer`` (engine DA-1949) via
-            :func:`_registry_auth_header`; anything else rides
-            ``X-Service-Token`` (legacy bridge).
+            :func:`registry_auth_header`; a non-``ctk_`` token raises
+            :exc:`ValueError` locally (rotation message, no network call).
         timeout: Request timeout in seconds.
 
     Returns:
@@ -420,13 +465,15 @@ def fetch_published_definition(
         answers 404 (name never published — the new-node case).
 
     Raises:
+        ValueError: When ``token`` is present but not a well-formed
+            ``ctk_`` key (see :func:`invalid_ctk_reason`).
         httpx.HTTPError: Transport failure (unreachable engine) — callers
             degrade to a skip note, never a hard failure.
         httpx.HTTPStatusError: Any non-404 HTTP error status.
     """
     headers: dict[str, str] = {"Accept": "application/json"}
     if token:
-        auth_name, auth_value = _registry_auth_header(token)
+        auth_name, auth_value = registry_auth_header(token)
         headers[auth_name] = auth_value
     base = engine_url.rstrip("/")
     # Tolerate register-style full-endpoint URLs (``.../api/workflows/nodes``)
@@ -511,13 +558,13 @@ def register_node(
             ``"in-process"``). ``"lambda"`` is REJECTED (#131 — not
             platform policy; Lambda nodes surface via Function URL /
             gateway as ``"http"``).
-        api_key: Optional API key for registry authentication
-            (sent as ``X-API-Key`` header).
-        service_token: Optional service token for CI/CD authentication.
-            Wire form follows the credential (#133): a ``ctk_`` key rides
-            ``Authorization: Bearer`` (engine DA-1949); anything else rides
-            ``X-Service-Token`` (legacy bridge). Takes precedence over
-            ``api_key`` when both are provided.
+        api_key: Optional API key for the node's OWN invoke auth — used only
+            by the optional ``verify`` probe (``verify_node``); it never
+            authenticates the registry call (the engine retired the
+            ``X-API-Key`` registry leg, #3760).
+        service_token: Registry credential — a ``ctk_`` API key (required).
+            Rides ``Authorization: Bearer`` (engine DA-1949); validated
+            locally by :func:`registry_auth_header` before any network call.
         tags: Optional searchable tags for the registry.
         invoke_config: Optional extra invocation parameters.
         timeout: Request timeout in seconds.
@@ -536,8 +583,8 @@ def register_node(
 
     Raises:
         RegistrationError: If the registration request fails.
-        ValueError: If neither ``api_key`` nor ``service_token`` is provided,
-            or if ``invoke_type`` is invalid.
+        ValueError: If ``service_token`` is missing or not a well-formed
+            ``ctk_`` key, or if ``invoke_type`` is invalid.
 
     Example::
 
@@ -548,22 +595,17 @@ def register_node(
             node,
             registry_url="https://engine.example.com/api/workflows/nodes/",
             invoke_url="https://my-node.example.com",
-            api_key="secret-key",
+            service_token="ctk_…",
         )
         print(result.action)         # "created"
         print(result.revision_id)    # "rev-abc123"
         print(result["name"])        # dict-like access for backward compat
-
-        # CI/CD with service token
-        register_node(
-            node,
-            registry_url="https://engine.example.com/api/workflows/nodes/",
-            invoke_url="https://my-node.example.com",
-            service_token="svs_xxx",
-        )
     """
-    if not api_key and not service_token:
-        raise ValueError("Either 'api_key' or 'service_token' must be provided for registration.")
+    if not service_token:
+        raise ValueError(
+            "service_token (a ctk_ API key) is required for registration — "
+            "the engine retired X-API-Key/X-Service-Token registry auth (#3760)"
+        )
 
     if invoke_type not in VALID_INVOKE_TYPES:
         raise ValueError(
@@ -595,11 +637,8 @@ def register_node(
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    if service_token:
-        auth_name, auth_value = _registry_auth_header(service_token)
-        headers[auth_name] = auth_value
-    elif api_key:
-        headers["X-API-Key"] = api_key
+    auth_name, auth_value = registry_auth_header(service_token)
+    headers[auth_name] = auth_value
 
     try:
         resp = httpx.post(registry_url, json=manifest, headers=headers, timeout=timeout)

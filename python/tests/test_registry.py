@@ -19,6 +19,8 @@ from canvastekk_workflow_sdk.registry import (
     register_node,
 )
 
+#: Well-formed registry credential for happy-path tests (DA-1948 shape).
+CTK = "ctk_" + "k" * 43
 
 class DummyNode(BaseNode):
     definition = WorkflowNodeManifest(
@@ -49,7 +51,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, api_key="key")
+            result = register_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         assert isinstance(result, RegisterNodeResult)
@@ -62,7 +64,7 @@ class TestRegisterNode:
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
         invoke_url = "https://node.example.com"
-        api_key = "secret-key"
+        service_token = CTK
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -70,7 +72,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_url=invoke_url, api_key=api_key)
+            register_node(node, registry_url, invoke_url=invoke_url, service_token=service_token)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -80,34 +82,20 @@ class TestRegisterNode:
         assert "title" not in call_kwargs["json"]
         assert call_kwargs["json"]["invoke_type"] == "http"
         assert call_kwargs["json"]["invoke_url"] == invoke_url
-        assert "X-API-Key" in call_kwargs["headers"]
-        assert call_kwargs["headers"]["X-API-Key"] == api_key
+        assert call_kwargs["headers"]["Authorization"] == f"Bearer {service_token}"
 
-    def test_includes_api_key_header_when_provided(self) -> None:
-        """Test that X-API-Key header is included when api_key is provided."""
+    def test_api_key_alone_never_authenticates_the_registry(self) -> None:
+        """#239: the X-API-Key registry leg is retired (engine #3760) — api_key
+        (node-invoke auth only) without a ctk_ service_token fails fast."""
+        node = DummyNode()
+        with pytest.raises(ValueError, match="service_token"):
+            register_node(node, "https://registry.example.com/api/nodes", api_key="secret-key")
+
+    def test_includes_bearer_header_when_ctk_service_token_provided(self) -> None:
+        """#239: a ctk_ key rides Authorization: Bearer — the only registry auth."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
-        api_key = "secret-key"
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"id": "123"}
-        mock_response.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, api_key=api_key)
-
-        mock_post.assert_called_once()
-        call_kwargs = mock_post.call_args[1]
-        assert "X-API-Key" in call_kwargs["headers"]
-        assert call_kwargs["headers"]["X-API-Key"] == api_key
-        assert "X-Service-Token" not in call_kwargs["headers"]
-
-    def test_includes_service_token_header_when_provided(self) -> None:
-        """Test that X-Service-Token header is included when service_token is provided."""
-        node = DummyNode()
-        registry_url = "https://registry.example.com/api/nodes"
-        service_token = "svs_abc123"
+        service_token = "ctk_" + "a" * 43
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -119,34 +107,30 @@ class TestRegisterNode:
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
-        assert "X-Service-Token" in call_kwargs["headers"]
-        assert call_kwargs["headers"]["X-Service-Token"] == service_token
+        assert call_kwargs["headers"]["Authorization"] == f"Bearer {service_token}"
+        assert "X-Service-Token" not in call_kwargs["headers"]
         assert "X-API-Key" not in call_kwargs["headers"]
 
-    def test_service_token_takes_precedence_over_api_key(self) -> None:
-        """Test that service_token takes precedence when both are provided."""
+    def test_legacy_service_token_raises_rotation_error(self) -> None:
+        """#239: legacy tokens fail locally with a rotation message — never a
+        mystery engine 401 (the wire leg was retired, engine #3760)."""
         node = DummyNode()
-        registry_url = "https://registry.example.com/api/nodes"
+        with pytest.raises(ValueError, match="ask ops to rotate"):
+            register_node(node, "https://registry.example.com/api/nodes", service_token="svs_abc123")
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"id": "123"}
-        mock_response.raise_for_status = MagicMock()
-
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, api_key="old-key", service_token="svs_xyz")
-
-        mock_post.assert_called_once()
-        call_kwargs = mock_post.call_args[1]
-        assert call_kwargs["headers"]["X-Service-Token"] == "svs_xyz"
-        assert "X-API-Key" not in call_kwargs["headers"]
+    def test_malformed_ctk_token_raises_truncation_hint(self) -> None:
+        """#239: ctk_-prefixed but wrong shape → local error with the expected
+        shape (DA-1948), before any network call."""
+        node = DummyNode()
+        with pytest.raises(ValueError, match="truncated or mistyped"):
+            register_node(node, "https://registry.example.com/api/nodes", service_token="ctk_short")
 
     def test_raises_value_error_when_no_auth_provided(self) -> None:
-        """Test that ValueError is raised when neither api_key nor service_token is provided."""
+        """Test that ValueError is raised when service_token is not provided."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
-        with pytest.raises(ValueError, match="api_key.*service_token"):
+        with pytest.raises(ValueError, match="service_token"):
             register_node(node, registry_url)
 
     def test_raises_value_error_when_empty_string_auth_provided(self) -> None:
@@ -154,7 +138,7 @@ class TestRegisterNode:
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
-        with pytest.raises(ValueError, match="api_key.*service_token"):
+        with pytest.raises(ValueError, match="service_token"):
             register_node(node, registry_url, api_key="", service_token="")
 
     def test_raises_registration_error_on_network_failure(self) -> None:
@@ -164,7 +148,7 @@ class TestRegisterNode:
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
             with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, api_key="key")
+                register_node(node, registry_url, service_token=CTK)
 
         assert "Registration failed" in str(exc_info.value)
         assert exc_info.value.status_code is None
@@ -182,7 +166,7 @@ class TestRegisterNode:
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=error):
             with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, api_key="key")
+                register_node(node, registry_url, service_token=CTK)
 
         assert exc_info.value.status_code == 401
 
@@ -198,7 +182,7 @@ class TestRegisterNode:
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=error):
             with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token="svs_xxx")
+                register_node(node, registry_url, service_token=CTK)
 
         assert exc_info.value.status_code == 500
 
@@ -214,7 +198,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_url=invoke_url, api_key="key")
+            register_node(node, registry_url, invoke_url=invoke_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -232,7 +216,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, api_key="key")
+            register_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -250,7 +234,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_type=invoke_type, api_key="key")
+            register_node(node, registry_url, invoke_type=invoke_type, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -267,7 +251,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, api_key="key")
+            register_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -285,7 +269,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, timeout=timeout, api_key="key")
+            register_node(node, registry_url, timeout=timeout, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -298,7 +282,7 @@ class TestRegisterNode:
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
             with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token="svs_xxx")
+                register_node(node, registry_url, service_token=CTK)
 
         assert "Registration failed" in str(exc_info.value)
 
@@ -313,7 +297,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, api_key="key")
+            result = register_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         assert isinstance(result, RegisterNodeResult)
@@ -332,7 +316,7 @@ class TestRegisterNode:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, api_key="key")
+            result = register_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         assert isinstance(result, RegisterNodeResult)
@@ -685,17 +669,25 @@ class TestRegisterNodeNewFeatures:
                 node,
                 "https://registry.example.com/api/nodes",
                 invoke_type="invalid",
-                api_key="key",
+                service_token=CTK,
             )
 
     def test_registry_auth_header_shapes(self) -> None:
-        """#133: wire form follows credential type — the shared helper both
-        register_node and the CLI route through."""
-        from canvastekk_workflow_sdk.registry import _registry_auth_header
+        """#239: ctk_-only wire form — the shared helper register_node, the
+        registry-diff, and convergence all route through."""
+        from canvastekk_workflow_sdk.registry import invalid_ctk_reason, registry_auth_header
 
         ctk = "ctk_" + "a" * 43
-        assert _registry_auth_header(ctk) == ("Authorization", f"Bearer {ctk}")
-        assert _registry_auth_header("svs_legacy") == ("X-Service-Token", "svs_legacy")
+        assert registry_auth_header(ctk) == ("Authorization", f"Bearer {ctk}")
+        with pytest.raises(ValueError, match="ask ops to rotate"):
+            registry_auth_header("svs_legacy")
+        # Shape validation mirrors CDS ApiKeyUtil (DA-1948): 47 chars, base62
+        # minus lookalikes (0 O I l).
+        assert invalid_ctk_reason(ctk) is None
+        assert "truncated" in (invalid_ctk_reason("ctk_short") or "")
+        assert "truncated" in (invalid_ctk_reason("ctk_" + "a" * 42) or "")
+        assert "truncated" in (invalid_ctk_reason("ctk_" + "a" * 42 + "0") or "")  # alphabet: no 0/O/I/l
+        assert "rotate" in (invalid_ctk_reason("") or "")
 
     def test_ctk_token_rides_authorization_bearer(self) -> None:
         """#133: ctk_ credentials authenticate as Authorization: Bearer (the
@@ -717,22 +709,16 @@ class TestRegisterNodeNewFeatures:
         assert headers["Authorization"] == f"Bearer {ctk}"
         assert "X-Service-Token" not in headers
 
-    def test_legacy_service_token_keeps_x_service_token(self) -> None:
-        """#133 no-regression: legacy tokens are byte-identical to today."""
+    def test_legacy_service_token_rejected_locally(self) -> None:
+        """#239: no-regression inverse — legacy tokens now raise instead of
+        riding a header the engine retired (#3760)."""
         node = DummyNode()
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"id": "123"}
-        mock_response.raise_for_status = MagicMock()
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
+        with pytest.raises(ValueError, match="rotate"):
             register_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 service_token="svs_legacy",
             )
-        headers = mock_post.call_args[1]["headers"]
-        assert headers["X-Service-Token"] == "svs_legacy"
-        assert "Authorization" not in headers
 
     def test_rejects_lambda_invoke_type_with_policy_error(self) -> None:
         """#131: direct AWS invoke is not a platform surface — every node is
@@ -747,7 +733,7 @@ class TestRegisterNodeNewFeatures:
                     "https://registry.example.com/api/nodes",
                     invoke_type="lambda",
                     invoke_url="arn:aws:lambda:ap-southeast-1:123456789:function:x",
-                    api_key="key",
+                    service_token=CTK,
                 )
         mock_post.assert_not_called()
 
@@ -801,7 +787,7 @@ class TestRegisterNodeNewFeatures:
                     node,
                     "https://registry.example.com/api/nodes",
                     invoke_type=invoke_type,
-                    api_key="key",
+                    service_token=CTK,
                 )
 
             call_kwargs = mock_post.call_args[1]
@@ -819,7 +805,7 @@ class TestRegisterNodeNewFeatures:
                 node,
                 "https://registry.example.com/api/nodes",
                 tags=["ml", "point-cloud"],
-                api_key="key",
+                service_token=CTK,
             )
 
         call_kwargs = mock_post.call_args[1]
@@ -837,7 +823,7 @@ class TestRegisterNodeNewFeatures:
                 node,
                 "https://registry.example.com/api/nodes",
                 invoke_config={"region": "ap-southeast-1"},
-                api_key="key",
+                service_token=CTK,
             )
 
         call_kwargs = mock_post.call_args[1]
@@ -851,7 +837,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, "https://registry.example.com/api/nodes", api_key="key")
+            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         call_kwargs = mock_post.call_args[1]
         assert "id" not in call_kwargs["json"]
@@ -864,7 +850,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, "https://registry.example.com/api/nodes", api_key="key")
+            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         call_kwargs = mock_post.call_args[1]
         assert "default_retry" not in call_kwargs["json"]
@@ -884,7 +870,7 @@ class TestRegisterNodeNewFeatures:
         mock_response.raise_for_status = MagicMock()
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
-            result = register_node(node, "https://registry.example.com/api/nodes", api_key="key")
+            result = register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         assert isinstance(result, RegisterNodeResult)
         assert result.node == {"id": "uuid-123", "name": "test"}
@@ -909,7 +895,7 @@ class TestRegisterNodeNewFeatures:
 
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
             with patch("canvastekk_workflow_sdk.registry.logger") as mock_logger:
-                register_node(node, "https://registry.example.com/api/nodes", api_key="key")
+                register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         mock_logger.info.assert_any_call("Node registration action: %s", "updated")
         mock_logger.info.assert_any_call("Revision ID: %s", "rev-789")
@@ -951,7 +937,7 @@ class TestRegistrationErrorEnrichment:
             )
         )
         with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
-            register_node(node, "https://registry.example.com/api/nodes", api_key="test-key")
+            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
     def test_immutable_error_extracts_changed_fields(self) -> None:
         """node_version_immutable 409 yields guidance naming changed fields."""

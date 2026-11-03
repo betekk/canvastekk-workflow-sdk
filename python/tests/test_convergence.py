@@ -188,6 +188,25 @@ def _page(nodes, number, total_pages):
     }
 
 
+class TestAuthRouting:
+    """#239: convergence rides the shared ctk_ auth helper — no raw headers."""
+
+    def test_get_json_sends_bearer_for_ctk_token(self, monkeypatch):
+        captured = {}
+
+        def fake_urlopen(req, timeout):
+            captured["headers"] = dict(req.headers)
+            return _FakeResponse({"content": [], "page": {}})
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        fetch_actives("https://cwe.example", "ctk_" + "t" * 43)
+        assert captured["headers"]["Authorization"] == "Bearer " + "ctk_" + "t" * 43
+
+    def test_legacy_token_raises_rotation_error(self):
+        with pytest.raises(ValueError, match="rotate"):
+            fetch_actives("https://cwe.example", "svs_legacy")
+
+
 class TestFetchActives:
     def test_paginates_all_pages(self, monkeypatch):
         pages = [
@@ -201,7 +220,7 @@ class TestFetchActives:
             return _FakeResponse(pages[len(seen) - 1])
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        actives = fetch_actives("https://cwe.example", "tok")
+        actives = fetch_actives("https://cwe.example", "ctk_" + "t" * 43)
         assert [n["name"] for n in actives] == ["a-lambda", "b-lambda"]
         assert "page=0" in seen[0] and "page=1" in seen[1]
 
@@ -211,7 +230,7 @@ class TestFetchActives:
             "urlopen",
             lambda req, timeout: _FakeResponse({"content": [{"name": "x"}], "page": {}}),
         )
-        assert [n["name"] for n in fetch_actives("https://cwe.example", "tok")] == ["x"]
+        assert [n["name"] for n in fetch_actives("https://cwe.example", "ctk_" + "t" * 43)] == ["x"]
 
 
 class TestDeleteIdempotency:
@@ -220,7 +239,7 @@ class TestDeleteIdempotency:
             raise urllib.error.HTTPError(req.full_url, 404, "not found", None, io.BytesIO(b""))
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        _delete("https://cwe.example/api/workflows/nodes/by-name/gone", "tok")
+        _delete("https://cwe.example/api/workflows/nodes/by-name/gone", "ctk_" + "t" * 43)
 
     def test_500_raises(self, monkeypatch):
         def fake_urlopen(req, timeout):
@@ -228,7 +247,7 @@ class TestDeleteIdempotency:
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
         with pytest.raises(urllib.error.HTTPError):
-            _delete("https://cwe.example/api/workflows/nodes/by-name/x", "tok")
+            _delete("https://cwe.example/api/workflows/nodes/by-name/x", "ctk_" + "t" * 43)
 
 
 class TestDrain:
@@ -241,7 +260,7 @@ class TestDrain:
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
         records = [{"name": "legacy-old-lambda"}, {"name": "weird/slug"}]
-        drain("https://cwe.example", "tok", records, dry_run=False)
+        drain("https://cwe.example", "ctk_" + "t" * 43, records, dry_run=False)
         assert deleted == [
             "https://cwe.example/api/workflows/nodes/by-name/legacy-old-lambda",
             "https://cwe.example/api/workflows/nodes/by-name/weird%2Fslug",
@@ -252,5 +271,5 @@ class TestDrain:
             raise AssertionError("dry-run must not hit the API")
 
         monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-        drain("https://cwe.example", "tok", [{"name": "legacy-old-lambda"}], dry_run=True)
+        drain("https://cwe.example", "ctk_" + "t" * 43, [{"name": "legacy-old-lambda"}], dry_run=True)
         assert "would soft-retire" in capsys.readouterr().out
