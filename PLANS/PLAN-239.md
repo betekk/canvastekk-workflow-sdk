@@ -6,12 +6,12 @@
 
 ## Acceptance Criteria
 
-- [ ] Non-ctk_ token fails locally with a rotation message on both runtimes (no network call)
-- [ ] Zero `X-Service-Token` occurrences in either package's source/tests/READMEs (docs/EXTERNAL-AUTHOR-GUIDE.md swept too — same audience)
-- [ ] Both packages expose a `ctk` bin; docs use it uniformly
-- [ ] Python probe accepts `--manifest` and `module:attribute`
-- [ ] Parity guard test green and wired into CI
-- [ ] Full gates green on both runtimes (ruff/pytest · tsc/eslint/vitest/tsup)
+- [x] Non-ctk_ token fails locally with a rotation message on both runtimes (no network call)
+- [x] Zero `X-Service-Token` occurrences in either package's source/tests/READMEs (docs/EXTERNAL-AUTHOR-GUIDE.md swept too — same audience)
+- [x] Both packages expose a `ctk` bin; docs use it uniformly
+- [x] Python probe accepts `--manifest` and `module:attribute`
+- [x] Parity guard test green and wired into CI
+- [x] Full gates green on both runtimes (ruff/pytest · tsc/eslint/vitest/tsup)
 
 ## Dependency & Consumer Map
 
@@ -106,20 +106,23 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 
 ### Phase 3: Parity guard + docs sweep + exit gate
 
-- [ ] **3.1** Add `python/tests/test_parity.py`: (a) a pairs table asserting name correspondence for the mirror cluster (registry/diff/cli surface: `registry_auth_header↔registryAuthHeader`, `register_node↔registerNode`, `fetch_published_definition↔fetchPublishedDefinition`, `diff_against_published↔diffAgainstPublished`, `build_registry_payload↔buildRegistryPayload`, `ENGINE_NON_COMPARISON_FIELDS↔same`, `diff_manifests↔diffManifests`, …) by walking `typescript/src/{registry,diff,cli}.ts` exports vs the python modules' public names after case-normalization, with every intentional asymmetry an explicit commented allowlist entry; (b) a CLI surface table ({register, probe} shared flags) asserted against both CLIs' usage text; (c) both packages expose a `ctk` bin (pyproject scripts + package.json bin); (d) the ctk_ shape rule is identical across runtimes — assert the length/alphabet literals in `typescript/src/registry.ts` match python's validator (source-text assertion, same technique as the export walk; arch-review finding). `skipif` when `typescript/src` absent
+- [x] **3.1** Add `python/tests/test_parity.py`: (a) a pairs table asserting name correspondence for the mirror cluster (registry/diff/cli surface: `registry_auth_header↔registryAuthHeader`, `register_node↔registerNode`, `fetch_published_definition↔fetchPublishedDefinition`, `diff_against_published↔diffAgainstPublished`, `build_registry_payload↔buildRegistryPayload`, `ENGINE_NON_COMPARISON_FIELDS↔same`, `diff_manifests↔diffManifests`, …) by walking `typescript/src/{registry,diff,cli}.ts` exports vs the python modules' public names after case-normalization, with every intentional asymmetry an explicit commented allowlist entry; (b) a CLI surface table ({register, probe} shared flags) asserted against both CLIs' usage text; (c) both packages expose a `ctk` bin (pyproject scripts + package.json bin); (d) the ctk_ shape rule is identical across runtimes — assert the length/alphabet literals in `typescript/src/registry.ts` match python's validator (source-text assertion, same technique as the export walk; arch-review finding). `skipif` when `typescript/src` absent
     — **Why:** the "copy-derived definitions drift apart" lesson — the mirror is convention today; this makes forgetting it a red test instead of a support ticket
     — **Done when:** test green in ci-python.yml (monorepo checkout carries typescript/), and adding a stray export to either side's mirror modules without an allowlist entry fails it
     — **Consumers affected:** SDK maintainers (the guard's audience)
+    — **Done:** 8 tests — pairs table (9 registry + 1 diff + 1 cli pairs), drift alarm with commented allowlist, CLI surface table, ctk bin both packages, DA-1948 shape literals pinned equal (arch-review finding); files: python/tests/test_parity.py; fixes: allowlist additions (VALID/UNSUPPORTED_INVOKE_TYPES, ts test-export asymmetries) surfaced by the drift alarm working as designed
 
-- [ ] **3.2** Sweep `docs/EXTERNAL-AUTHOR-GUIDE.md`: L336–338 (register wire-form paragraph → ctk_-only), L464–467 auth-method table (retire the X-Service-Token row), L515–516 param table (api_key/service_token wording to match new register_node contract)
+- [x] **3.2** Sweep `docs/EXTERNAL-AUTHOR-GUIDE.md`: L336–338 (register wire-form paragraph → ctk_-only), L464–467 auth-method table (retire the X-Service-Token row), L515–516 param table (api_key/service_token wording to match new register_node contract)
     — **Why:** user-facing guide still teaches the dead header — same audience as the READMEs, same AC spirit
     — **Done when:** zero `X-Service-Token` outside the rotation-message string and history notes; `ctk` used in examples
     — **Consumers affected:** external node authors
+    — **Done:** full sweep beyond the three planned spots — register_node examples, curl example, GitHub Actions example (Bearer), env-var table (REGISTRY_API_KEY row removed), 401 troubleshooting row, TS CLI paragraph (`ctk`); files: docs/EXTERNAL-AUTHOR-GUIDE.md; fixes: none
 
-- [ ] **3.3** Zero-occurrence gate + full exit gate: `grep -rn "X-Service-Token" python/ typescript/ docs/` returns only deliberate history-note contexts (rotation message, changelog); run BOTH runtimes' full gates (ruff+pytest; tsc+typecheck:tests+eslint+vitest+tsup) and record the `tier=full` memo
+- [x] **3.3** Zero-occurrence gate + full exit gate: `grep -rn "X-Service-Token" python/ typescript/ docs/` returns only deliberate history-note contexts (rotation message, changelog); run BOTH runtimes' full gates (ruff+pytest; tsc+typecheck:tests+eslint+vitest+tsup) and record the `tier=full` memo
     — **Why:** the AC's zero-occurrence + full-gates boxes need a single checkable proof point on the final tree
     — **Done when:** both gates green on the same SHA; memo line appended below
     — **Consumers affected:** none (verification)
+    — **Done:** grep clean (remaining occurrences = the rotation message itself, retirement docstrings, negative assertions; node-level X-API-Key in auth/ is a different live system); one stale `_run_register` docstring line fixed; gates: ruff green + pytest 1012 passed · tsc×2 + eslint + vitest 473 + tsup green
 
 ## Technical Notes
 
@@ -145,5 +148,7 @@ Cross-module consumers beyond the node itself: yes — every consumer repo's dep
 ## Trace
 
 GATE ed30a7e tier=full lint=t typecheck=n.a build=n.a unit=t e2e=n.a
+GATE 75e9d0b tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG phase1 full-tier: auth critical-area anchor (registry credential handling)
 LOG phase2 full-tier: auth critical-area anchor (py/ts mirror of the same credential gate)
+LOG phase3 full-tier: ticket exit gate (unconditional)

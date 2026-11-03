@@ -343,9 +343,10 @@ def _run_register(args: list[str]) -> int:
 
     Mirrors the proven service-identity path (deploy-lambda.yml): POST the
     mapped payload to ``{engine}/api/workflows/nodes/``, then verify via
-    ``by-name/{name}``. The credential's wire form follows its type (#133):
-    a ``ctk_`` token rides ``Authorization: Bearer`` (engine DA-1949); a
-    legacy service token rides ``X-Service-Token``.
+    ``by-name/{name}``. The credential is a ``ctk_`` API key riding
+    ``Authorization: Bearer`` (engine DA-1949), validated locally (#239) —
+    a legacy or malformed key exits 2 with a rotation/truncation hint
+    before any network call.
 
     Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx ·
     6 network. The token is read from ``CANVASTEKK_NODE_REGISTRATION_KEY`` and is
