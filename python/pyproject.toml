@@ -36,14 +36,14 @@ url = "https://pypi.pkg.github.com/betekk/"
 priority = "supplemental"
 
 [tool.poetry.dependencies]
-pydantic = "^2.12"
+pydantic = "^2.14"
 httpx = "^0.28"
 jsonschema = "^4.26.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.0"
-pytest-asyncio = "^1.3"
-ruff = "^0.17.2"
+pytest = "^9.2"
+pytest-asyncio = "^1.4"
+ruff = "^0.17.3"
 pytest-cov = "^7.1.0"
 mangum = "^0.22"
 
