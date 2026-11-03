@@ -495,15 +495,25 @@ Defines what a node is. Maps to the engine's **registry-level node type** (`Work
 ## CLI: register + probe (v0.28+)
 
 ```bash
-canvastekk-workflow-sdk probe --manifest manifest.json
+canvastekk-workflow-sdk probe --manifest manifest.json [--engine-url URL]
 CANVASTEKK_NODE_REGISTRATION_KEY=<token> canvastekk-workflow-sdk register \
   --manifest manifest.json --engine-url https://cwe.example.com \
   [--invoke-url URL] [--name-suffix -lambda]
 ```
 
 Same vocabulary mapping, auth (`X-Service-Token`), and exit codes as the python
-CLI. `probe` is fully offline. `GET /manifest` also serves `code_digest` (sha256
+CLI. `GET /manifest` also serves `code_digest` (sha256
 of the module calling `createNodeApp`, computed at startup, never author-settable).
+
+**Pre-flight registry diff (v0.63+, `probe --engine-url`):** with the engine URL
+and `CANVASTEKK_NODE_REGISTRATION_KEY` set, `probe` also fetches the published
+definition by name and applies the engine's registration gate locally (#233):
+same-version data drift (the deploy-time 409 `node_version_immutable`) and
+version downgrades fail in seconds instead of at minute 20 of a deploy. Without
+the flag, the credential, or with the engine unreachable, the diff is skipped
+with a warning and the offline probes stay authoritative. The bump level
+(major/minor/patch) is never judged — that stays the author's declaration.
+Register-style full-endpoint URLs are tolerated and normalized.
 
 **Versioning:** The `version` field is a semantic version string (e.g. `"1.0.0"`) validated against the X.Y.Z pattern. The engine enforces immutability: re-registering with the same version and changed data is rejected. Bump the version for any schema or metadata changes.
 

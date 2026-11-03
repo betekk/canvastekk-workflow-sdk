@@ -6,6 +6,8 @@ import {
   registerNodeResultHas,
   registryAuthHeader,
   registerNode,
+  fetchPublishedDefinition,
+  diffAgainstPublished,
 } from "../src/registry.js";
 import { RegistrationError } from "../src/exceptions.js";
 import { VERSION } from "../src/version.js";
@@ -384,5 +386,65 @@ describe("registerNode credential wire form (#135)", () => {
     }
     expect(cap.headers["X-Service-Token"]).toBe("svs_legacy");
     expect(cap.headers["Authorization"]).toBeUndefined();
+  });
+});
+
+describe("fetchPublishedDefinition (#233)", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it("200 returns the parsed definition with ctk_ Bearer auth", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ name: "echo", version: "1.9.1", timeout_seconds: 7200 }), { status: 200 }),
+    ) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+    const node = await fetchPublishedDefinition("https://cwe.example.com", "echo", { token: "ctk_x" });
+    expect(node).toEqual({ name: "echo", version: "1.9.1", timeout_seconds: 7200 });
+    const [url, init] = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe("https://cwe.example.com/api/workflows/nodes/by-name/echo");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer ctk_x");
+  });
+
+  it("404 returns null (new node)", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
+    expect(await fetchPublishedDefinition("https://cwe.example.com", "never-published")).toBeNull();
+  });
+
+  it("register-style full-endpoint URLs are normalized", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+    await fetchPublishedDefinition("https://cwe.example.com/api/workflows/nodes/", "echo");
+    const [url] = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0] as [string];
+    expect(url).toBe("https://cwe.example.com/api/workflows/nodes/by-name/echo");
+  });
+});
+
+describe("diffAgainstPublished (#233)", () => {
+  const local = {
+    name: "echo",
+    version: "1.9.1",
+    timeout_seconds: 7200,
+    description: "Test",
+    input_schema: { type: "object", properties: { a: { type: "string" } } },
+  };
+
+  it("reports changed fields, deep-comparing schemas", () => {
+    expect(diffAgainstPublished(local, { ...local, timeout_seconds: 3600 })).toEqual(["timeout_seconds"]);
+    const reordered = { ...local, input_schema: { properties: { a: { type: "string" } }, type: "object" } };
+    expect(diffAgainstPublished(local, reordered)).toEqual([]);
+  });
+
+  it("ignores engine-assigned fields and local-only keys", () => {
+    expect(diffAgainstPublished(local, { ...local, id: "u", owner: "o", node_status: "inactive" })).toEqual([]);
+    expect(diffAgainstPublished({ ...local, future_field: "x" }, local)).toEqual([]);
+  });
+
+  it("version drift is reported as a field", () => {
+    expect(diffAgainstPublished(local, { ...local, version: "1.9.0" })).toEqual(["version"]);
   });
 });

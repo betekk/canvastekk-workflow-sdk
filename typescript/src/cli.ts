@@ -4,7 +4,7 @@
  * Usage:
  *   canvastekk-workflow-sdk register --manifest <file.json|URL> --engine-url URL
  *                                    [--invoke-url URL] [--name-suffix S] [--json]
- *   canvastekk-workflow-sdk probe --manifest <file.json> [--json]
+ *   canvastekk-workflow-sdk probe --manifest <file.json> [--engine-url URL] [--json]
  *
  * register maps the canonical manifest to the engine request vocabulary
  * (name=slug, label=display name; NEVER a client-sent slug key) and POSTs to
@@ -16,17 +16,20 @@
  * Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx/server
  * · 6 network. The token is never printed.
  *
- * probe runs fully offline: zod manifest validation, the engine-request
+ * probe runs offline by default: zod manifest validation, the engine-request
  * mirror (required keys, no slug key, whitelist), and the host-ceiling
  * check (DA-3499) — strictly stricter than registration: passing here
- * implies registration passes (not biconditional).
+ * implies registration passes (not biconditional). With --engine-url
+ * (#233) it additionally applies the pre-flight registry diff — same
+ * failure semantics as the python CLI's ctk probe --engine-url.
  */
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
 
 import { WorkflowNodeManifestSchema, type WorkflowNodeManifest } from "./definition.js";
-import { buildRegistryPayload, registryAuthHeader } from "./registry.js";
+import { buildRegistryPayload, registryAuthHeader, fetchPublishedDefinition, diffAgainstPublished } from "./registry.js";
+import { versionTuple, compareVersionTuples } from "./diff.js";
 
 const ENGINE_REQUEST_ALLOWED = new Set([
   "name",
@@ -96,6 +99,7 @@ export function probeManifest(raw: unknown): {
   errors: string[];
   warnings: string[];
   probes: string[];
+  registry_diff?: RegistryDiffReport;
 } {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -138,6 +142,13 @@ export function probeManifest(raw: unknown): {
   };
 }
 
+/** Pre-flight registry diff block (#233) — mirrors the Python SDK's matrix. */
+export interface RegistryDiffReport {
+  status: "skipped" | "new-node" | "unchanged" | "changed" | "newer-version" | "older-version";
+  published_version: string | null;
+  changed_fields: string[];
+}
+
 async function loadManifest(source: string): Promise<unknown> {
   if (/^https?:\/\//.test(source)) {
     const resp = await fetch(source);
@@ -159,9 +170,88 @@ function usage(): number {
   process.stderr.write(
     "Usage: canvastekk-workflow-sdk <command> [options]\n" +
       "  register --manifest <file.json|URL> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]\n" +
-      "  probe --manifest <file.json> [--json]\n",
+      "  probe --manifest <file.json> [--engine-url URL] [--json]\n",
   );
   return 2;
+}
+
+/**
+ * Apply the #233 registry diff to a probe report, in place.
+ *
+ * Behavior matrix (never asserts the bump level — patch/minor/major stays
+ * author intent): no flag / no credential / engine error → skip warning,
+ * validity unchanged; name not published → new-node pass; same version +
+ * identical data → unchanged pass; same version + changed data → fail
+ * naming the changed fields (engine 409 node_version_immutable); higher
+ * version → pass (+ "bumped but nothing changed" warning when identical);
+ * lower version → fail (engine rejects downgrades).
+ */
+export async function applyRegistryDiff(
+  report: { valid: boolean; errors: string[]; warnings: string[]; registry_diff?: RegistryDiffReport },
+  payload: Record<string, unknown>,
+  engineUrl: string | undefined,
+  token: string | undefined,
+): Promise<void> {
+  report.registry_diff = { status: "skipped", published_version: null, changed_fields: [] };
+  if (!engineUrl) {
+    report.warnings.push("registry diff skipped (no --engine-url — offline probes only)");
+    return;
+  }
+  if (!token) {
+    report.warnings.push("registry diff skipped (no credential: set CANVASTEKK_NODE_REGISTRATION_KEY)");
+    return;
+  }
+  let published: Record<string, unknown> | null;
+  try {
+    published = await fetchPublishedDefinition(engineUrl, String(payload.name ?? ""), { token });
+  } catch (e) {
+    report.warnings.push(`registry diff skipped (engine error: ${(e as Error).message})`);
+    return;
+  }
+  if (published === null) {
+    report.registry_diff = { status: "new-node", published_version: null, changed_fields: [] };
+    return;
+  }
+  const publishedVersion = String(published.version ?? "");
+  const localVersion = String(payload.version ?? "");
+  let older: boolean;
+  try {
+    older = compareVersionTuples(versionTuple(localVersion), versionTuple(publishedVersion)) < 0;
+  } catch {
+    report.warnings.push(
+      `registry diff skipped (unparsable version pair '${localVersion}' vs '${publishedVersion}')`,
+    );
+    return;
+  }
+  const changed = diffAgainstPublished(payload, published).filter((f) => f !== "version");
+  if (older) {
+    report.registry_diff = { status: "older-version", published_version: publishedVersion, changed_fields: changed };
+    report.valid = false;
+    report.errors.push(
+      `version ${localVersion} is older than published ${publishedVersion} — ` +
+        "the engine rejects downgrades (publish a higher semver)",
+    );
+  } else if (localVersion === publishedVersion) {
+    report.registry_diff = {
+      status: changed.length === 0 ? "unchanged" : "changed",
+      published_version: publishedVersion,
+      changed_fields: changed,
+    };
+    if (changed.length > 0) {
+      report.valid = false;
+      report.errors.push(
+        `definition data changed but version is still ${localVersion} ` +
+          `(changed: ${changed.join(", ")}) — bump the version before deploying`,
+      );
+    }
+  } else {
+    report.registry_diff = { status: "newer-version", published_version: publishedVersion, changed_fields: changed };
+    if (changed.length === 0) {
+      report.warnings.push(
+        `version bumped ${publishedVersion} -> ${localVersion} but definition data is identical — intentional?`,
+      );
+    }
+  }
 }
 
 async function runRegister(args: string[]): Promise<number> {
@@ -256,11 +346,34 @@ async function runProbe(args: string[]): Promise<number> {
     return 2;
   }
   const report = probeManifest(raw);
+  const engineUrl = flag(args, "--engine-url");
+  const token = (process.env.CANVASTEKK_NODE_REGISTRATION_KEY ?? process.env.CANVASTEKK_REGISTRY_TOKEN) ?? "";
+  if (engineUrl && WorkflowNodeManifestSchema.safeParse(raw).success) {
+    const parsed = WorkflowNodeManifestSchema.parse(raw);
+    await applyRegistryDiff(report, buildEngineRequest(parsed), engineUrl, token || undefined);
+  } else if (engineUrl) {
+    report.registry_diff = { status: "skipped", published_version: null, changed_fields: [] };
+  }
   if (useJson) {
     process.stdout.write(JSON.stringify(report, null, 2) + "\n");
   } else {
-    process.stdout.write(report.valid ? "PASS: manifest passes all registration probes\n" : "FAIL: manifest has errors\n");
+    process.stdout.write(
+      report.valid ? "PASS: manifest passes all registration probes\n" : "FAIL: manifest has errors\n",
+    );
     for (const err of report.errors) process.stdout.write(`  ERROR: ${err}\n`);
+    for (const warn of report.warnings) process.stdout.write(`  WARN: ${warn}\n`);
+    if (report.registry_diff) {
+      process.stdout.write(
+        `  Registry diff: ${report.registry_diff.status}` +
+          (report.registry_diff.published_version
+            ? ` (published ${report.registry_diff.published_version})`
+            : "") +
+          (report.registry_diff.changed_fields.length > 0
+            ? ` — changed: ${report.registry_diff.changed_fields.join(", ")}`
+            : "") +
+          "\n",
+      );
+    }
   }
   return report.valid ? 0 : 1;
 }
