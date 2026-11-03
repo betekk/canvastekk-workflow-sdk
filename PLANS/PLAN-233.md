@@ -16,12 +16,12 @@ From ticket #233:
 - [ ] Bump level (major/minor/patch) is never asserted
 - [ ] Unit tests cover all five rows + the offline skip
 
-AC1 amended at authoring (ticket says `ctk validate`; implementation lands in
-`ctk probe` — the command whose contract is "passes locally ⇔ passes
-registration". `validate` stays the fast offline validator; the diff needs the
-engine, so it rides `probe --engine-url`. `validate` gains no engine
-dependency.) Matrix extended to six rows: older-version-than-published also
-fails (engine `ResourceConflictError` path).
+AC1 amended at authoring and **confirmed by the user in the Step 7 requirements
+gate** (round 1/2): the diff surface is `ctk probe --engine-url <url>` —
+`validate` stays the fast offline validator; the diff needs the engine, so it
+rides `probe --engine-url` and `validate` gains no engine dependency. The
+sixth matrix row (older-version-than-published → fail fast) was confirmed in
+the same round.
 
 ## Dependency & Consumer Map
 
