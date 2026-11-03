@@ -2,16 +2,18 @@
  * CLI entrypoint for @betekk/canvastekk-workflow-sdk (DA-2603).
  *
  * Usage:
- *   canvastekk-workflow-sdk register --manifest <file.json|URL> --engine-url URL
- *                                    [--invoke-url URL] [--name-suffix S] [--json]
- *   canvastekk-workflow-sdk probe --manifest <file.json> [--engine-url URL] [--json]
+ *   ctk register --manifest <file.json|URL> --engine-url URL
+ *                [--invoke-url URL] [--name-suffix S] [--json]
+ *   ctk probe --manifest <file.json> [--engine-url URL] [--json]
+ *   (bin names: ctk and canvastekk-workflow-sdk are identical, #239)
  *
  * register maps the canonical manifest to the engine request vocabulary
  * (name=slug, label=display name; NEVER a client-sent slug key) and POSTs to
  * {engine}/api/workflows/nodes/, then verifies via by-name/{name}. The
- * credential's wire form follows its type (#135): a ctk_ token rides
- * Authorization: Bearer (engine DA-1949); a legacy service token rides
- * X-Service-Token. Read from CANVASTEKK_NODE_REGISTRATION_KEY, never printed.
+ * credential is a ctk_ API key riding Authorization: Bearer (engine DA-1949),
+ * validated locally (#239) — a legacy/malformed token fails with exit 2
+ * before any network call. Read from CANVASTEKK_NODE_REGISTRATION_KEY,
+ * never printed.
  *
  * Exit codes: 0 ok · 2 usage · 3 auth (401/403) · 4 other 4xx · 5 5xx/server
  * · 6 network. The token is never printed.
@@ -28,7 +30,13 @@ import { pathToFileURL } from "node:url";
 import process from "node:process";
 
 import { WorkflowNodeManifestSchema, type WorkflowNodeManifest } from "./definition.js";
-import { buildRegistryPayload, registryAuthHeader, fetchPublishedDefinition, diffAgainstPublished } from "./registry.js";
+import {
+  buildRegistryPayload,
+  registryAuthHeader,
+  fetchPublishedDefinition,
+  diffAgainstPublished,
+  invalidCtkReason,
+} from "./registry.js";
 import { versionTuple, compareVersionTuples } from "./diff.js";
 
 const ENGINE_REQUEST_ALLOWED = new Set([
@@ -144,7 +152,14 @@ export function probeManifest(raw: unknown): {
 
 /** Pre-flight registry diff block (#233) — mirrors the Python SDK's matrix. */
 export interface RegistryDiffReport {
-  status: "skipped" | "new-node" | "unchanged" | "changed" | "newer-version" | "older-version";
+  status:
+    | "skipped"
+    | "new-node"
+    | "unchanged"
+    | "changed"
+    | "newer-version"
+    | "older-version"
+    | "invalid-credential";
   published_version: string | null;
   changed_fields: string[];
 }
@@ -168,7 +183,7 @@ function flag(args: string[], name: string): string | undefined {
 
 function usage(): number {
   process.stderr.write(
-    "Usage: canvastekk-workflow-sdk <command> [options]\n" +
+    "Usage: ctk <command> [options]  (bin alias: canvastekk-workflow-sdk)\n" +
       "  register --manifest <file.json|URL> --engine-url URL [--invoke-url URL] [--name-suffix S] [--json]\n" +
       "  probe --manifest <file.json> [--engine-url URL] [--json]\n",
   );
@@ -199,6 +214,15 @@ export async function applyRegistryDiff(
   }
   if (!token) {
     report.warnings.push("registry diff skipped (no credential: set CANVASTEKK_NODE_REGISTRATION_KEY)");
+    return;
+  }
+  const tokenError = invalidCtkReason(token);
+  if (tokenError) {
+    // #239: a present-but-invalid credential FAILS the report — never a
+    // skip (the engine retired the legacy legs, #3760).
+    report.registry_diff = { status: "invalid-credential", published_version: null, changed_fields: [] };
+    report.valid = false;
+    report.errors.push(tokenError);
     return;
   }
   let published: Record<string, unknown> | null;
@@ -262,6 +286,11 @@ async function runRegister(args: string[]): Promise<number> {
   const token = (process.env.CANVASTEKK_NODE_REGISTRATION_KEY ?? process.env.CANVASTEKK_REGISTRY_TOKEN) ?? "";
   if (!token) {
     process.stderr.write("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)\n");
+    return 2;
+  }
+  const tokenError = invalidCtkReason(token);
+  if (tokenError) {
+    process.stderr.write(`Error: ${tokenError}\n`);
     return 2;
   }
 

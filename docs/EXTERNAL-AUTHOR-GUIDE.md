@@ -333,16 +333,17 @@ python -m canvastekk_workflow_sdk register handler:definition \
 
 The CLI maps the manifest to the engine's request vocabulary automatically
 (`name` = the manifest's `slug`, `label` = the display `name`, plus schemas,
-cost, timeout, constraints, deprecation), authenticates with the header
-the token shape selects — a `ctk_` credential rides `Authorization: Bearer`,
-a legacy service token rides `X-Service-Token` — POSTs to
+cost, timeout, constraints, deprecation), authenticates with your `ctk_`
+API key (`Authorization: Bearer`), POSTs to
 `{engine}/api/workflows/nodes/`, and
-verifies the row via `by-name/{name}`. Exit codes: `0` ok · `2` usage ·
+verifies the row via `by-name/{name}`. The credential is validated locally
+(#239): a legacy or malformed key fails with a rotation/truncation hint
+before any network call. Exit codes: `0` ok · `2` usage ·
 `3` auth (401/403) · `4` other 4xx · `5` server · `6` network. The token is
 read from the environment and never printed.
 
-The TypeScript package ships the same CLI (`canvastekk-workflow-sdk register
---manifest <file.json|URL> --engine-url URL …` / `canvastekk-workflow-sdk
+The TypeScript package ships the same CLI (`ctk register
+--manifest <file.json|URL> --engine-url URL …` / `ctk
 probe --manifest <file.json>`) with identical flags, mapping, and exit codes.
 
 ### `code_digest` (v0.28+)
@@ -461,10 +462,16 @@ After deployment, register your node so the engine can discover it. The engine s
 
 ### Authentication Methods
 
+Registry authentication uses **`ctk_` API keys** (created in the platform's
+API-key UI; 47 chars: `ctk_` + 43). One method, both runtimes:
+
 | Method | Header | Use Case |
 |--------|--------|----------|
-| **Service Token** | `X-Service-Token` | CI/CD pipelines (recommended) |
-| **API Key** | `X-API-Key` | Manual registration, testing |
+| **ctk_ API key** | `Authorization: Bearer` | CI/CD pipelines and manual registration |
+
+Treat the key like a password: never commit it, never paste it in issues.
+The SDK validates its shape locally and fails fast with a rotation hint;
+legacy `X-Service-Token` registry auth was retired at the engine (#3760).
 
 ### Using `register_node()` (Python)
 
@@ -474,21 +481,24 @@ from canvastekk_workflow_sdk.registry import register_node
 
 node = MyNode()
 
-# CI/CD with service token (recommended)
+# CI/CD with your ctk_ API key (the registry credential — #239)
 register_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
-    service_token="svs_your-token-here",
+    service_token="ctk_your-key-here",
     tags=["category:utility", "team:platform"],
 )
 
-# Manual with API key
+# With the optional verify probe (api_key is the NODE's own auth — it
+# never authenticates the registry call)
 register_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
-    api_key="your-api-key",
+    service_token="ctk_your-key-here",
+    verify=True,
+    api_key="your-node-invoke-key",
 )
 
 # Lambda-hosted node — still HTTP-contract: expose the function via its
@@ -500,7 +510,7 @@ register_node(
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_type="http",
     invoke_url="https://my-node.lambda-url.ap-southeast-1.on.aws/",
-    api_key="your-api-key",
+    service_token="ctk_your-key-here",
 )
 ```
 
@@ -512,13 +522,11 @@ register_node(
 | `registry_url` | `str` | Yes | Engine registry endpoint (e.g., `/api/workflows/nodes/`) |
 | `invoke_url` | `str \| None` | No | URL where the node is reachable |
 | `invoke_type` | `"http" \| "sagemaker" \| "in-process"` | No | Invocation type (default: `"http"`). `"lambda"` is rejected — not a platform surface (Function URL/gateway + `"http"` instead, [#131](https://github.com/betekk/canvastekk-workflow-sdk/issues/131)) |
-| `api_key` | `str \| None` | Yes* | API key for auth (`X-API-Key` header) |
-| `service_token` | `str \| None` | Yes* | Service token for CI/CD (`X-Service-Token` header, takes precedence) |
+| `api_key` | `str \| None` | No | Node-invoke auth — used only by the optional `verify` probe; never authenticates the registry call |
+| `service_token` | `str \| None` | Yes | Registry credential — a `ctk_` API key (`Authorization: Bearer`, validated locally) |
 | `tags` | `list[str] \| None` | No | Searchable tags for the registry |
 | `invoke_config` | `dict \| None` | No | Extra invocation parameters (e.g., Lambda region) |
 | `timeout` | `int` | No | Request timeout in seconds (default: 30) |
-
-*Either `api_key` or `service_token` must be provided.
 
 ### Using `curl` (manual)
 
@@ -526,10 +534,10 @@ register_node(
 # Get your node manifest
 MANIFEST=$(curl -s http://localhost:8001/manifest)
 
-# Register with service token
+# Register with your ctk_ API key
 curl -X POST https://engine.example.com/api/workflows/nodes/ \
   -H "Content-Type: application/json" \
-  -H "X-Service-Token: svs_your-token-here" \
+  -H "Authorization: Bearer ctk_your-key-here" \
   -d "$(echo "$MANIFEST" | jq '. + {invoke_url: "https://my-node.example.com", invoke_type: "http"}')"
 ```
 
@@ -541,8 +549,7 @@ Secrets are **never stored in code**. Use your CI/CD provider's secrets store.
 
 | Secret | When Required | Description |
 |--------|--------------|-------------|
-| `CANVASTEKK_NODE_REGISTRATION_KEY` (deprecated alias: `CANVASTEKK_REGISTRY_TOKEN`, removed at fleet purge tracker#3838) | CI/CD registration | Service credential for automated registration. The header is picked from the token shape: a `ctk_` credential rides `Authorization: Bearer`, a legacy service token rides `X-Service-Token`. Issued by the platform team. |
-| `REGISTRY_API_KEY` | Manual registration | API key for the registry (`X-API-Key` header). Provided by the platform team. |
+| `CANVASTEKK_NODE_REGISTRATION_KEY` (deprecated alias: `CANVASTEKK_REGISTRY_TOKEN`, removed at fleet purge tracker#3838) | CI/CD registration | Registry credential for automated registration: a `ctk_` API key riding `Authorization: Bearer` (validated locally by the SDK, #239). Issued by the platform team. |
 | `CANVASTEKK_API_KEY` | Node auth (API Key mode) | Shared secret for authenticating requests to your node. Set via `NodeAuth.api_key()`. Local dev / CI profile; org production nodes use central token mode. |
 | `CWE_API_BASE_URL` | Node auth (central token mode) | Workflow engine base URL for `NodeAuth.central()` token verification (v0.54.0+, `docs/NODE-TOKEN-CONTRACT.md`). |
 | `CANVASTEKK_KEYCLOAK_SERVER_URL` | Node auth (Keycloak mode) | Keycloak base URL. Only needed if using Keycloak auth. |
@@ -617,7 +624,7 @@ jobs:
       - name: Validate registration
         run: |
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "X-Service-Token: ${{ secrets.CANVASTEKK_NODE_REGISTRATION_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.CANVASTEKK_NODE_REGISTRATION_KEY }}" \
             "${{ env.ENGINE_URL }}/my-node-v1.0.0")
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "Registration verification failed (HTTP $HTTP_STATUS)"
@@ -644,7 +651,7 @@ When calling the registry API, you may encounter these errors:
 
 | HTTP Status | Error Meaning | Cause | Fix |
 |-------------|--------------|-------|-----|
-| **401** | Unauthorized | Missing or invalid API key / service token | Check your `api_key` or `service_token` value. Ensure the header is correct (`X-API-Key` or `X-Service-Token`). |
+| **401** | Unauthorized | Missing or invalid `ctk_` API key | Check your `service_token` value (a well-formed `ctk_` key, 47 chars). The SDK validates the shape locally — a local shape error means a truncated or rotated key. |
 | **403** | Forbidden | Wrong owner — the node is registered under a different owner | Contact the platform team to transfer ownership, or use a different node ID. |
 | **404** | Not Found | Node not found in registry (GET/PUT/DELETE) or registry endpoint doesn't exist | Verify the `registry_url` and node ID. |
 | **409** | Conflict | Node already exists with a different owner, **or** same version registered with different content (immutability violation) | Use a unique node ID, or **bump your version** if you changed the schema or metadata. |

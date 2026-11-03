@@ -18,6 +18,9 @@ from canvastekk_workflow_sdk.registry import (
     fetch_published_definition,
 )
 
+#: Well-formed registry credential (DA-1948 shape: ctk_ + 43).
+CTK = "ctk_" + "x" * 43
+
 NAME = "cds-file-lambda"
 
 
@@ -46,27 +49,21 @@ class TestFetchPublishedDefinition:
             return _Resp(200, {"name": NAME, "version": "1.9.1", "timeout_seconds": 7200})
 
         with patch("canvastekk_workflow_sdk.registry.httpx.get", side_effect=fake_get):
-            node = fetch_published_definition("https://cwe.example.com", NAME, token="ctk_secret")
+            node = fetch_published_definition("https://cwe.example.com", NAME, token=CTK)
 
         assert node == {"name": NAME, "version": "1.9.1", "timeout_seconds": 7200}
         assert captured["url"] == f"https://cwe.example.com/api/workflows/nodes/by-name/{NAME}"
-        assert captured["headers"]["Authorization"] == "Bearer ctk_secret"
+        assert captured["headers"]["Authorization"] == f"Bearer {CTK}"
 
     def test_404_returns_none_for_new_node(self) -> None:
         with patch("canvastekk_workflow_sdk.registry.httpx.get", return_value=_Resp(404)):
             assert fetch_published_definition("https://cwe.example.com", "never-published") is None
 
-    def test_non_ctk_token_rides_service_token_header(self) -> None:
-        captured: dict = {}
-
-        def fake_get(url: str, headers: dict | None = None, **_: object) -> _Resp:
-            captured["headers"] = headers or {}
-            return _Resp(200, {"name": NAME})
-
-        with patch("canvastekk_workflow_sdk.registry.httpx.get", side_effect=fake_get):
+    def test_non_ctk_token_raises_rotation_error(self) -> None:
+        """#239: legacy tokens fail locally (rotation message) — never a
+        header the engine retired (#3760)."""
+        with pytest.raises(ValueError, match="ask ops to rotate"):
             fetch_published_definition("https://cwe.example.com", NAME, token="legacy-token")
-
-        assert captured["headers"]["X-Service-Token"] == "legacy-token"
 
     def test_transport_error_propagates_for_caller_degradation(self) -> None:
         with patch(

@@ -21,7 +21,8 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "canvastekk-workflow-sdk": "./dist/cli.js"
+    "canvastekk-workflow-sdk": "./dist/cli.js",
+    "ctk": "./dist/cli.js"
   },
   "files": [
     "dist"

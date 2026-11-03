@@ -92,7 +92,7 @@ class TestProbeDefinition:
 
 
 class TestRunRegister:
-    def _run(self, argv, token="t0ps3cret", environ=None):
+    def _run(self, argv, token="ctk_" + "t" * 43, environ=None):
         env = {"CANVASTEKK_NODE_REGISTRATION_KEY": token, **(environ or {})}
         buf_out, buf_err = io.StringIO(), io.StringIO()
         with patch.dict("os.environ", env), redirect_stdout(buf_out), redirect_stderr(buf_err):
@@ -103,6 +103,19 @@ class TestRunRegister:
         code, _, err = self._run(["m:d", "--engine-url", "https://eng"], token="")
         assert code == 2
         assert "CANVASTEKK_NODE_REGISTRATION_KEY" in err
+
+    def test_non_ctk_token_is_rotation_error(self) -> None:
+        """#239: legacy credentials fail locally (exit 2, rotation message) —
+        no network call."""
+        code, _, err = self._run(["m:d", "--engine-url", "https://eng"], token="t0ps3cret")
+        assert code == 2
+        assert "ctk_" in err and "rotate" in err
+
+    def test_malformed_ctk_token_is_usage_error(self) -> None:
+        """#239: truncated ctk_ keys fail locally with the shape hint."""
+        code, _, err = self._run(["m:d", "--engine-url", "https://eng"], token="ctk_short")
+        assert code == 2
+        assert "truncated" in err
 
     def test_missing_engine_url_is_usage_error(self) -> None:
         assert self._run(["m:d"])[0] == 2
@@ -215,7 +228,7 @@ class TestRegisterManifestFileInput:
             return response
 
         with (
-            patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}),
+            patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "ctk_" + "t" * 43}),
             patch("urllib.request.urlopen", side_effect=fake_urlopen),
         ):
             code = _run_register(["--manifest", str(path), "--engine-url", "https://eng", "--json"])
@@ -223,7 +236,7 @@ class TestRegisterManifestFileInput:
         assert calls[0][1] == "https://eng/api/workflows/nodes/"
 
     def test_manifest_missing_file_is_usage_error(self, tmp_path) -> None:
-        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "t"}):
+        with patch.dict("os.environ", {"CANVASTEKK_NODE_REGISTRATION_KEY": "ctk_" + "t" * 43}):
             assert _run_register(["--manifest", str(tmp_path / "nope.json"), "--engine-url", "https://eng"]) == 2
 
 

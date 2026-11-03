@@ -7,6 +7,7 @@ import {
   registryAuthHeader,
   registerNode,
   fetchPublishedDefinition,
+  invalidCtkReason,
   diffAgainstPublished,
 } from "../src/registry.js";
 import { RegistrationError } from "../src/exceptions.js";
@@ -328,19 +329,30 @@ describe("stamped provenance — dual-write dead (#123)", () => {
   });
 });
 
-const CTK_KEY = "ctk_" + "a".repeat(43);
+const CTK = "ctk_" + "a".repeat(43);
 
-describe("registryAuthHeader wire form (#135)", () => {
+describe("registryAuthHeader wire form (#239: ctk_ only)", () => {
   it("ctk_ credentials ride Authorization: Bearer", () => {
-    expect(registryAuthHeader(CTK_KEY)).toEqual(["Authorization", `Bearer ${CTK_KEY}`]);
+    expect(registryAuthHeader(CTK)).toEqual(["Authorization", `Bearer ${CTK}`]);
   });
 
-  it("legacy service tokens keep X-Service-Token byte-identically", () => {
-    expect(registryAuthHeader("svs_legacy")).toEqual(["X-Service-Token", "svs_legacy"]);
+  it("legacy service tokens throw the rotation message locally", () => {
+    expect(() => registryAuthHeader("svs_legacy")).toThrow(/ask ops to rotate/);
+  });
+
+  it("malformed ctk_ keys throw the DA-1948 truncation hint", () => {
+    expect(() => registryAuthHeader("ctk_short")).toThrow(/truncated or mistyped/);
+    expect(() => registryAuthHeader("ctk_" + "a".repeat(42))).toThrow(/truncated/);
+    expect(() => registryAuthHeader("ctk_" + "a".repeat(42) + "0")).toThrow(/truncated/);
+  });
+
+  it("invalidCtkReason mirrors the python helper (null = valid)", () => {
+    expect(invalidCtkReason(CTK)).toBeNull();
+    expect(invalidCtkReason("svs_legacy")).toMatch(/rotate/);
   });
 });
 
-describe("registerNode credential wire form (#135)", () => {
+describe("registerNode credential wire form (#239: ctk_ only)", () => {
   const captureHeaders = (): { headers: Record<string, string> } => {
     const state = { headers: {} as Record<string, string> };
     const realFetch = globalThis.fetch;
@@ -358,34 +370,40 @@ describe("registerNode credential wire form (#135)", () => {
     };
   };
 
-  it("sends Authorization: Bearer for ctk_ keys — no X-Service-Token", async () => {
+  it("sends Authorization: Bearer for ctk_ keys — no legacy headers", async () => {
     const cap = captureHeaders();
     try {
       await registerNode(
         { definition: testDef },
         "https://engine.example.com/api/workflows/nodes/",
-        { serviceToken: CTK_KEY },
+        { serviceToken: CTK },
       ).catch(() => undefined);
     } finally {
       cap.restore();
     }
-    expect(cap.headers["Authorization"]).toBe(`Bearer ${CTK_KEY}`);
+    expect(cap.headers["Authorization"]).toBe(`Bearer ${CTK}`);
     expect(cap.headers["X-Service-Token"]).toBeUndefined();
+    expect(cap.headers["X-API-Key"]).toBeUndefined();
   });
 
-  it("legacy service tokens are unchanged", async () => {
+  it("legacy service tokens throw the rotation message before any fetch", async () => {
     const cap = captureHeaders();
     try {
-      await registerNode(
-        { definition: testDef },
-        "https://engine.example.com/api/workflows/nodes/",
-        { serviceToken: "svs_legacy" },
-      ).catch(() => undefined);
+      await expect(
+        registerNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/", {
+          serviceToken: "svs_legacy",
+        }),
+      ).rejects.toThrow(/ask ops to rotate/);
     } finally {
       cap.restore();
     }
-    expect(cap.headers["X-Service-Token"]).toBe("svs_legacy");
     expect(cap.headers["Authorization"]).toBeUndefined();
+  });
+
+  it("missing serviceToken throws naming it (apiKey registry leg removed)", async () => {
+    await expect(
+      registerNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/"),
+    ).rejects.toThrow(/serviceToken/);
   });
 });
 
@@ -400,14 +418,14 @@ describe("fetchPublishedDefinition (#233)", () => {
       new Response(JSON.stringify({ name: "echo", version: "1.9.1", timeout_seconds: 7200 }), { status: 200 }),
     ) as unknown as typeof fetch;
     globalThis.fetch = fetchMock;
-    const node = await fetchPublishedDefinition("https://cwe.example.com", "echo", { token: "ctk_x" });
+    const node = await fetchPublishedDefinition("https://cwe.example.com", "echo", { token: CTK });
     expect(node).toEqual({ name: "echo", version: "1.9.1", timeout_seconds: 7200 });
     const [url, init] = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0] as [
       string,
       RequestInit,
     ];
     expect(url).toBe("https://cwe.example.com/api/workflows/nodes/by-name/echo");
-    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer ctk_x");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(`Bearer ${CTK}`);
   });
 
   it("404 returns null (new node)", async () => {

@@ -14,6 +14,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+#: Well-formed registry credential for probe tests (DA-1948 shape).
+CTK = "ctk_" + "x" * 43
+
 PYTHON_BIN = Path(sys.executable)
 REPO_PYTHON_DIR = Path(__file__).resolve().parents[1]
 
@@ -144,7 +147,7 @@ def test_validate_missing_module_path():
     assert result.returncode == 1, (
         f"Expected exit 1, got {result.returncode}. stdout: {result.stdout}, stderr: {result.stderr}"
     )
-    assert "module path required" in result.stderr
+    assert "module path or --manifest required" in result.stderr
 
 
 def test_version_flag():
@@ -506,19 +509,19 @@ class TestProbeRegistryDiff:
 
     def test_new_node_passes(self) -> None:
         with self._engine(None):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "new-node"
 
     def test_same_version_identical_data_passes_unchanged(self) -> None:
         with self._engine(self._published("1.9.1", timeout_seconds=7200)):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "unchanged"
 
     def test_same_version_changed_data_fails_naming_fields(self) -> None:
         with self._engine(self._published("1.9.1", timeout_seconds=3600)):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is False
         assert report["registry_diff"]["status"] == "changed"
         assert report["registry_diff"]["changed_fields"] == ["timeout_seconds"]
@@ -526,20 +529,20 @@ class TestProbeRegistryDiff:
 
     def test_newer_version_changed_data_passes(self) -> None:
         with self._engine(self._published("1.9.0", timeout_seconds=3600)):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "newer-version"
 
     def test_newer_version_identical_data_warns_but_passes(self) -> None:
         with self._engine(self._published("1.9.0", timeout_seconds=7200)):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "newer-version"
         assert any("identical — intentional?" in w for w in report["warnings"])
 
     def test_older_version_fails(self) -> None:
         with self._engine(self._published("2.0.0")):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is False
         assert report["registry_diff"]["status"] == "older-version"
         assert any("older than published" in e for e in report["errors"])
@@ -553,7 +556,7 @@ class TestProbeRegistryDiff:
             "canvastekk_workflow_sdk.registry.httpx.get",
             side_effect=_httpx.ConnectError("engine unreachable"),
         ):
-            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "skipped"
         assert any("engine error" in w for w in report["warnings"])
@@ -567,6 +570,106 @@ class TestProbeRegistryDiff:
             "properties": {"new_mandatory": {"type": "string"}},
         }
         with self._engine(self._published("1.9.1")):
-            report = self._probe(manifest, engine_url="https://cwe.example.com", token="ctk_x")
+            report = self._probe(manifest, engine_url="https://cwe.example.com", token=CTK)
         assert report["valid"] is True
         assert report["registry_diff"]["status"] == "newer-version"
+
+
+class TestProbeRegistryDiffCredentialGate:
+    """#239: a present-but-invalid credential fails the probe report — never
+    a skip (the engine retired the legacy legs, #3760)."""
+
+    def _probe_with_token(self, token: str) -> dict:
+        from canvastekk_workflow_sdk.__main__ import _probe_definition
+
+        manifest = TestProbeRegistryDiff()._manifest()
+        return _probe_definition(manifest, engine_url="https://cwe.example.com", token=token)
+
+    def test_legacy_token_fails_with_rotation_error(self) -> None:
+        report = self._probe_with_token("svs_legacy")
+        assert report["valid"] is False
+        assert report["registry_diff"]["status"] == "invalid-credential"
+        assert any("rotate" in e for e in report["errors"])
+
+    def test_truncated_ctk_token_fails_with_shape_hint(self) -> None:
+        report = self._probe_with_token("ctk_short")
+        assert report["valid"] is False
+        assert report["registry_diff"]["status"] == "invalid-credential"
+        assert any("truncated" in e for e in report["errors"])
+
+
+def test_probe_accepts_manifest_file():
+    """#239: probe --manifest runs the same probes without an import path."""
+    import json as _json
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manifest_file = Path(tmpdir) / "manifest.json"
+        manifest_file.write_text(
+            _json.dumps(
+                {
+                    "slug": "echo",
+                    "version": "1.0.0",
+                    "name": "Echo",
+                    "description": "Test",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                }
+            )
+        )
+        result = subprocess.run(
+            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "probe", "--manifest", str(manifest_file), "--json"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            env=_cli_env(),
+        )
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}. stdout: {result.stdout}, stderr: {result.stderr}"
+        )
+        report = _json.loads(result.stdout)
+        assert report["valid"] is True
+        assert report["registry_diff"]["status"] == "skipped"
+
+
+def test_probe_manifest_with_legacy_token_fails():
+    """#239: CLI probe with a legacy env credential exits 1 naming rotation."""
+    import json as _json
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manifest_file = Path(tmpdir) / "manifest.json"
+        manifest_file.write_text(
+            _json.dumps(
+                {
+                    "slug": "echo",
+                    "version": "1.0.0",
+                    "name": "Echo",
+                    "description": "Test",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                }
+            )
+        )
+        env = _cli_env()
+        env["CANVASTEKK_NODE_REGISTRATION_KEY"] = "svs_legacy"
+        result = subprocess.run(
+            [
+                str(PYTHON_BIN),
+                "-m",
+                "canvastekk_workflow_sdk",
+                "probe",
+                "--manifest",
+                str(manifest_file),
+                "--engine-url",
+                "https://cwe.example.com",
+                "--json",
+            ],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert result.returncode == 1
+        report = _json.loads(result.stdout)
+        assert report["valid"] is False
+        assert report["registry_diff"]["status"] == "invalid-credential"
+        assert any("rotate" in e for e in report["errors"])
