@@ -12,7 +12,7 @@ dynamic = ["dependencies"]
 jwt = ["PyJWT>=2.15,<3"]
 keycloak = ["PyJWT>=2.15,<3", "cryptography>=50,<51"]
 serve = ["uvicorn>=0.54,<0.55"]
-fastapi = ["fastapi>=0.143.5,<0.144"]
+fastapi = ["fastapi>=0.143.5,<0.163"]
 lambda = ["mangum>=0.22,<1"]
 
 [project.urls]
