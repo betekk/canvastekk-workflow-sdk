@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import sys
+import time
 from importlib.resources import as_file
 from importlib.resources import files as pkg_files
 from pathlib import Path
@@ -98,6 +99,9 @@ def _validate_definition(definition) -> dict:
 
     return report
 
+
+_REGISTER_ATTEMPTS = 4
+_REGISTER_BACKOFF_S = 2.0
 
 _ENGINE_REQUEST_ALLOWED = frozenset(
     {
@@ -429,7 +433,25 @@ def _run_register(args: list[str]) -> int:
         return code
 
     try:
-        status, body = _request("POST", base, json.dumps(payload).encode())
+        status, body = None, None
+        for attempt in range(1, _REGISTER_ATTEMPTS + 1):
+            try:
+                status, body = _request("POST", base, json.dumps(payload).encode())
+                break
+            except urllib.error.HTTPError as e:
+                if e.code < 500 or attempt == _REGISTER_ATTEMPTS:
+                    raise
+                reason = f"HTTP {e.code}"
+            except (urllib.error.URLError, OSError) as e:
+                if attempt == _REGISTER_ATTEMPTS:
+                    raise
+                reason = f"{type(e).__name__}: {e}"
+            wait = _REGISTER_BACKOFF_S * (2 ** (attempt - 1))
+            print(
+                f"register: attempt {attempt}/{_REGISTER_ATTEMPTS} failed ({reason}); retrying in {wait:.0f}s",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")[:300]
         if e.code in (401, 403):
