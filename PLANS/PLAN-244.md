@@ -43,20 +43,23 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
     — **Done:** verdict section written (drop-in, ctk_-only prerequisite, no release, no SDK change to file) + in-ticket bump decision recorded per detection-gate user answer; files: docs/COMPATIBILITY-v0.64.0.md §1/§4; fixes: none
 
 ### Phase 2: Apply the alignment — bump both lagging pins to v0.64.0
-- [ ] **2.1** In canvastekk-llm-service (worktree `worktrees/244-cls-pin`, branch `feat/244-cls-pin` off `origin/dev`): bump `opencode_app/Dockerfile` LAMBDA-stage SDK wheel URL v0.61.0 → v0.64.0; PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
+- [x] **2.1** In canvastekk-llm-service (worktree `worktrees/244-cls-pin`, branch `feat/244-cls-pin` off `origin/dev`): bump `opencode_app/Dockerfile` LAMBDA-stage SDK wheel URL v0.61.0 → v0.64.0; PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
     — **Why:** AC4 as scoped by the user — OpenCode lambda is one of the two lagging consumers; pip installs at build time so no lockfile exists to regenerate
     — **Done when:** the Dockerfile carries the v0.64.0 wheel URL and the PR is open (its watcher merges green)
     — **Consumers affected:** opencode_app LAMBDA image build; registration at deploy requires `ctk_` credentials (already the engine's only accepted credential)
-- [ ] **2.2** In canvastekk-ifc-service-app (worktree `worktrees/244-cisa-pin`, branch `feat/244-cisa-pin` off `origin/dev`): bump `apps/node/package.json` `@betekk/canvastekk-workflow-sdk` tgz URL v0.61.0 → v0.64.0, regenerate `apps/node/package-lock.json` (`npm install --package-lock-only`); PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
+    — **Done:** llm-service feat/244-cls-pin 704d6fb — Dockerfile wheel URL v0.61.0→v0.64.0, asset name verified vs release listing; files: opencode_app/Dockerfile; fixes: none
+- [x] **2.2** In canvastekk-ifc-service-app (worktree `worktrees/244-cisa-pin`, branch `feat/244-cisa-pin` off `origin/dev`): bump `apps/node/package.json` `@betekk/canvastekk-workflow-sdk` tgz URL v0.61.0 → v0.64.0, regenerate `apps/node/package-lock.json` (`npm install --package-lock-only`); PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
     — **Why:** AC4 — CISA's TS lane is the other lagging consumer; engine floor unchanged (>=24 both versions, CISA CI pins node 24) so the bump is drop-in
     — **Done when:** package.json + package-lock.json both reference v0.64.0 tgz and the PR is open
     — **Consumers affected:** apps/node build + its workflow-node registration path
+    — **Done:** ifc-service-app feat/244-cisa-pin 19eefc2 — tgz pin + lockfile regen (scoped diff: version/resolved/integrity/ctk bin); npm ci + typecheck + lint(0 err) + 126/126 tests green vs new tgz; files: apps/node/package.json, apps/node/package-lock.json; fixes: none
 
 ### Phase 3: Verification gate + ship
-- [ ] **3.1** Run the gate: report diff is docs-only (both CI lanes paths-filtered out) → tier light for the report; each pin bump runs its consumer repo's applicable check (Dockerfile line-only → light; CISA lockfile regen → npm build/typecheck if configured, else light with the lockfile diff verified)
+- [x] **3.1** Run the gate: report diff is docs-only (both CI lanes paths-filtered out) → tier light for the report; each pin bump runs its consumer repo's applicable check (Dockerfile line-only → light; CISA lockfile regen → npm build/typecheck if configured, else light with the lockfile diff verified)
     — **Why:** exit-gate discipline per diff surface
     — **Done when:** gate memo lines appended to this PLAN's Trace (one per PR)
     — **Consumers affected:** none
+    — **Done:** CLS bump gate=light (URL constant, no local lane applies; build lane rides CI); CISA bump gate=full (typecheck=t lint=t unit=t vs installed v0.64.0); report gate=light n.a. lanes; fixes: none
 - [ ] **3.2** Commit + push all three branches, create all three PRs (report PR carries `Closes betekk/canvastekk-workflow-sdk#244`), arm background merge watchers, land LEARNINGS capture (if any)
     — **Why:** ship the verification + alignment
     — **Done when:** three PR URLs exist with watchers armed
@@ -77,3 +80,4 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
 ## Trace
 
 GATE n/a tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — docs-only diff (md), both CI lanes paths-filtered; citations verified to resolve (2026-11-11)
+GATE PENDING tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — exit gate, docs-only diff in SDK repo (repo CI paths-filters docs/PLANS out of both lanes); consumer-repo gates green (CLS 704d6fb light; CISA 19eefc2 full typecheck/lint/unit)
