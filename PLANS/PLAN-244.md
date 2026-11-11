@@ -26,18 +26,21 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
 ## Implementation Phases
 
 ### Phase 1: Record v0.64.0 contracts and consumer inventory
-- [ ] **1.1** Author `docs/COMPATIBILITY-v0.64.0.md` recording (a) the Python + TypeScript node manifest shape (`WorkflowNodeManifest`: identity, schemas, token_cost, retry, metadata, `sdk_version` provenance stamp, `code_digest`, `mode`, `effective_contract` routes), (b) the execute contract (`POST /execute` JSON body; presigned-GET file inputs; multipart upload-session outputs, legacy presigned-PUT fails `NodeIOError` DA-3340), (c) the `/manifest` discovery endpoint shape, and (d) registration behavior (`POST` registry payload, `RegisterNodeResult{node,action,revision_id,previous_version,changes}`, `ctk_`-only credentials with offline validation #239/#3760)
+- [x] **1.1** Author `docs/COMPATIBILITY-v0.64.0.md` recording (a) the Python + TypeScript node manifest shape (`WorkflowNodeManifest`: identity, schemas, token_cost, retry, metadata, `sdk_version` provenance stamp, `code_digest`, `mode`, `effective_contract` routes), (b) the execute contract (`POST /execute` JSON body; presigned-GET file inputs; multipart upload-session outputs, legacy presigned-PUT fails `NodeIOError` DA-3340), (c) the `/manifest` discovery endpoint shape, and (d) registration behavior (`POST` registry payload, `RegisterNodeResult{node,action,revision_id,previous_version,changes}`, `ctk_`-only credentials with offline validation #239/#3760)
     — **Why:** ACs 1–2 — the report is the ticket's deliverable; contracts must be recorded from the v0.64.0 tag sources, not dev HEAD assumptions
     — **Done when:** the file exists in the worktree and every recorded fact cites its source file:line in the v0.64.0 tree
     — **Consumers affected:** none (new doc)
-- [ ] **1.2** Record the consumer pin inventory table verified against each consumer repo's remote `dev` branch (CLS gateway pyproject v0.64.0; CLS OpenCode lambda Dockerfile v0.61.0; CISA apps/python v0.64.0; CISA apps/node v0.61.0; workflow-engine fastapi_app v0.64.0; workflow-nodes apps/python v0.64.0) with the v0.61.0→v0.64.0 delta analysis (ctk_-only auth, `ctk` bin, registry-diff probe; manifest/execute contracts unchanged — verified via `git diff --stat v0.61.0 v0.64.0`)
+    — **Done:** report authored at docs/COMPATIBILITY-v0.64.0.md — manifest/execute/discovery/registration contracts recorded with file:line citations (all verified to resolve); files: docs/COMPATIBILITY-v0.64.0.md; fixes: none
+- [x] **1.2** Record the consumer pin inventory table verified against each consumer repo's remote `dev` branch (CLS gateway pyproject v0.64.0; CLS OpenCode lambda Dockerfile v0.61.0; CISA apps/python v0.64.0; CISA apps/node v0.61.0; workflow-engine fastapi_app v0.64.0; workflow-nodes apps/python v0.64.0) with the v0.61.0→v0.64.0 delta analysis (ctk_-only auth, `ctk` bin, registry-diff probe; manifest/execute contracts unchanged — verified via `git diff --stat v0.61.0 v0.64.0`)
     — **Why:** AC 3 — "current" means verified against remote dev, not local checkouts that may lag
     — **Done when:** each table row names the consumer manifest file path and the exact pinned URL as fetched from `repos/*/contents?ref=dev`
     — **Consumers affected:** none (report only)
-- [ ] **1.3** Document the CLS/OpenCode alignment verdict: v0.64.0 is a drop-in for node code (no manifest/execution contract change); the ONLY upgrade prerequisite for the two v0.61.0 consumers (CLS OpenCode lambda, CISA apps/node) is registry credentials already rotated to `ctk_` keys; verdict **no SDK change required, no release**; both consumer pins are bumped in-ticket (Phase 2, user decision) — the report records this as applied alignment, parent betekk/canvastekk-tracker#4211
+    — **Done:** inventory table built from `gh api repos/*/contents?ref=dev` fetches (6 consumers, 2 lagging at v0.61.0 identified); files: docs/COMPATIBILITY-v0.64.0.md §3; fixes: none
+- [x] **1.3** Document the CLS/OpenCode alignment verdict: v0.64.0 is a drop-in for node code (no manifest/execution contract change); the ONLY upgrade prerequisite for the two v0.61.0 consumers (CLS OpenCode lambda, CISA apps/node) is registry credentials already rotated to `ctk_` keys; verdict **no SDK change required, no release**; both consumer pins are bumped in-ticket (Phase 2, user decision) — the report records this as applied alignment, parent betekk/canvastekk-tracker#4211
     — **Why:** ACs 4–6 — the alignment decision + no-release verdict is the point of the ticket
     — **Done when:** the report states the verdict explicitly and the PR body carries it (PR target `dev`, `Closes betekk/canvastekk-workflow-sdk#244`)
     — **Consumers affected:** none (no code change)
+    — **Done:** verdict section written (drop-in, ctk_-only prerequisite, no release, no SDK change to file) + in-ticket bump decision recorded per detection-gate user answer; files: docs/COMPATIBILITY-v0.64.0.md §1/§4; fixes: none
 
 ### Phase 2: Apply the alignment — bump both lagging pins to v0.64.0
 - [ ] **2.1** In canvastekk-llm-service (worktree `worktrees/244-cls-pin`, branch `feat/244-cls-pin` off `origin/dev`): bump `opencode_app/Dockerfile` LAMBDA-stage SDK wheel URL v0.61.0 → v0.64.0; PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
@@ -72,3 +75,5 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
 - **Report read as an upgrade mandate** — mitigation: verdict section states explicitly that no SDK release is made and consumer bumps are follow-ups, not part of this ticket.
 
 ## Trace
+
+GATE n/a tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — docs-only diff (md), both CI lanes paths-filtered; citations verified to resolve (2026-11-11)
