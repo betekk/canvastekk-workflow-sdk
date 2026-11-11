@@ -8,7 +8,7 @@
 - [ ] SDK `v0.64.0` compatibility report exists.
 - [ ] Manifest and execute contracts are recorded.
 - [ ] Consumer pin inventory is current.
-- [ ] CLS and OpenCode alignment is documented.
+- [ ] CLS and OpenCode alignment is documented **and applied**: both lagging v0.61.0 pins bumped to v0.64.0 in-ticket (user decision, detection-gate round 1) — CLS `opencode_app/Dockerfile` + CISA `apps/node/package.json` (+lockfile), via sub-PRs in the consumer repos (`Part of` refs; only the report PR carries `Closes`).
 - [ ] Any required SDK change is filed separately (verdict: none required — recorded with rationale).
 - [ ] No SDK release is made unless a gap is found (verdict: no gap — no release).
 
@@ -17,9 +17,11 @@
 | Node (file/module) | Depends on (must precede) | Consumers (who depends on this) | Change risk |
 |---------------------|---------------------------|---------------------------------|-------------|
 | `docs/COMPATIBILITY-v0.64.0.md` (new) | contract inspection (v0.64.0 tag sources) | none — new doc, no code imports | low |
+| `canvastekk-llm-service/opencode_app/Dockerfile` (pin line) | v0.64.0 release artifacts | LAMBDA image build; deploy-time node registration (ctk_ creds) | low — URL constant bump |
+| `canvastekk-ifc-service-app/apps/node/package.json` + lockfile (pin) | v0.64.0 release artifacts | apps/node build, workflow-node TS registration | low — engine floor unchanged (>=24) |
 | `PLANS/PLAN-244.md` | — | this pipeline (Step 8) | low |
 
-Docs-only ticket: zero code-path nodes, so no cross-module consumers exist. Consumer Map is intentionally thin — architecture review triage (Step 7) relies on this being honest.
+Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-interface consumers), so cross-module blast radius is nil — architecture-review triage stays zero-reviewer on an honestly thin code map.
 
 ## Implementation Phases
 
@@ -32,19 +34,29 @@ Docs-only ticket: zero code-path nodes, so no cross-module consumers exist. Cons
     — **Why:** AC 3 — "current" means verified against remote dev, not local checkouts that may lag
     — **Done when:** each table row names the consumer manifest file path and the exact pinned URL as fetched from `repos/*/contents?ref=dev`
     — **Consumers affected:** none (report only)
-- [ ] **1.3** Document the CLS/OpenCode alignment verdict: v0.64.0 is a drop-in for node code (no manifest/execution contract change); the ONLY upgrade prerequisite for the two v0.61.0 consumers (CLS OpenCode lambda, CISA apps/node) is registry credentials already rotated to `ctk_` keys; verdict **no SDK change required, no release**; consumer-side pin bumps listed as recommended follow-ups (parent betekk/canvastekk-tracker#4211)
+- [ ] **1.3** Document the CLS/OpenCode alignment verdict: v0.64.0 is a drop-in for node code (no manifest/execution contract change); the ONLY upgrade prerequisite for the two v0.61.0 consumers (CLS OpenCode lambda, CISA apps/node) is registry credentials already rotated to `ctk_` keys; verdict **no SDK change required, no release**; both consumer pins are bumped in-ticket (Phase 2, user decision) — the report records this as applied alignment, parent betekk/canvastekk-tracker#4211
     — **Why:** ACs 4–6 — the alignment decision + no-release verdict is the point of the ticket
     — **Done when:** the report states the verdict explicitly and the PR body carries it (PR target `dev`, `Closes betekk/canvastekk-workflow-sdk#244`)
     — **Consumers affected:** none (no code change)
 
-### Phase 2: Verification gate + ship
-- [ ] **2.1** Run the gate: docs-only diff → both CI lanes are paths-filtered out (`python/**`, `typescript/**`), so gate = tier light: verify the report renders as valid Markdown (headings/tables/fences), every source citation resolves in the v0.64.0 tree, and the working tree is clean of stray artifacts
-    — **Why:** exit-gate discipline — even docs tickets need an objective completion check
-    — **Done when:** gate memo line `GATE <sha> tier=light` appended to this PLAN's Trace
+### Phase 2: Apply the alignment — bump both lagging pins to v0.64.0
+- [ ] **2.1** In canvastekk-llm-service (worktree `worktrees/244-cls-pin`, branch `feat/244-cls-pin` off `origin/dev`): bump `opencode_app/Dockerfile` LAMBDA-stage SDK wheel URL v0.61.0 → v0.64.0; PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
+    — **Why:** AC4 as scoped by the user — OpenCode lambda is one of the two lagging consumers; pip installs at build time so no lockfile exists to regenerate
+    — **Done when:** the Dockerfile carries the v0.64.0 wheel URL and the PR is open (its watcher merges green)
+    — **Consumers affected:** opencode_app LAMBDA image build; registration at deploy requires `ctk_` credentials (already the engine's only accepted credential)
+- [ ] **2.2** In canvastekk-ifc-service-app (worktree `worktrees/244-cisa-pin`, branch `feat/244-cisa-pin` off `origin/dev`): bump `apps/node/package.json` `@betekk/canvastekk-workflow-sdk` tgz URL v0.61.0 → v0.64.0, regenerate `apps/node/package-lock.json` (`npm install --package-lock-only`); PR targeting `dev`, body `Part of betekk/canvastekk-workflow-sdk#244`
+    — **Why:** AC4 — CISA's TS lane is the other lagging consumer; engine floor unchanged (>=24 both versions, CISA CI pins node 24) so the bump is drop-in
+    — **Done when:** package.json + package-lock.json both reference v0.64.0 tgz and the PR is open
+    — **Consumers affected:** apps/node build + its workflow-node registration path
+
+### Phase 3: Verification gate + ship
+- [ ] **3.1** Run the gate: report diff is docs-only (both CI lanes paths-filtered out) → tier light for the report; each pin bump runs its consumer repo's applicable check (Dockerfile line-only → light; CISA lockfile regen → npm build/typecheck if configured, else light with the lockfile diff verified)
+    — **Why:** exit-gate discipline per diff surface
+    — **Done when:** gate memo lines appended to this PLAN's Trace (one per PR)
     — **Consumers affected:** none
-- [ ] **2.2** Commit + push `feat/244`, land LEARNINGS capture (if any), create the PR targeting `dev`
-    — **Why:** ship the verification
-    — **Done when:** PR URL exists and background merge watcher is armed
+- [ ] **3.2** Commit + push all three branches, create all three PRs (report PR carries `Closes betekk/canvastekk-workflow-sdk#244`), arm background merge watchers, land LEARNINGS capture (if any)
+    — **Why:** ship the verification + alignment
+    — **Done when:** three PR URLs exist with watchers armed
     — **Consumers affected:** none
 
 ## Technical Notes
