@@ -66,8 +66,8 @@ Python `python/canvastekk_workflow_sdk/definition.py`; TypeScript
   (DA-3340)
 - Cancellation: `cancel_event` aborts in-flight downloads; `execute()` itself
   cannot be interrupted
-- `BaseNode.execute(inputs, context)` is the author surface (65 node
-  implementations dispatch through it today)
+- `BaseNode.execute(inputs, context)` is the author surface (the SDK repo's
+  own examples and tests carry 65 implementations dispatching through it)
 
 ### 2.3 Discovery / version header
 
@@ -81,7 +81,11 @@ manifest cross-checking.
 Python `registry.py:register_node`, TS `registry.ts:197 registerNode`:
 
 - `POST` the registry payload built from the manifest
-  (`buildRegistryPayload`: `invoke_type` ∈ {`http`,`lambda`,`inline`…},
+  (`buildRegistryPayload`: `invoke_type` — the `InvokeType` literal is
+  `{"http", "lambda", "sagemaker", "in-process"}`
+  (`registry.py:23`), **but `lambda` is listed in
+  `UNSUPPORTED_INVOKE_TYPES` and rejected with migration guidance — the
+  supported set today is `http` / `sagemaker` / `in-process`**;
   `invoke_url`, `tags`, `invoke_config`)
 - **Credential:** `serviceToken` — a `ctk_` API key, **required** (#239);
   rides `Authorization: Bearer` (`registryAuthHeader`, offline validation:

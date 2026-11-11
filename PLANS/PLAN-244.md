@@ -80,4 +80,6 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
 ## Trace
 
 GATE n/a tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — docs-only diff (md), both CI lanes paths-filtered; citations verified to resolve (2026-11-11)
-GATE PENDING tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — exit gate, docs-only diff in SDK repo (repo CI paths-filters docs/PLANS out of both lanes); consumer-repo gates green (CLS 704d6fb light; CISA 19eefc2 full typecheck/lint/unit)
+GATE c8ba499 tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — exit gate, docs-only diff in SDK repo (repo CI paths-filters docs/PLANS out of both lanes); consumer-repo gates green (CLS 704d6fb light; CISA 19eefc2 full typecheck/lint/unit)
+LOG review-fix r1: report §2.4 invoke_type set corrected to literal {http,lambda,sagemaker,in-process} with lambda unsupported (UNSUPPORTED_INVOKE_TYPES); §2.2 65-implementations phrasing repo-local. Source: code review (Major docs-accuracy).
+GATE PENDING2 tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — review-fix re-gate, docs-only; corrected claims re-verified vs registry.py:23 + UNSUPPORTED_INVOKE_TYPES (fixes c8ba499 -> this SHA)
