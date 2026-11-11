@@ -60,10 +60,11 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
     — **Done when:** gate memo lines appended to this PLAN's Trace (one per PR)
     — **Consumers affected:** none
     — **Done:** CLS bump gate=light (URL constant, no local lane applies; build lane rides CI); CISA bump gate=full (typecheck=t lint=t unit=t vs installed v0.64.0); report gate=light n.a. lanes; fixes: none
-- [ ] **3.2** Commit + push all three branches, create all three PRs (report PR carries `Closes betekk/canvastekk-workflow-sdk#244`), arm background merge watchers, land LEARNINGS capture (if any)
+- [x] **3.2** Commit + push all three branches, create all three PRs (report PR carries `Closes betekk/canvastekk-workflow-sdk#244`), arm background merge watchers, land LEARNINGS capture (if any)
     — **Why:** ship the verification + alignment
     — **Done when:** three PR URLs exist with watchers armed
     — **Consumers affected:** none
+    — **Done:** PRs created — workflow-sdk#245 (Closes #244), llm-service#633 (CLS pin), ifc-service-app#482 (CISA pin); watchers armed; files: PLANS/PLAN-244.md, LEARNINGS/anti-patterns/validity-set-minus-rejection-map-is-support-surface.md; fixes: none
 
 ## Technical Notes
 - v0.64.0 tag = merge `2d54486` of dev PR #241; dev HEAD `872c6c7` is its content parent — dev carries the same contracts (pyproject `version` fields on branches are cosmetic; releases stamp at build time from PR labels via git-cliff).
@@ -82,4 +83,4 @@ Docs + pin-constant ticket: the only "consumers" are build pipelines (no code-in
 GATE n/a tier=light lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — docs-only diff (md), both CI lanes paths-filtered; citations verified to resolve (2026-11-11)
 GATE c8ba499 tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — exit gate, docs-only diff in SDK repo (repo CI paths-filters docs/PLANS out of both lanes); consumer-repo gates green (CLS 704d6fb light; CISA 19eefc2 full typecheck/lint/unit)
 LOG review-fix r1: report §2.4 invoke_type set corrected to literal {http,lambda,sagemaker,in-process} with lambda unsupported (UNSUPPORTED_INVOKE_TYPES); §2.2 65-implementations phrasing repo-local. Source: code review (Major docs-accuracy).
-GATE PENDING2 tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — review-fix re-gate, docs-only; corrected claims re-verified vs registry.py:23 + UNSUPPORTED_INVOKE_TYPES (fixes c8ba499 -> this SHA)
+GATE ba21e6a tier=full lint=n.a typecheck=n.a build=n.a unit=n.a e2e=n.a — review-fix re-gate, docs-only; corrected claims re-verified vs registry.py:23 + UNSUPPORTED_INVOKE_TYPES (fixes c8ba499 -> this SHA)
