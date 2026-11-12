@@ -80,3 +80,4 @@ LOG ticket exit gate: Phase 2 reuses the green full-gate evidence for the unchan
 GATE 57d8f76 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG review-fix round 1 (Minor): running-cap coverage now writes one 100-byte chunk before the second chunk exceeds the cap, proving partial-file cleanup rather than only rejection
 LOG review-fix re-gate: Ruff + compileall + 1017 tests + wheel/sdist; E2E n.a (backend-only Python, no Playwright target)
+GATE f8c1c0a tier=full lint=t typecheck=t build=t unit=t e2e=n.a
