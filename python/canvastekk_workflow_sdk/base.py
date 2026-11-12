@@ -264,11 +264,11 @@ class BaseNode(ABC):
         url: str,
         context: ExecutionContext,
     ) -> Path:
-        """Download a single presigned URL to the downloads dir.
+        """Stream a single presigned URL to the downloads dir.
 
         Enforces the SSRF URL policy on every request and redirect hop,
         a mid-stream byte cap, a total download deadline, and cleans up
-        partial files on any failure.
+        partial files on any failure. Every streaming response is closed.
 
         Returns the local path of the completed download.
         """
@@ -286,11 +286,71 @@ class BaseNode(ABC):
                     raise NodeIOError(f"Download for field '{field_name}' was cancelled")
 
                 try:
-                    resp = httpx.get(
+                    with httpx.stream(
+                        "GET",
                         current_url,
                         timeout=_HTTPX_DOWNLOAD_TIMEOUT,
                         follow_redirects=False,
-                    )
+                    ) as resp:
+                        if resp.status_code in (301, 302, 303, 307, 308):
+                            hops += 1
+                            if hops > MAX_REDIRECT_HOPS:
+                                raise NodeIOError(
+                                    f"Too many redirects downloading file for field '{field_name}'",
+                                    details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                                )
+                            next_url = resp.headers.get("location")
+                            if not next_url:
+                                raise NodeIOError(
+                                    f"Redirect without Location header downloading file for field '{field_name}'",
+                                    details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                                )
+                            current_url = validate_external_url(
+                                next_url if "://" in next_url else str(urljoin(current_url, next_url))
+                            )
+                            filename = f"{field_name}_{self._extract_filename(current_url)}"
+                            continue
+
+                        if resp.status_code >= 400:
+                            raise NodeIOError(
+                                f"HTTP {resp.status_code} downloading file for field '{field_name}'",
+                                details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
+                            )
+
+                        local_path = context.downloads_dir / filename
+
+                        content_disposition = resp.headers.get("content-disposition")
+                        if content_disposition:
+                            filename = f"{field_name}_{self._extract_filename(current_url, content_disposition)}"
+                            local_path = context.downloads_dir / filename
+
+                        content_length = resp.headers.get("content-length")
+                        if content_length and content_length.isdigit():
+                            if int(content_length) > max_bytes:
+                                raise NodeIOError(
+                                    f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)",
+                                    details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
+                                )
+
+                        try:
+                            with open(local_path, "wb") as f:
+                                running = 0
+                                for chunk in resp.iter_bytes(chunk_size=65536):
+                                    if cancel_event is not None and cancel_event.is_set():
+                                        raise NodeIOError(f"Download for field '{field_name}' was cancelled")
+                                    running += len(chunk)
+                                    if running > max_bytes:
+                                        raise NodeIOError(
+                                            f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)",
+                                            details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
+                                        )
+                                    if time.monotonic() > deadline:
+                                        raise NodeIOError(f"Download deadline exceeded for field '{field_name}'")
+                                    f.write(chunk)
+                        except BaseException:
+                            local_path.unlink(missing_ok=True)
+                            raise
+                        return local_path
                 except httpx.TimeoutException as exc:
                     raise NodeIOError(f"Timeout downloading file for field '{field_name}': {exc}") from exc
                 except httpx.HTTPError as exc:
@@ -298,66 +358,6 @@ class BaseNode(ABC):
                         f"Failed to download file for field '{field_name}': {exc}",
                         details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
                     ) from exc
-
-                if resp.status_code in (301, 302, 303, 307, 308):
-                    hops += 1
-                    if hops > MAX_REDIRECT_HOPS:
-                        raise NodeIOError(
-                            f"Too many redirects downloading file for field '{field_name}'",
-                            details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
-                        )
-                    next_url = resp.headers.get("location")
-                    if not next_url:
-                        raise NodeIOError(
-                            f"Redirect without Location header downloading file for field '{field_name}'",
-                            details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
-                        )
-                    current_url = validate_external_url(
-                        next_url if "://" in next_url else str(urljoin(current_url, next_url))
-                    )
-                    filename = f"{field_name}_{self._extract_filename(current_url)}"
-                    continue
-
-                if resp.status_code >= 400:
-                    raise NodeIOError(
-                        f"HTTP {resp.status_code} downloading file for field '{field_name}'",
-                        details={"sub_code": IO_SUBCODE_DOWNLOAD_FAILED},
-                    )
-
-                local_path = context.downloads_dir / filename
-
-                content_disposition = resp.headers.get("content-disposition")
-                if content_disposition:
-                    filename = f"{field_name}_{self._extract_filename(current_url, content_disposition)}"
-                    local_path = context.downloads_dir / filename
-
-                content_length = resp.headers.get("content-length")
-                if content_length and content_length.isdigit():
-                    if int(content_length) > max_bytes:
-                        raise NodeIOError(
-                            f"File for field '{field_name}' exceeds size cap ({content_length} > {max_bytes} bytes)",
-                            details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
-                        )
-
-                try:
-                    with open(local_path, "wb") as f:
-                        running = 0
-                        for chunk in resp.iter_bytes(chunk_size=65536):
-                            if cancel_event is not None and cancel_event.is_set():
-                                raise NodeIOError(f"Download for field '{field_name}' was cancelled")
-                            running += len(chunk)
-                            if running > max_bytes:
-                                raise NodeIOError(
-                                    f"File for field '{field_name}' exceeds size cap ({running} > {max_bytes} bytes)",
-                                    details={"sub_code": IO_SUBCODE_SIZE_EXCEEDED},
-                                )
-                            if time.monotonic() > deadline:
-                                raise NodeIOError(f"Download deadline exceeded for field '{field_name}'")
-                            f.write(chunk)
-                except BaseException:
-                    local_path.unlink(missing_ok=True)
-                    raise
-                return local_path
         except UrlPolicyError as exc:
             raise NodeIOError(
                 f"Blocked URL for field '{field_name}': {exc}",
