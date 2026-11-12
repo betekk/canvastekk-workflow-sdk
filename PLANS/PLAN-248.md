@@ -9,7 +9,7 @@
 - [x] Content-length and running-byte caps reject over-limit input during transfer
 - [x] Redirect SSRF checks, cancellation, deadline, and partial-file cleanup remain intact
 - [x] Tests cover declared and undeclared content lengths, over-cap streams, and cleanup
-- [ ] Existing file-input tests and SDK conformance suites pass
+- [x] Existing file-input tests and SDK conformance suites pass
 - **Post-merge release (orchestrator-owned):** a final SDK release is published with the Python wheel and checksum so CASA can pin the new SDK asset; the exact tag is commented on #248
 
 ## Dependency & Consumer Map
@@ -40,10 +40,11 @@ The only production-code consumer in this repository is `_prepare_file_inputs`; 
 
 ### Phase 2: Full SDK verification and ticket exit gate
 
-- [ ] **2.1** Run scoped Ruff checks, Python compile checks, the complete Python test suite (including file-input and conformance tests), and wheel/sdist builds; tick all pre-release acceptance criteria and append the final-SHA full gate memo
+- [x] **2.1** Run scoped Ruff checks, Python compile checks, the complete Python test suite (including file-input and conformance tests), and wheel/sdist builds; tick all pre-release acceptance criteria and append the final-SHA full gate memo
     — **Why:** this changes shared network and security-sensitive behavior inherited by external nodes, and the ticket exit gate is unconditionally full before review and PR creation
     — **Done when:** Ruff, compile checks, all Python tests, and both package builds pass on the final implementation tree; `PLANS/PLAN-248.md` records exact evidence and `GATE <short-sha> tier=full` for the pushed implementation SHA
     — **Consumers affected:** PR gate citation, SDK maintainers, downstream release consumers
+    — **Done:** full exit gate green on implementation 57d8f76 — Ruff, compileall, 1017 tests (including file-input and conformance), wheel and sdist builds; all five pre-release ACs ticked; files: PLANS/PLAN-248.md; fixes: none
 
 ## Post-merge release follow-through
 
@@ -75,3 +76,5 @@ This release action is intentionally outside the implementation executor's pre-m
 ## Trace
 LOG full-gate escalation: Phase 1 changed the shared download transport and SSRF/cap cleanup path with cross-module and external node consumers
 LOG Phase 1 commands: Ruff check (all SDK source, tests, scripts), compileall, poetry build (wheel + sdist), full pytest (1017 passed); focused file-download/local-server run 60 passed; E2E n.a (backend-only Python, no Playwright target)
+LOG ticket exit gate: Phase 2 reuses the green full-gate evidence for the unchanged implementation committed as 57d8f76; no duplicate checks for the same risk
+GATE 57d8f76 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
