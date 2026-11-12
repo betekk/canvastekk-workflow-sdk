@@ -147,58 +147,73 @@ class StrictValidationNode(BaseNode):
         return {}
 
 
+class _MockStreamResponse:
+    """Context-managed httpx.stream response double with lifecycle evidence."""
+
+    def __init__(self, content: bytes = b"", headers: dict[str, str] | None = None, status_code: int = 200):
+        self.content = content
+        self.headers = httpx.Headers(headers or {})
+        self.status_code = status_code
+        self.entered = False
+        self.exited = False
+        self.iterated = False
+
+    def __enter__(self):
+        self.entered = True
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.exited = True
+
+    def iter_bytes(self, chunk_size=65536):
+        self.iterated = True
+        yield self.content
+
+
 def _make_mock_stream(content: bytes, headers: dict[str, str] | None = None):
-    """Create a mock httpx.get response (kept name for test-history parity)."""
-
-    class MockResponse:
-        def __init__(self):
-            self.headers = httpx.Headers(headers or {})
-            self.status_code = 200
-
-        def iter_bytes(self, chunk_size=65536):
-            yield content
-
-    return MockResponse()
+    """Create a context-managed mock httpx.stream response."""
+    return _MockStreamResponse(content, headers)
 
 
 def _make_mock_stream_error(status_code: int):
-    """Create a mock httpx.get response with an error status code."""
-
-    class MockResponse:
-        def __init__(self):
-            self.headers = httpx.Headers({})
-            self.status_code = status_code
-
-        def iter_bytes(self, chunk_size=65536):
-            yield b""
-
-    return MockResponse()
+    """Create a mock httpx.stream response with an error status code."""
+    return _MockStreamResponse(status_code=status_code)
 
 
 class TestAutoDownload:
     """Tests for auto-download file input pipeline."""
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_url_downloaded_and_replaced_with_local_path(self, mock_stream, tmp_path):
-        mock_stream.return_value = _make_mock_stream(
-            b"fake ply data",
-            {"content-disposition": 'attachment; filename="scan.ply"'},
+        content = b"fake ply data"
+        stream_response = _make_mock_stream(
+            content,
+            {
+                "content-disposition": 'attachment; filename="scan.ply"',
+                "content-length": str(len(content)),
+            },
         )
+        mock_stream.return_value = stream_response
 
         node = FileInputNode()
+        url = "https://s3.example.com/bucket/scan.ply?sig=abc"
         request = NodeExecutionRequest(
             run_id="test-run",
             node_id="test-node",
-            inputs={"point_cloud": "https://s3.example.com/bucket/scan.ply?sig=abc"},
+            inputs={"point_cloud": url},
         )
         response = node.run(request)
 
         assert response.status == "pass"
         assert response.outputs is not None
-        assert response.outputs["size"] == len(b"fake ply data")
-        assert not response.outputs["size"] == 0
+        assert response.outputs["size"] == len(content)
+        assert stream_response.entered
+        assert stream_response.iterated
+        assert stream_response.exited
+        assert mock_stream.call_args.args == ("GET", url)
+        assert mock_stream.call_args.kwargs["follow_redirects"] is False
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_original_url_stored_in_metadata(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -298,9 +313,10 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["message"] == "https://example.com/not-a-file"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_download_http_error_raises_io_error(self, mock_stream):
-        mock_stream.return_value = _make_mock_stream_error(404)
+        stream_response = _make_mock_stream_error(404)
+        mock_stream.return_value = stream_response
 
         node = FileInputNode()
         request = NodeExecutionRequest(
@@ -313,8 +329,10 @@ class TestAutoDownload:
         assert response.status == "fail"
         assert response.error_type == "NodeIOError"
         assert "404" in response.error
+        assert not stream_response.iterated
+        assert stream_response.exited
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_download_timeout_raises_io_error(self, mock_stream):
         mock_stream.side_effect = httpx.TimeoutException("timed out")
 
@@ -330,7 +348,7 @@ class TestAutoDownload:
         assert response.error_type == "NodeIOError"
         assert "Timeout" in response.error
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_content_disposition_path_traversal_sanitized(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -357,19 +375,17 @@ class TestAutoDownload:
         assert "../" not in local
         assert Path(local).name == "point_cloud_scan.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_two_file_inputs_no_collision(self, mock_stream):
         call_count = [0]
 
-        class DualMockResponse:
+        class DualMockResponse(_MockStreamResponse):
             def __init__(self, idx):
-                self.idx = idx
                 ext = "ply" if idx == 0 else "json"
-                self.status_code = 200
-                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data.{ext}"'})
-
-            def iter_bytes(self, chunk_size=65536):
-                yield f"file-{self.idx}".encode()
+                super().__init__(
+                    f"file-{idx}".encode(),
+                    {"content-disposition": f'attachment; filename="data.{ext}"'},
+                )
 
         def stream_side_effect(*args, **kwargs):
             idx = call_count[0]
@@ -393,7 +409,7 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["file_a"] != response.outputs["file_b"]
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_url_with_query_params_filename_extracted(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -418,7 +434,7 @@ class TestAutoDownload:
         local = metadata_captured["point_cloud"]["local_path"]
         assert Path(local).name == "point_cloud_scan.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_url_with_no_extension_fallback(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"data", {})
 
@@ -489,19 +505,17 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["message"] == "hello"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_multiple_file_inputs_all_processed(self, mock_stream):
         call_count = [0]
 
-        class SeqMockResponse:
+        class SeqMockResponse(_MockStreamResponse):
             def __init__(self, idx):
-                self.idx = idx
                 ext = "ply" if idx == 0 else "json"
-                self.status_code = 200
-                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data_{idx}.{ext}"'})
-
-            def iter_bytes(self, chunk_size=65536):
-                yield f"file-{self.idx}".encode()
+                super().__init__(
+                    f"file-{idx}".encode(),
+                    {"content-disposition": f'attachment; filename="data_{idx}.{ext}"'},
+                )
 
         def stream_side_effect(*args, **kwargs):
             idx = call_count[0]
@@ -537,7 +551,7 @@ class TestAutoDownload:
 
         assert response.status == "fail"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_wrong_extension_validation_fails(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"not a ply file",
@@ -556,7 +570,7 @@ class TestAutoDownload:
         assert response.error_type == "NodeValidationError"
         assert ".txt" in response.error
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_file_too_large_validation_fails(self, mock_stream):
         big_content = b"x" * 200
 
@@ -577,19 +591,18 @@ class TestAutoDownload:
         assert response.error_type == "NodeIOError"
         assert "exceeds" in response.error.lower() or "size" in response.error.lower()
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_partial_download_failure_cleans_up(self, mock_stream, tmp_path):
         call_count = [0]
 
-        class FailOnSecondResponse:
+        class FailOnSecondResponse(_MockStreamResponse):
             def __init__(self, idx):
-                self.idx = idx
                 ext = "ply" if idx == 0 else "json"
-                self.status_code = 500 if idx == 1 else 200
-                self.headers = httpx.Headers({"content-disposition": f'attachment; filename="data_{idx}.{ext}"'})
-
-            def iter_bytes(self, chunk_size=65536):
-                yield f"file-{self.idx}".encode()
+                super().__init__(
+                    f"file-{idx}".encode(),
+                    {"content-disposition": f'attachment; filename="data_{idx}.{ext}"'},
+                    status_code=500 if idx == 1 else 200,
+                )
 
         def stream_side_effect(*args, **kwargs):
             idx = call_count[0]
@@ -694,16 +707,8 @@ class TestExecutionContextExtensions:
 
 
 def _make_redirect_response(location: str):
-    """Mock httpx.get response: 302 redirect to `location`."""
-
-    class RedirectResponse:
-        status_code = 302
-        headers = httpx.Headers({"location": location})
-
-        def iter_bytes(self, chunk_size=65536):
-            yield b""
-
-    return RedirectResponse()
+    """Mock httpx.stream response: 302 redirect to `location`."""
+    return _MockStreamResponse(headers={"location": location}, status_code=302)
 
 
 class TestDownloadPolicy:
@@ -717,7 +722,7 @@ class TestDownloadPolicy:
 
     def test_redirect_to_private_ip_blocked(self) -> None:
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.get",
+            "canvastekk_workflow_sdk.base.httpx.stream",
             return_value=_make_redirect_response(f"https://{self.PRIVATE_HOST}/x.ply"),
         ):
             node = FileInputNode()
@@ -739,7 +744,7 @@ class TestDownloadPolicy:
             _make_redirect_response("https://example.com/redirected.ply"),
             _make_mock_stream(b"redirected content"),
         ]
-        with patch("canvastekk_workflow_sdk.base.httpx.get", side_effect=responses):
+        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=responses):
             metadata_captured: dict[str, Any] = {}
 
             class CaptureNode(FileInputNode):
@@ -757,6 +762,7 @@ class TestDownloadPolicy:
 
         assert response.status == "pass"
         assert Path(metadata_captured["point_cloud"]["local_path"]).name.startswith("point_cloud_")
+        assert all(stream_response.exited for stream_response in responses)
 
     def test_relative_redirect_resolved_against_current_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
@@ -764,7 +770,7 @@ class TestDownloadPolicy:
             _make_redirect_response("/next/scan.ply"),
             _make_mock_stream(b"data"),
         ]
-        with patch("canvastekk_workflow_sdk.base.httpx.get", side_effect=responses):
+        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=responses):
             response = FileInputNode().run(
                 NodeExecutionRequest(
                     run_id="r-rel",
@@ -778,7 +784,7 @@ class TestDownloadPolicy:
     def test_too_many_redirect_hops_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
         redirects = [_make_redirect_response(f"https://example.com/hop{i}.ply") for i in range(7)]
-        with patch("canvastekk_workflow_sdk.base.httpx.get", side_effect=redirects):
+        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=redirects):
             response = FileInputNode().run(
                 NodeExecutionRequest(
                     run_id="r-loops",
@@ -791,32 +797,54 @@ class TestDownloadPolicy:
         assert response.error_type == "NodeIOError"
         assert "redirect" in response.error.lower()
 
-    def test_declared_cap_aborts_mid_stream_and_cleans_up(
+    def test_content_length_cap_rejects_before_iteration_and_cleans_up(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
-        with patch(
-            "canvastekk_workflow_sdk.base.httpx.get",
-            return_value=_make_mock_stream(b"x" * 200),
-        ):
+        stream_response = _make_mock_stream(b"x" * 200, {"content-length": "200"})
+        with patch("canvastekk_workflow_sdk.base.httpx.stream", return_value=stream_response):
             response = StrictValidationNode().run(
                 NodeExecutionRequest(
-                    run_id="r-cap",
-                    node_id="n-cap",
+                    run_id="r-header-cap",
+                    node_id="n-header-cap",
                     inputs={"data": "https://example.com/big.json"},
                 )
             )
 
         assert response.status == "fail"
         assert response.error_type == "NodeIOError"
-        downloads = tmp_path / "r-cap" / "n-cap" / "downloads"
+        assert "200 > 100" in response.error
+        assert not stream_response.iterated
+        assert stream_response.exited
+        downloads = tmp_path / "r-header-cap" / "n-header-cap" / "downloads"
+        assert not any(downloads.glob("*")) if downloads.exists() else True
+
+    def test_running_cap_aborts_mid_stream_and_cleans_up(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
+        stream_response = _make_mock_stream(b"x" * 200)
+        with patch("canvastekk_workflow_sdk.base.httpx.stream", return_value=stream_response):
+            response = StrictValidationNode().run(
+                NodeExecutionRequest(
+                    run_id="r-stream-cap",
+                    node_id="n-stream-cap",
+                    inputs={"data": "https://example.com/big.json"},
+                )
+            )
+
+        assert response.status == "fail"
+        assert response.error_type == "NodeIOError"
+        assert stream_response.iterated
+        assert stream_response.exited
+        downloads = tmp_path / "r-stream-cap" / "n-stream-cap" / "downloads"
         assert not any(downloads.glob("*")) if downloads.exists() else True
 
     def test_env_default_cap_applies_when_undeclared(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
         monkeypatch.setenv("CANVASTEKK_MAX_DOWNLOAD_BYTES", "10")
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.get",
+            "canvastekk_workflow_sdk.base.httpx.stream",
             return_value=_make_mock_stream(b"x" * 12),
         ):
             response = MultiFileInputNode().run(
@@ -843,7 +871,7 @@ class TestDownloadPolicy:
             lambda timeout_seconds, started=None: _time.monotonic() - 1,
         )
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.get",
+            "canvastekk_workflow_sdk.base.httpx.stream",
             return_value=_make_mock_stream(b"payload"),
         ):
             response = FileInputNode().run(
@@ -865,7 +893,7 @@ class TestDownloadPolicy:
         cancel.set()
         node = FileInputNode()
         node._set_cancel_event(cancel)
-        with patch("canvastekk_workflow_sdk.base.httpx.get") as mock_get:
+        with patch("canvastekk_workflow_sdk.base.httpx.stream") as mock_get:
             response = node.run(
                 NodeExecutionRequest(
                     run_id="r-cancel",
@@ -942,14 +970,14 @@ class ArrayFileInputNode(BaseNode):
 class TestArrayFileInputsSdk161:
     """S.1: array file inputs download element-wise."""
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_array_urls_downloaded_element_wise(self, mock_stream):
         payloads = {
             "https://s3.example.com/a.ply": b"AAAA",
             "https://s3.example.com/b.ply": b"BBBBBB",
         }
 
-        def _serve(url, *args, **kwargs):
+        def _serve(method, url, *args, **kwargs):
             return _make_mock_stream(
                 payloads[url],
                 {"content-disposition": f'attachment; filename="{url.rsplit("/", 1)[1]}"'},
@@ -971,7 +999,7 @@ class TestArrayFileInputsSdk161:
         assert response.status == "pass"
         assert sorted(response.outputs["parts"]) == [4, 6]
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_array_metadata_is_per_element_list(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"XX", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
@@ -993,7 +1021,7 @@ class TestArrayFileInputsSdk161:
         assert all(e["original_url"] == "https://s3.example.com/a.ply" for e in entries)
         assert all("local_path" in e and e["size_bytes"] == 2 for e in entries)
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_mixed_elements_pass_non_urls_through(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"ZZZ", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
@@ -1014,13 +1042,13 @@ class TestArrayFileInputsSdk161:
         assert parts[0].startswith("/")
         assert parts[1] == "already-local.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.get")
+    @patch("canvastekk_workflow_sdk.base.httpx.stream")
     def test_mid_list_failure_cleans_downloads(self, mock_stream):
         payloads = {
             "https://s3.example.com/a.ply": b"AAAA",
         }
 
-        def _serve(url, *args, **kwargs):
+        def _serve(method, url, *args, **kwargs):
             if url in payloads:
                 return _make_mock_stream(
                     payloads[url],
