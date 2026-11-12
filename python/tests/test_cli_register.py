@@ -266,3 +266,84 @@ class TestRegistryConvergenceCommand:
                 main()
         assert exc.value.code == 0
         assert "--registry-base" in capsys.readouterr().out
+
+
+class TestRegisterRetry:
+    """#242: bounded retry on engine 5xx + transport errors; 4xx fails fast."""
+
+    def _run(self, argv, token="ctk_" + "t" * 43, environ=None):
+        env = {"CANVASTEKK_NODE_REGISTRATION_KEY": token, **(environ or {})}
+        buf_out, buf_err = io.StringIO(), io.StringIO()
+        with patch.dict("os.environ", env), redirect_stdout(buf_out), redirect_stderr(buf_err):
+            code = _run_register(argv)
+        return code, buf_out.getvalue(), buf_err.getvalue()
+
+    @staticmethod
+    def _post_response(status=201, body=b"{}"):
+        response = io.BytesIO(body)
+        response.status = status
+        return response
+
+    @staticmethod
+    def _http_error(code_):
+        import urllib.error
+
+        return urllib.error.HTTPError("u", code_, "Error", hdrs=None, fp=io.BytesIO(b"{}"))
+
+    def _retry_run(self, side_effects):
+        import urllib.error
+
+        calls = []
+
+        def fake_urlopen(req, timeout=None):
+            calls.append(req.method)
+            effect = side_effects.pop(0)
+            if isinstance(effect, (urllib.error.HTTPError, urllib.error.URLError, OSError)):
+                raise effect
+            return effect
+
+        sleeps = []
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen), patch(
+            "canvastekk_workflow_sdk.__main__.time.sleep", side_effect=sleeps.append
+        ):
+            code, out, err = self._run(
+                ["tests.test_cli_register:_manifest_module_marker", "--engine-url", "https://eng", "--json"]
+            )
+        return code, out, err, calls, sleeps
+
+    def test_502s_then_success_retries(self) -> None:
+        code, out, err, calls, sleeps = self._retry_run(
+            [self._http_error(502), self._http_error(503), self._post_response(201), self._post_response(200)]
+        )
+        assert code == 0, out
+        assert calls.count("POST") == 3
+        assert sleeps == [2, 4]
+        assert "attempt 1/4 failed (HTTP 502)" in err
+        assert "attempt 2/4 failed (HTTP 503)" in err
+
+    def test_client_error_fails_fast(self) -> None:
+        code, out, err, calls, sleeps = self._retry_run([self._http_error(409)])
+        assert code == 4
+        assert len(calls) == 1
+        assert sleeps == []
+        assert "retrying" not in err
+
+    def test_persistent_502_exhausts_attempts(self) -> None:
+        code, out, err, calls, sleeps = self._retry_run(
+            [self._http_error(502)] * 4
+        )
+        assert code == 5
+        assert len(calls) == 4
+        assert sleeps == [2, 4, 8]
+        assert "Engine error (HTTP 502)" in out
+
+    def test_transport_error_then_success(self) -> None:
+        import urllib.error
+
+        code, out, err, calls, sleeps = self._retry_run(
+            [urllib.error.URLError("conn refused"), self._post_response(201), self._post_response(200)]
+        )
+        assert code == 0, out
+        assert calls.count("POST") == 2
+        assert sleeps == [2]
+        assert "attempt 1/4 failed (URLError" in err
