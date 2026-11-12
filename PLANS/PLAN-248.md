@@ -36,7 +36,7 @@ The only production-code consumer in this repository is `_prepare_file_inputs`; 
     — **Why:** the existing mocks patch the buffered API and therefore cannot prove streaming behavior; explicit pre-iteration and cleanup assertions prevent a syntactic API swap that still reads or leaks the body
     — **Done when:** the focused file-download tests prove both cap mechanisms, no partial file remains after over-cap failures, response context managers exit on every exercised path, and existing redirect/cancellation/deadline/filename/metadata tests pass unchanged in behavior
     — **Consumers affected:** Python CI and maintainers relying on the file-input regression suite
-    — **Done:** context-managed doubles now track entry, iteration, and exit; tests cover in-limit declared length, over-limit declared length before iteration, undeclared running-cap cleanup, and closure on success, redirect, HTTP error, and cap failures; focused file-download/local-server run 60 passed; files: python/tests/test_file_download.py; fixes: none
+    — **Done:** context-managed doubles now track entry, iteration, and exit; tests cover in-limit declared length, over-limit declared length before iteration, undeclared running-cap cleanup after a written chunk, and closure on success, redirect, HTTP error, and cap failures; focused file-download/local-server run 60 passed; files: python/tests/test_file_download.py; fixes: review round 1 split the running-cap body into two 100-byte chunks to prove partial-file cleanup
 
 ### Phase 2: Full SDK verification and ticket exit gate
 
@@ -78,3 +78,5 @@ LOG full-gate escalation: Phase 1 changed the shared download transport and SSRF
 LOG Phase 1 commands: Ruff check (all SDK source, tests, scripts), compileall, poetry build (wheel + sdist), full pytest (1017 passed); focused file-download/local-server run 60 passed; E2E n.a (backend-only Python, no Playwright target)
 LOG ticket exit gate: Phase 2 reuses the green full-gate evidence for the unchanged implementation committed as 57d8f76; no duplicate checks for the same risk
 GATE 57d8f76 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG review-fix round 1 (Minor): running-cap coverage now writes one 100-byte chunk before the second chunk exceeds the cap, proving partial-file cleanup rather than only rejection
+LOG review-fix re-gate: Ruff + compileall + 1017 tests + wheel/sdist; E2E n.a (backend-only Python, no Playwright target)

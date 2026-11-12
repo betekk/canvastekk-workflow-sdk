@@ -823,7 +823,14 @@ class TestDownloadPolicy:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
-        stream_response = _make_mock_stream(b"x" * 200)
+
+        class ChunkedResponse(_MockStreamResponse):
+            def iter_bytes(self, chunk_size=65536):
+                self.iterated = True
+                yield b"x" * 100
+                yield b"x" * 100
+
+        stream_response = ChunkedResponse()
         with patch("canvastekk_workflow_sdk.base.httpx.stream", return_value=stream_response):
             response = StrictValidationNode().run(
                 NodeExecutionRequest(
@@ -835,6 +842,7 @@ class TestDownloadPolicy:
 
         assert response.status == "fail"
         assert response.error_type == "NodeIOError"
+        assert "200 > 100" in response.error
         assert stream_response.iterated
         assert stream_response.exited
         downloads = tmp_path / "r-stream-cap" / "n-stream-cap" / "downloads"
