@@ -3,7 +3,7 @@ name: Release
 
 on:
   push:
-    branches: [dev, prod]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -21,9 +21,9 @@ jobs:
     secrets: inherit
 
   publish:
-    name: Build & publish SDK (prod finals only)
+    name: Build & publish SDK (release merges only)
     needs: [release]
-    if: github.ref_name == 'prod' && needs.release.outputs.new_tag != ''
+    if: needs.release.outputs.is_release == 'true' && needs.release.outputs.new_tag != ''
     # documented pick-runner exception (Tier H): sub-minute job — picker overhead exceeds the saving
     runs-on: ubuntu-24.04
     timeout-minutes: 30

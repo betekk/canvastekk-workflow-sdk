@@ -52,14 +52,16 @@ Cross-module consumers exist beyond the repo (nodes repo dispatch) → architect
     — **Done:** step-level if added, release_branches: dev with rationale comment (bare finals; ordinary pushes never reach the step), default_bump sourced from release_intent.type; actionlint green; files: reusable-release.yml; fixes: none
 
 ### Phase 2: release.yml — trigger and publish gate
-- [ ] **2.1** `on.push.branches: [dev, prod]` → `[dev]` (keep `workflow_dispatch`)
+- [x] **2.1** `on.push.branches: [dev, prod]` → `[dev]` (keep `workflow_dispatch`)
     — **Why:** Single-lane; prod pushes stop triggering releases once #262 deletes the branch — removing it now makes the cutover a no-op for CI.
     — **Done when:** `prod` appears nowhere in the file's trigger config.
     — **Consumers affected:** none beyond the workflow itself.
-- [ ] **2.2** Publish job: `if: github.ref_name == 'prod' && needs.release.outputs.new_tag != ''` → `if: needs.release.outputs.is_release == 'true' && needs.release.outputs.new_tag != ''`; retitle `(prod finals only)` → `(release merges only)`
+    — **Done:** trigger narrowed to [dev], workflow_dispatch kept; files: release.yml; fixes: none
+- [x] **2.2** Publish job: `if: github.ref_name == 'prod' && needs.release.outputs.new_tag != ''` → `if: needs.release.outputs.is_release == 'true' && needs.release.outputs.new_tag != ''`; retitle `(prod finals only)` → `(release merges only)`
     — **Why:** The publish lane (wheel/tgz build, GitHub Packages, `sdk-released` dispatch) is the payload-contract surface — gate swap only, zero step edits below it (AC-6).
     — **Done when:** actionlint passes; `git diff` shows no hunk below the publish job's `env:` block.
     — **Consumers affected:** GitHub Packages consumers, canvastekk-workflow-nodes rebuild (CWN/CRS/CASA).
+    — **Done:** gate swapped to is_release && new_tag, job retitled; diff = 3 single-line hunks at :6/:24/:26, zero hunks below the gate — dispatch payload byte-identical; actionlint green; files: release.yml; fixes: none
 
 ### Phase 3: CI lane triggers
 - [ ] **3.1** `ci-python.yml`: both `branches: [dev, prod]` lists (push + PR) → `[dev]`
@@ -114,3 +116,5 @@ Cross-module consumers exist beyond the repo (nodes repo dispatch) → architect
 
 LOG gate-escalation Phase 1: full tier — anchor: CI/workflow file touched + Dependency & Consumer Map node with cross-module consumers (reusable-release.yml → release.yml caller).
 LOG fix r1 (unit axis): pytest collection failed — ModuleNotFoundError fastapi; env created without extras. Root cause: canonical CI invocation is `poetry install -E fastapi` (ci-python.yml:118). Repaired env, re-ran full unit axis green. total_fixes=1.
+GATE 60ebec4 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG gate-escalation Phase 2: full tier — anchor: CI/workflow file touched (release.yml trigger + publish gate; publish lane is the dispatch-contract surface).
