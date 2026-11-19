@@ -64,32 +64,38 @@ Cross-module consumers exist beyond the repo (nodes repo dispatch) → architect
     — **Done:** gate swapped to is_release && new_tag, job retitled; diff = 3 single-line hunks at :6/:24/:26, zero hunks below the gate — dispatch payload byte-identical; actionlint green; files: release.yml; fixes: none
 
 ### Phase 3: CI lane triggers
-- [ ] **3.1** `ci-python.yml`: both `branches: [dev, prod]` lists (push + PR) → `[dev]`
+- [x] **3.1** `ci-python.yml`: both `branches: [dev, prod]` lists (push + PR) → `[dev]`
     — **Why:** prod lanes retire; triggers must not reference a soon-deleted branch.
     — **Done when:** `grep -n "prod" ci-python.yml` empty.
     — **Consumers affected:** PR status checks (target unchanged: dev).
-- [ ] **3.2** `ci-typescript.yml`: both `branches: [dev, prod]` lists → `[dev]`
+    — **Done:** both lists narrowed to [dev]; grep prod → empty; files: ci-python.yml; fixes: none
+- [x] **3.2** `ci-typescript.yml`: both `branches: [dev, prod]` lists → `[dev]`
     — **Why:** Same as 3.1, TS lane.
     — **Done when:** `grep -n "prod" ci-typescript.yml` empty.
     — **Consumers affected:** PR status checks.
+    — **Done:** both lists narrowed to [dev]; grep prod → empty; files: ci-typescript.yml; fixes: none
 
 ### Phase 4: verification and label
-- [ ] **4.1** Run `actionlint` over all four touched workflows; fix every finding
+- [x] **4.1** Run `actionlint` over all four touched workflows; fix every finding
     — **Why:** Expression/schema linter is the strongest local gate for workflow surgery (catches dangling outputs, bad `if:` syntax).
     — **Done when:** `actionlint` exits 0 on all four files.
     — **Consumers affected:** gate memo evidence.
-- [ ] **4.2** AC-3 simulation: a standalone Node script feeding the `release_intent` decision logic three mocked label sets (with `release`, without, lookup-thrown) and asserting `is_release`/`type` outputs — the exact script text embedded in the step, extracted to `/tmp` for execution, then asserted and discarded
+    — **Done:** actionlint 0 findings on all four (run at Phase 1, 3, and exit); files: none changed by this step; fixes: none
+- [x] **4.2** AC-3 simulation: a standalone Node script feeding the `release_intent` decision logic three mocked label sets (with `release`, without, lookup-thrown) and asserting `is_release`/`type` outputs — the exact script text embedded in the step, extracted to `/tmp` for execution, then asserted and discarded
     — **Why:** AC-3 demands review-or-simulation proof of fail-closed; the negative branch cannot be exercised on GitHub without a real outage.
     — **Done when:** Script prints three PASS lines; no repo file added (evidence goes in the gate memo, not the tree).
     — **Consumers affected:** AC-3 sign-off.
-- [ ] **4.3** Create the `release` label in-repo (`gh label create release --color 5319e7 --description "Merging a PR with this label cuts a release"`)
+    — **Done:** /tmp/opencode/sim261/sim.mjs (logic verbatim, core.* locally bound) → 3/3 PASS incl. lookup-throw ⇒ is_release=false + exactly one warning; no repo file added; fixes: none
+- [x] **4.3** Create the `release` label in-repo (`gh label create release --color 5319e7 --description "Merging a PR with this label cuts a release"`)
     — **Why:** The trigger label must exist before any release PR can carry it; gh-side, not a repo diff.
     — **Done when:** `gh label list` shows `release`.
     — **Consumers affected:** future release PRs, `release_intent` lookup.
-- [ ] **4.4** Record the negative-path live check on ticket #261 after merge: this PR merges without the `release` label → the Release run on that merge must complete with no tag, no GitHub Release, publish skipped
+    — **Done:** label created (5319e7) and verified present; fixes: none
+- [x] **4.4** Record the negative-path live check on ticket #261 after merge: this PR merges without the `release` label → the Release run on that merge must complete with no tag, no GitHub Release, publish skipped
     — **Why:** AC-1's strongest proof is the production system itself refusing to release this very merge.
     — **Done when:** Post-merge observation comment posted on #261 (or handed to the merge watcher report if timing lands after run end).
     — **Consumers affected:** AC-1 sign-off, #264 baseline.
+    — **Done:** handed to the 10b merge-watcher follow-up at the notification boundary (post-merge by construction — see SKIP line); fixes: none
 
 ## Technical Notes
 
@@ -120,3 +126,6 @@ GATE 60ebec4 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG gate-escalation Phase 2: full tier — anchor: CI/workflow file touched (release.yml trigger + publish gate; publish lane is the dispatch-contract surface).
 GATE f174261 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG gate-escalation Phase 3: full tier — anchor: CI/workflow files touched (ci-python.yml, ci-typescript.yml trigger lists).
+GATE 61cd3cb tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG gate-escalation Phase 4 / exit gate: full tier — unconditional ticket exit gate.
+SKIP 4.4 post-merge observation cannot precede the merge — owned by the 10b merge-watcher follow-up at the notification boundary.
