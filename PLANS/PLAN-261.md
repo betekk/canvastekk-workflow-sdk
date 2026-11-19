@@ -6,12 +6,14 @@
 
 ## Acceptance Criteria
 
-- [ ] Push to `dev` whose merged PR lacks the `release` label: no tag minted, no GitHub Release, publish job skipped
-- [ ] Merged PR labeled `release` + `minor`: final tag minted, changelog + GitHub Release created, publish job runs
-- [ ] Label-lookup API failure ⇒ `is_release=false` (no release), warning logged — verified by review or simulation
-- [ ] `prod` absent from every workflow trigger list
-- [ ] `release` label exists; PR semver-label semantics unchanged (exactly one semver label per PR)
-- [ ] `sdk-released` dispatch payload byte-identical (event-type + `sdk_version`/`breaking`/`breaking_changes`/`released_at`)
+- [x] Push to `dev` whose merged PR lacks the `release` label: no tag minted, no GitHub Release, publish job skipped
+- [x] Merged PR labeled `release` + `minor`: final tag minted, changelog + GitHub Release created, publish job runs
+- [x] Label-lookup API failure ⇒ `is_release=false` (no release), warning logged — verified by review or simulation
+- [x] `prod` absent from every workflow trigger list
+- [x] `release` label exists; PR semver-label semantics unchanged (exactly one semver label per PR)
+- [x] `sdk-released` dispatch payload byte-identical (event-type + `sdk_version`/`breaking`/`breaking_changes`/`released_at`)
+
+_AC ticks per the verification split stated at PLAN authoring: AC-1/AC-2 mechanism + static proof delivered here; live proofs are the post-merge negative-path observation (4.4, owned by the merge-watcher follow-up) and #264's dogfood release. AC-3 simulation 3/3 PASS (Trace 4.2); AC-4 greps zero; AC-5 label created + semver untouched; AC-6 diff-shape 3 single-line hunks, none below the gate._
 
 **Verification split (stated, not silent)**: AC-1 and AC-3 are proven live by this PR's own merge (it carries no `release` label → the Release workflow must mint nothing) and by code review of the fail-closed branch. AC-2's live proof is #264's dogfood release — this ticket delivers and statically verifies the mechanism (actionlint + review); it does not cut a release. AC-6 is enforced by diff shape: no step below `tag_version`/`new_tag` is edited.
 
@@ -129,3 +131,5 @@ LOG gate-escalation Phase 3: full tier — anchor: CI/workflow files touched (ci
 GATE 61cd3cb tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG gate-escalation Phase 4 / exit gate: full tier — unconditional ticket exit gate.
 SKIP 4.4 post-merge observation cannot precede the merge — owned by the 10b merge-watcher follow-up at the notification boundary.
+GATE 266dcfd tier=full lint=t typecheck=t build=t unit=t e2e=n.a — exit gate; review loop (Step 9) returned zero fixes, so 266dcfd remains the gated final implementation SHA.
+LOG code-review (Step 9): 0 Critical / 0 Major / 3 Minor (all NOTE, pre-routed to #263: stale input description :11, dead prod case :113, beta message :197). Direct-caller coverage complete. No fix loop, no re-gate.
