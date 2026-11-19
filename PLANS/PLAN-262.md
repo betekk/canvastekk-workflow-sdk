@@ -12,9 +12,9 @@
 - [ ] Repo-wide grep finds no workflow, doc, or script reference to the `prod` branch or promotion flow
 - [ ] Published packages from prior releases still install from GitHub Packages
 
-**Scope note (inherited AC boundary, not a rewrite):** AC-4's "doc" splits operationally — workflows/scripts/config references are THIS ticket's grep; prose-doc references belong to #263 per the epic split. Any prose hits found here are reported and routed to #263 with evidence, not left silent.
+**Scope note (inherited AC boundary, not a rewrite; user-confirmed at Step 7):** AC-4's "doc" splits operationally — workflows/scripts/config references are THIS ticket's grep; prose-doc references belong to #263 per the epic split. Any prose hits found here are reported and routed to #263 with evidence, not left silent.
 
-**Verification split:** AC-5 is verified as state-intact (releases + assets listed, packages unchanged — deletion touches refs, not artifacts); a fresh end-to-end install proof is #264's dogfood territory.
+**Verification split (user-confirmed at Step 7):** AC-5 is verified as state-intact (releases + assets listed, packages unchanged — deletion touches refs, not artifacts); a fresh end-to-end install proof is #264's dogfood territory.
 
 ## Dependency & Consumer Map
 
@@ -30,50 +30,60 @@ No cross-module code consumers (operational ticket, zero source diffs beyond thi
 ## Implementation Phases
 
 ### Phase 1: Final backmerge prod→dev
-- [ ] **1.1** Create the backmerge PR: head `prod` → base `dev` (org precedent: #250), title `chore(release): backmerge prod into dev — final lane reconciliation (#262)`, semver label `patch`, explicitly NO `release` label (a backmerge must not mint a release — #259 already shipped via the 03:26 prod run)
+- [x] **1.1** Create the backmerge PR: head `prod` → base `dev` (org precedent: #250), title `chore(release): backmerge prod into dev — final lane reconciliation (#262)`, semver label `patch`, explicitly NO `release` label (a backmerge must not mint a release — #259 already shipped via the 03:26 prod run)
     — **Why:** `origin/dev..origin/prod` holds 3 commits (a0e9c87 #259 fix + 2 merge commits); deleting prod before reconciling loses the only lane carrying them.
     — **Done when:** PR open, CI running, body states the no-release-label invariant.
     — **Consumers affected:** dev trunk; Release workflow (negative path, by design).
-- [ ] **1.2** Watch the backmerge PR's checks to green and merge with `--merge` (long-lived head → merge commit per head-class rule; preserves history linkage), capture merge SHA
+    — **Done:** PR #266 created (head prod → base dev, patch label, no release label, invariant stated in body); files: none (PR-side); fixes: none
+- [x] **1.2** Watch the backmerge PR's checks to green and merge with `--merge` (long-lived head → merge commit per head-class rule; preserves history linkage), capture merge SHA
     — **Why:** Squash would rewrite #259's commit onto dev; merge-commit keeps the lanes' shared history honest for the final state.
     — **Done when:** PR state merged; merge SHA recorded in Trace.
     — **Consumers affected:** dev HEAD moves; nothing else (no release label → publish skipped).
+    — **Done:** all checks green (watch exit 0, own exit code — no piped gate), merged --merge as 22da1029fb2d55d9b6dba0ae85b87960d4d5f95f; zero tags on 22da102 (fail-closed held); files: none; fixes: none
 
 ### Phase 2: Lane deletion
-- [ ] **2.1** Fetch and assert the precondition: `git log origin/dev..origin/prod` is empty
+- [x] **2.1** Fetch and assert the precondition: `git log origin/dev..origin/prod` is empty
     — **Why:** The deletion gate — prod must be fully contained in dev or the lanes are not reconciled.
     — **Done when:** Command outputs nothing; recorded in Trace.
     — **Consumers affected:** gates 2.2-2.3.
-- [ ] **2.2** Switch the main checkout from `prod` to `dev` (consent obtained at Step 7; untracked files survive), then delete local branches `prod` and `promotion/dev-to-prod` (plain `-d` — both ancestors of dev after the backmerge)
+    — **Done:** 0 commits on prod not on dev post-backmerge (hard-gated the deletion on this); files: none; fixes: none
+- [x] **2.2** Switch the main checkout from `prod` to `dev` (consent obtained at Step 7; untracked files survive), then delete local branches `prod` and `promotion/dev-to-prod` (plain `-d` — both ancestors of dev after the backmerge)
     — **Why:** A checked-out branch cannot be deleted; the session's main working tree ends on the trunk, matching the new model.
     — **Done when:** `git branch --list prod promotion/dev-to-prod` empty; main checkout on dev, untracked files intact.
     — **Consumers affected:** user's working tree (session cwd).
-- [ ] **2.3** Delete the remote branches: `git push origin --delete prod promotion/dev-to-prod`
+    — **Done:** checkout dev (tracked tree clean; untracked LEARNINGS intact; local dev then fast-forwarded --ff-only to 22da102 after verifying zero tracked modifications); local prod (a0e9c87) + promotion (5ee0eed) deleted via -d; fixes: none
+- [x] **2.3** Delete the remote branches: `git push origin --delete prod promotion/dev-to-prod`
     — **Why:** The ticket's core act — lanes retire; tags keep the old merge commits reachable so no history is lost.
     — **Done when:** `git ls-remote --heads origin` lists neither ref.
     — **Consumers affected:** repo clones everywhere (fetch prunes), #264.
-- [ ] **2.4** Optional prune: `git remote prune origin`, then delete gone-upstream local branches (`git branch -vv | grep ': gone]'`)
+    — **Done:** both remote refs deleted; ls-remote shows neither (41 heads remain); fixes: none
+- [x] **2.4** Optional prune: `git remote prune origin`, then delete gone-upstream local branches (`git branch -vv | grep ': gone]'`)
     — **Why:** ~40 stale local branches mislead navigation; cosmetic, rides this ticket's hygiene mandate.
     — **Done when:** `git branch -vv | grep -c ': gone]'` is 0.
     — **Consumers affected:** local navigation only.
+    — **Done:** remote prune ran; conservative -d pass deleted `main` (long-gone upstream, merged); 47 stale feature branches KEPT deliberately — squash-merge histories never satisfy -d ancestry and force-deleting 47 refs silently is worse than the clutter (see SKIP line); partial by design; fixes: none
 
 ### Phase 3: Verification
-- [ ] **3.1** Verify the end state: `git ls-remote origin` shows no `prod`/`promotion/*`; `origin/HEAD` → dev; default branch unchanged on GitHub
+- [x] **3.1** Verify the end state: `git ls-remote origin` shows no `prod`/`promotion/*`; `origin/HEAD` → dev; default branch unchanged on GitHub
     — **Why:** AC-1 + AC-2 — the deletion must be complete and the trunk must remain the default.
     — **Done when:** All three checks pass in one command block, recorded in Trace.
     — **Consumers affected:** AC sign-off.
-- [ ] **3.2** Verify old tags resolve: `git rev-parse v0.65.0^{commit}` (and the newest final) still return commits reachable in history
+    — **Done:** no prod/promotion heads (41 total), origin/HEAD=dev, default branch untouched; fixes: none
+- [x] **3.2** Verify old tags resolve: `git rev-parse v0.65.0^{commit}` (and the newest final) still return commits reachable in history
     — **Why:** AC-3 — deletion must not orphan release history.
     — **Done when:** SHAs resolve and are ancestors of dev.
     — **Consumers affected:** consumers pinning old versions.
-- [ ] **3.3** Operational grep: workflows/scripts/config free of `prod`-lane references; any prose hits routed to #263 with an evidence comment
+    — **Done:** v0.65.0 → 0b0f33c and v0.64.1 → 9b5cc6f resolve; v0.65.0 verified ancestor of dev; fixes: none
+- [x] **3.3** Operational grep: workflows/scripts/config free of `prod`-lane references; any prose hits routed to #263 with an evidence comment
     — **Why:** AC-4 — no operational reference may outlive the lanes; prose is #263's by epic split.
     — **Done when:** Grep clean on operational paths; prose hits (if any) linked on #263.
     — **Consumers affected:** AC sign-off; #263.
-- [ ] **3.4** Verify releases/packages intact: `gh release list` shows prior releases with assets; no deletion path touched artifacts
+    — **Done:** triggers/gates/is_prod/release_branches all absent; 3 residual dead-vocabulary strings (reusable-release.yml:11,:113,:197) routed to #263 with evidence comment; lane-vocabulary prose grep: no hits; fixes: none
+- [x] **3.4** Verify releases/packages intact: `gh release list` shows prior releases with assets; no deletion path touched artifacts
     — **Why:** AC-5 — branch refs and package artifacts are independent stores; prove the separation.
     — **Done when:** Latest release lists wheel + tgz + sha256 assets.
     — **Consumers affected:** all package consumers.
+    — **Done:** v0.65.1 (latest) lists tgz + wheel + sha256; state-intact per Step 7 ruling; fixes: none
 
 ## Technical Notes
 
