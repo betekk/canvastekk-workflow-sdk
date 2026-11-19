@@ -6,11 +6,11 @@
 
 ## Acceptance Criteria
 
-- [ ] `git ls-remote origin` shows no `prod`, no `promotion/*`
-- [ ] `origin/HEAD` still resolves to `dev` (no default-branch change needed)
-- [ ] Old release tags (e.g. `v0.65.0`) still resolve to their commits
-- [ ] Repo-wide grep finds no workflow, doc, or script reference to the `prod` branch or promotion flow
-- [ ] Published packages from prior releases still install from GitHub Packages
+- [x] `git ls-remote origin` shows no `prod`, no `promotion/*`
+- [x] `origin/HEAD` still resolves to `dev` (no default-branch change needed)
+- [x] Old release tags (e.g. `v0.65.0`) still resolve to their commits
+- [x] Repo-wide grep finds no workflow, doc, or script reference to the `prod` branch or promotion flow — operational paths verified clean; 3 dead-vocabulary strings routed to #263 (user-confirmed scope)
+- [x] Published packages from prior releases still install from GitHub Packages — state-intact verification (user-confirmed); fresh install proof rides #264
 
 **Scope note (inherited AC boundary, not a rewrite; user-confirmed at Step 7):** AC-4's "doc" splits operationally — workflows/scripts/config references are THIS ticket's grep; prose-doc references belong to #263 per the epic split. Any prose hits found here are reported and routed to #263 with evidence, not left silent.
 
@@ -103,3 +103,11 @@ No cross-module code consumers (operational ticket, zero source diffs beyond thi
 - **Main-checkout disruption** → consent at Step 7; untracked files survive `checkout dev`; nothing force-resets.
 - **Accidental release on backmerge** → no `release` label on the PR; #261's fail-closed gate is the backstop (already proven live).
 - **Someone re-creates the lanes by habit** → #263 documents the new procedure; epic AC requires the re-scope.
+
+## Trace
+
+LOG gate-escalation exit gate: full tier — unconditional ticket exit gate (docs-only branch diff, ladder run in-worktree regardless: actionlint, tsc ×2, tsup, poetry build, pytest 1038, vitest 489; e2e n.a — no frontend).
+SKIP 2.4 full prune — 47 stale local branches are squash-merge histories (never satisfy -d ancestry); conservative keep beats silent mass force-delete; `main` (long-gone) pruned.
+LOG stale-tree correction: first 3.3 grep ran against the main checkout's lagging local dev (pre-#261 files) and produced false evidence; fixed by verifying tracked-tree cleanliness then `merge --ff-only origin/dev` (22da102) and re-running — grep then clean. Recorded as a LEARNINGS candidate.
+GATE 49e4481 tier=full lint=t typecheck=t build=t unit=t e2e=n.a — exit gate; Step 9 review returned zero fixes, so 49e4481 remains the gated final implementation SHA.
+LOG code-review (Step 9): docs-only diff (PLAN-262.md); evidence claims verified against run outputs; 0 findings; direct-caller gate vacuous (no code symbols).
