@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NodeValidationError } from "./exceptions.js";
+import { PROTOCOL_2_OUTCOMES } from "./protocol.js";
 
 /**
  * S.5 (SDK#161): the node-execution status vocabulary (lowercase wire).
@@ -30,7 +31,12 @@ export type NodeExecutionStatus = z.infer<typeof NodeExecutionStatusSchema>;
  * @throws {NodeValidationError} On missing/unknown values (validation category)
  */
 export function parseNodeExecutionStatus(value: unknown): NodeExecutionStatus {
-  const parsed = NodeExecutionStatusSchema.safeParse(value);
+  // Node protocol 2 (engine#1300): the exact words SUCCEEDED / FAILED read as
+  // pass / fail. Still strict: no case folding, ACCEPTED is not a result.
+  const legacy = typeof value === "string" ? PROTOCOL_2_OUTCOMES[value] : undefined;
+  const parsed = NodeExecutionStatusSchema.safeParse(
+    legacy === "pass" || legacy === "fail" ? legacy : value,
+  );
   if (!parsed.success) {
     throw new NodeValidationError(
       `Unknown node execution status ${JSON.stringify(value)}; expected one of ["pass","fail","skipped","timeout"]`,
@@ -42,7 +48,9 @@ export function parseNodeExecutionStatus(value: unknown): NodeExecutionStatus {
 
 export const NodeExecutionResponseSchema = z.object({
   execution_id: z.string(),
-  status: z.union([z.literal("pass"), z.literal("fail")]),
+  // Node code produces pass / fail; /execute answers SUCCEEDED / FAILED when
+  // the engine asks for node protocol 2 (X-Node-Protocol, engine#1300).
+  status: z.union([z.literal("pass"), z.literal("fail"), z.literal("SUCCEEDED"), z.literal("FAILED")]),
   outputs: z.record(z.string(), z.unknown()).nullable().default(null),
   token_usage: z.number().min(0.0).default(0.0),
   duration_ms: z.number().int().min(0).default(0),
@@ -58,7 +66,7 @@ export const NodeExecutionResponseSchema = z.object({
  * Fields use snake_case for wire-format compatibility with the Python engine.
  *
  * @property execution_id - Unique identifier for this execution
- * @property status - Execution result: `"pass"` or `"fail"`
+ * @property status - Execution result: `"pass"` or `"fail"` (`"SUCCEEDED"` / `"FAILED"` on the wire under node protocol 2)
  * @property outputs - Output values on success, `null` on failure
  * @property duration_ms - Execution duration in milliseconds
  * @property token_usage - Token consumption (0.0 if not applicable)
