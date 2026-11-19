@@ -20,7 +20,13 @@ class NodeExecutionResponse(BaseModel):
     """
 
     execution_id: str = Field(description="Unique ID for this execution (for cancellation)")
-    status: Literal["pass", "fail"] = Field(description="Execution result status")
+    status: Literal["pass", "fail", "SUCCEEDED", "FAILED"] = Field(
+        description=(
+            "Execution result status. Node code produces ``pass`` / ``fail``; "
+            "``/execute`` answers ``SUCCEEDED`` / ``FAILED`` when the engine asks for "
+            "node protocol 2 (``X-Node-Protocol``, engine#1300)"
+        )
+    )
     outputs: dict[str, Any] | None = Field(
         default=None,
         description="Output values (if pass)",
