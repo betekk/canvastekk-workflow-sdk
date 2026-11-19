@@ -31,6 +31,7 @@ from canvastekk_workflow_sdk._url import is_dev_mode as _is_dev_mode
 from canvastekk_workflow_sdk.auth import NodeAuth, _AuthBackend
 from canvastekk_workflow_sdk.exceptions import NodeExecutionError, NodeTimeoutError, get_http_status_for_error
 from canvastekk_workflow_sdk.logging import configure_logging
+from canvastekk_workflow_sdk.protocol import NODE_PROTOCOL_HEADER, outcome_for_protocol, requested_protocol
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
 from canvastekk_workflow_sdk.response import (
     HealthResponse,
@@ -363,6 +364,7 @@ def create_node_app(
 
         body.pop("account_id", None)
         body.pop("capability", None)
+        protocol = requested_protocol(request.headers.get(NODE_PROTOCOL_HEADER))
         capability: str | None = None
         capability_header = request.headers.get("x-node-capability")
         if capability_header is not None and capability_header.strip():
@@ -463,6 +465,8 @@ def create_node_app(
             except Exception:
                 logging.getLogger(__name__).debug("Post-execution temp cleanup skipped", exc_info=True)
 
+            if protocol >= 2:
+                response = response.model_copy(update={"status": outcome_for_protocol(response.status, protocol)})
             return response
 
         finally:

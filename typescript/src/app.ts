@@ -11,6 +11,7 @@ import { SDKVersionMiddleware } from "./middleware.js";
 import { CANVASTEKK_AUTH_MARKER } from "./auth.js";
 import type { BaseNode } from "./base-node.js";
 import { NodeExecutionRequestSchema } from "./request.js";
+import { NODE_PROTOCOL_HEADER, outcomeForProtocol, requestedProtocol } from "./protocol.js";
 import { HealthResponseSchema } from "./response.js";
 import { getDefaultUploader, type UploadTarget } from "./uploads.js";
 import { isDevMode } from "./url-policy.js";
@@ -125,6 +126,7 @@ export function createNodeApp(
       return;
     }
     const execRequest = parsed.data;
+    const protocol = requestedProtocol(req.headers[NODE_PROTOCOL_HEADER]);
     const capabilityHeader = req.headers["x-node-capability"];
     execRequest.capability =
       typeof capabilityHeader === "string" && capabilityHeader.trim()
@@ -178,6 +180,9 @@ export function createNodeApp(
         }
       }
 
+      if (protocol >= 2) {
+        response = { ...response, status: outcomeForProtocol(response.status, protocol) as typeof response.status };
+      }
       res.json(response);
     } catch (err) {
       next(err);

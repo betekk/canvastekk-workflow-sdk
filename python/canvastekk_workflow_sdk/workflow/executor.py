@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from canvastekk_workflow_sdk.protocol import NODE_PROTOCOL_HEADER, NODE_PROTOCOL_VERSION, read_outcome
+
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.base import BaseNode
     from canvastekk_workflow_sdk.context import ExecutionContext
@@ -163,7 +165,11 @@ class HttpExecutor(NodeExecutor):
         response: httpx.Response | None = None
         for attempt in range(self._retries + 1):
             try:
-                response = await client.post(f"{url}/execute", json=payload)
+                response = await client.post(
+                    f"{url}/execute",
+                    json=payload,
+                    headers={NODE_PROTOCOL_HEADER: str(NODE_PROTOCOL_VERSION)},
+                )
                 response.raise_for_status()
                 break
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
@@ -176,7 +182,7 @@ class HttpExecutor(NodeExecutor):
         data = response.json()
         if not isinstance(data, dict):
             raise RuntimeError(f"Node '{slug}' returned malformed response (not an object)")
-        if data.get("status") == "pass":
+        if read_outcome(data.get("status")) == "pass":
             outputs = data.get("outputs", {})
             if not isinstance(outputs, dict):
                 raise RuntimeError(f"Node '{slug}' returned malformed outputs (not an object)")

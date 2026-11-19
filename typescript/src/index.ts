@@ -66,6 +66,14 @@ export {
   type HealthResponse,
 } from "./response.js";
 export {
+  NODE_PROTOCOL_HEADER,
+  NODE_PROTOCOL_VERSION,
+  PROTOCOL_2_OUTCOMES,
+  outcomeForProtocol,
+  readOutcome,
+  requestedProtocol,
+} from "./protocol.js";
+export {
   StructuredJsonFormatter,
   HumanReadableFormatter,
   configureLogging,
