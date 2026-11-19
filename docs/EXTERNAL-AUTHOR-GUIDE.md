@@ -105,6 +105,16 @@ app = MyNode().create_app()
 3. **Implement `execute(inputs, context)`** — return a dict matching your `output_schema`
 4. **Call `.create_app()`** — produces a ready-to-run FastAPI app
 
+### Error fields live on the response envelope — never in `outputs`
+
+The node protocol carries failure information on the **response envelope**, not inside your outputs: `NodeExecutionResponse` has top-level `error`, `error_type`, and `error_code` fields (populated on `status: "fail"`), while `outputs` is populated **only on `status: "pass"`** and is validated against your `output_schema`.
+
+Consequences for contract authors:
+
+- **`output_schema` must not list `error`, `error_type`, or `error_code` in `required`.** A passing run never produces them inside `outputs`, so such a schema can never be satisfied — requiring them in workflow contracts is what caused the #1266 outage. The SDK now **rejects these manifests at definition time** (manifest construction / CLI `validate` fails with a message naming the offending fields), so protocol-invalid schemas cannot reach the registry (#257).
+- **Optional** properties with these names remain legal: the check-node contract builder (`build_check_output_schema`) deliberately keeps a nullable optional `error` property that the engine's ErrorOutputNode error-append rewrite populates.
+- Workflow contracts that need failure detail should read the envelope (`error` / `error_code` on the node-call response), not node outputs.
+
 ### Node ID Format
 
 The `id` field is automatically derived from `slug` + `version` as `{slug}-v{version}` (e.g., `my-node-v1.0.0`). Node authors must NOT provide `id` manually.

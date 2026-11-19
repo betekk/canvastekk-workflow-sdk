@@ -427,6 +427,7 @@ The validator checks:
 - File fields use `type: "string"` (not `"object"` or `"array"`)
 - Warns on file fields missing `x-accept` or `x-maxSizeBytes` extensions
 - `input_schema` / `output_schema` are structurally valid draft-7 JSON schemas
+- `output_schema` `required` lists no envelope fields (`error` / `error_type` / `error_code` — they travel on the response envelope, never in outputs; #257)
 
 ### CLI Manifest Diff
 
@@ -650,6 +651,7 @@ Key decisions recorded as the SDK evolves. See [`PLANS/PLAN-DA-894.md`](./PLANS/
 | `httpx` promoted to runtime dependency | Replaces `urllib.request` in `uploads.py` and `registry.py`. Async-capable, timeout/redirect support, already a de facto standard in FastAPI projects |
 | `python-multipart` removed | JSON-only `/execute` endpoint. File data never hits the SDK — engine sends presigned URLs, node downloads directly |
 | `WorkflowNodeManifest.model_validator` rejects `format: "binary"` | Definition-time validation. Node authors discover errors on app startup, not at runtime |
+| `WorkflowNodeManifest` rejects envelope fields in `output_schema` `required` | Definition-time validation (#257). `error`/`error_type`/`error_code` travel on the response envelope, never in `outputs` — a schema requiring them can never be satisfied by a passing run (the #1266 outage class). Optional `error` properties stay legal (ErrorOutputNode error-append) |
 | `validate_file_input()` helper on `WorkflowNodeManifest` | Validates downloaded files against `x-accept` (extensions) and `x-maxSizeBytes` (size). Node authors call after download |
 | `x-*` JSON Schema extensions | Custom keys (`x-accept`, `x-maxSizeBytes`, `x-description`) ignored by `Draft7Validator`, consumed by frontend and node. Follows JSON Schema extension convention |
 | CLI `python -m canvastekk_workflow_sdk validate` | Offline manifest validation for node authors during development. Fast feedback without server startup |

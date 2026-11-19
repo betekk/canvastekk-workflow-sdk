@@ -52,20 +52,23 @@
 
 ### Phase 3: Contract-authoring docs + skill mirror + README sweep
 
-- [ ] **3.1** `docs/EXTERNAL-AUTHOR-GUIDE.md`: add an "Error fields live on the envelope" note in the output-schema/contract-authoring area — `error`, `error_type`, `error_code` are response-envelope fields (`NodeExecutionResponse`), `outputs` carries only `output_schema`-shaped values and only on `pass`; output schemas must not require envelope fields (SDK rejects at definition time, #257).
+- [x] **3.1** `docs/EXTERNAL-AUTHOR-GUIDE.md`: add an "Error fields live on the envelope" note in the output-schema/contract-authoring area — `error`, `error_type`, `error_code` are response-envelope fields (`NodeExecutionResponse`), `outputs` carries only `output_schema`-shaped values and only on `pass`; output schemas must not require envelope fields (SDK rejects at definition time, #257).
     — **Why:** AC "contract-authoring docs updated" — the guide is the document the misrequiring contract authors followed
     — **Done when:** guide states where error lives and the new rule in ≥1 findable place (`rg "envelope"` hits it)
     — **Consumers affected:** external authors
+    — **Done:** new subsection "Error fields live on the response envelope — never in `outputs`" after Key Requirements (envelope fields named, outputs-only-on-pass, #1266 link, definition-time rejection, optional-property legality, contract guidance to read the envelope); files: `docs/EXTERNAL-AUTHOR-GUIDE.md`; fixes: none
 
-- [ ] **3.2** Assistant skill contract table (`python/canvastekk_workflow_sdk/data/skills/canvastekk-workflow-sdk-assistant/SKILL.md`) gains the rule row in **Schema rules** ("output_schema `required` must never list `error`/`error_type`/`error_code` — envelope fields, never outputs; SDK rejects at definition time"); copy the file byte-identically to `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md`.
+- [x] **3.2** Assistant skill contract table (`python/canvastekk_workflow_sdk/data/skills/canvastekk-workflow-sdk-assistant/SKILL.md`) gains the rule row in **Schema rules** ("output_schema `required` must never list `error`/`error_type`/`error_code` — envelope fields, never outputs; SDK rejects at definition time"); copy the file byte-identically to `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md`.
     — **Why:** the skill gates node creation; the CI `skill-mirror-guard` `diff -r` fails unless both copies land together
     — **Done when:** `diff -r .agents/skills python/canvastekk_workflow_sdk/data/skills` exits 0
     — **Consumers affected:** node-authoring agents, CI mirror guard
+    — **Done:** rule bullet added to Schema rules (required-never, optional-fine nuance included); cp to `.agents` mirror; `diff -r` exit 0; files: both `SKILL.md` copies; fixes: none
 
-- [ ] **3.3** README sweeps: root `README.md` validation table row ("`WorkflowNodeManifest` rejects envelope fields in output_schema `required`") + the same one-liner in `python/README.md` and `typescript/README.md` near their existing manifest/file-format validation notes.
+- [x] **3.3** README sweeps: root `README.md` validation table row ("`WorkflowNodeManifest` rejects envelope fields in output_schema `required`") + the same one-liner in `python/README.md` and `typescript/README.md` near their existing manifest/file-format validation notes.
     — **Why:** LEARNINGS py-ts-sdk-changes-sweep-root-readme — SDK behavior changes must sweep the root README in the same change; package READMEs document the validation surface
     — **Done when:** all three READMEs mention the guard; no stale claims contradict it
     — **Consumers affected:** humans reading the docs
+    — **Done:** root README validator-checks bullet + design-decision table row (with #1266 class + optional-property nuance); python README validator-checks bullet; ts README requirement-2 note (parse rejects envelope-required outputs); `rg -l "envelope fields"` hits all three; files: `README.md`, `python/README.md`, `typescript/README.md`; fixes: none
 
 ### Phase 4: Exit gate + trace
 
@@ -95,4 +98,6 @@ None blocking (parent epic tracker#4295 lists A7 as independent). No new externa
 GATE 7ce10a9 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
 LOG Phase 1 gate: ruff scoped errored once (I001 import order, auto-fixed), then green; test_definition.py 110 passed; full python suite 1020 passed 1 skipped (main-checkout poetry venv; worktree lacks fastapi extra). GATE memo follows the phase commit.
 LOG Phase 2 gate (green first try): eslint scoped on definition/registry + tests, tsc typecheck + typecheck:tests, definition+registry 107 passed, full ts suite 480 passed (npm ci run in worktree — node_modules is untracked and not inherited).
+GATE 8d8c3d1 tier=light lint=t typecheck=t build=- unit=t e2e=n.a
+LOG Phase 3 gate (docs-only): skill-mirror diff -r exit 0; rg "envelope" hits guide (3) and all three READMEs mention the guard; no contradicting claims found.
 
