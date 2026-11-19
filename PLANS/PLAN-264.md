@@ -110,3 +110,4 @@ Operational ticket (branch diff = this PLAN only); zero reviewers selected at St
 LOG requirements gate: zero-reviewer rule fired (operational ticket); interrogation round 1/2 doubled as production-impact consent — user confirmed "Cut v0.66.0 now, minor".
 LOG gate-escalation exit gate: full tier — unconditional; ladder run in-worktree (actionlint ×4, tsc ×2, tsup, poetry build, pytest 1042, vitest 489; e2e n.a) — this PR's CI is paths-filtered (docs-only diff), so the local ladder is its only suite evidence.
 EVIDENCE release chain: PR #269 (release+minor) → merge 1d1e8e6 → run 44485175388 success → tag v0.66.0 == 1d1e8e6 → GH Release (tgz+wheel+sha256) → publish + 3 smoke greens → CWN run 44485557947 queued 08:11:46. Window: exactly one new tag; dc67027 minted nothing.
+GATE 38b95c7 tier=full lint=t typecheck=t build=t unit=t e2e=n.a — exit gate; Step 9 review returned zero fixes, so 38b95c7 is the gated final implementation SHA.
