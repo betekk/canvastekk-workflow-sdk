@@ -24,26 +24,28 @@
 
 ### Phase 1: Python definition-time guard
 
-- [ ] **1.1** Add `@model_validator(mode="after")` `_validate_output_schema_required_fields` to `WorkflowNodeManifest` (`python/canvastekk_workflow_sdk/definition.py`): if `output_schema["required"]` (when a list) intersects `{"error", "error_type", "error_code"}`, raise `ValueError` naming the offending field(s), stating the protocol fact (`error` et al. are returned on the response envelope, never in `outputs`), and pointing at the guide. Optional properties with those names are NOT rejected.
+- [x] **1.1** Add `@model_validator(mode="after")` `_validate_output_schema_required_fields` to `WorkflowNodeManifest` (`python/canvastekk_workflow_sdk/definition.py`): if `output_schema["required"]` (when a list) intersects `{"error", "error_type", "error_code"}`, raise `ValueError` naming the offending field(s), stating the protocol fact (`error` et al. are returned on the response envelope, never in `outputs`), and pointing at the guide. Optional properties with those names are NOT rejected.
     — **Why:** root-cause fix at the single chokepoint every registered manifest routes through (same precedent as the `format: "binary"` definition-time rejection); prevents new protocol-invalid registry entries instead of cleaning up after them
     — **Done when:** constructing a manifest whose output_schema requires `error` raises `ValueError` matching the message; a manifest with an optional `error` property (e.g. `build_check_output_schema` output) still constructs
     — **Consumers affected:** all python SDK surfaces + node authors; zero existing in-repo manifests/tests/goldens affected (verified by grep)
+    — **Done:** validator added after `_validate_file_field_formats` with module-level `ENVELOPE_RESERVED_OUTPUT_FIELDS` frozenset (class-attr form avoided — ModelPrivateAttr trap from DA-2627 history); message names fields + protocol fact + guide; files: `python/canvastekk_workflow_sdk/definition.py`; fixes: none
 
-- [ ] **1.2** Tests in `python/tests/test_definition.py` (class holding the binary-format tests): (a) rejects each of `error`/`error_type`/`error_code` in output_schema required; (b) accepts output_schema with optional `error` property — pin the `build_check_output_schema` compat; (c) accepts `error` required in input_schema (not protocol-invalid); (d) `required` absent or non-list does not raise.
+- [x] **1.2** Tests in `python/tests/test_definition.py` (class holding the binary-format tests): (a) rejects each of `error`/`error_type`/`error_code` in output_schema required; (b) accepts output_schema with optional `error` property — pin the `build_check_output_schema` compat; (c) accepts `error` required in input_schema (not protocol-invalid); (d) `required` absent or non-list does not raise.
     — **Why:** the guard's boundary (required-only, output-only, family-of-three) is the safety property; pinned tests stop a future refactor from silently widening or narrowing it
     — **Done when:** `pytest python/tests/test_definition.py` green, new tests fail if the validator is removed
     — **Consumers affected:** CI python suite
+    — **Done:** four tests added beside the binary-format tests (rejects-each-field, optional-error via build_check_output_schema, input-side error legal, absent/non-list required safe); test_definition.py 110 passed, full suite 1020 passed 1 skipped via main-checkout poetry venv (worktree lacks its own fastapi extra); files: `python/tests/test_definition.py`; fixes: ruff I001 import order (auto-fixed)
 
 ### Phase 2: TypeScript definition-time guard (parity)
 
-- [ ] **2.1** Add `validateOutputSchemaRequiredFields(schema)` to `typescript/src/definition.ts`, called from the manifest schema's existing `superRefine` where `validateFileFieldFormats` runs on `output_schema`; identical semantics and near-identical message to python (parity suites compare behavior).
-    — **Why:** the ts package registers the same registry; a python-only guard leaves js-authored nodes able to reintroduce the outage
-    — **Done when:** `WorkflowNodeManifestSchema.parse` throws for required-`error` output schemas and passes for optional-`error` ones
+- [ ] **2.1** Add `validateOutputSchemaRequiredFields(schema)` to `typescript/src/definition.ts`, called from the manifest schema's existing `superRefine` where `validateFileFieldFormats` runs on `output_schema`; identical semantics and near-identical message to python (parity suites compare behavior). Close the parse-site gap (architecture review finding 1): `registerNode` builds its payload from `WorkflowNodeManifestSchema.parse(node.definition)` — parse is otherwise lazy (`base-node.ts` `getDefinition`) and the CLI path (`cli.ts:324`) is the only eager parse today, so a direct `registerNode({ definition: <literal> })` caller would ship an unvalidated manifest.
+    — **Why:** the ts package registers the same registry; a python-only guard leaves js-authored nodes able to reintroduce the outage, and structural typing lets object literals skip lazy validation on the direct-API path
+    — **Done when:** `WorkflowNodeManifestSchema.parse` throws for required-`error` output schemas and passes for optional-`error` ones; `registerNode` parses before building the payload (test pins a literal definition reaching `buildRegistryPayload` validated)
     — **Consumers affected:** ts SDK surfaces + js node authors
 
-- [ ] **2.2** Mirror tests in `typescript/tests/definition.test.ts` covering the same four cases as 1.2.
-    — **Why:** same boundary-pinning as 1.2, ts side
-    — **Done when:** `vitest run definition.test.ts` green
+- [ ] **2.2** Mirror tests in `typescript/tests/definition.test.ts` covering the same four cases as 1.2, plus one `registerNode` test pinning that a raw literal definition with required-`error` outputs is rejected before any network call.
+    — **Why:** same boundary-pinning as 1.2, ts side; the registerNode parse hook needs its own pin (it is the fix for the architecture-review bypass finding)
+    — **Done when:** `vitest run definition.test.ts registry.test.ts` green
     — **Consumers affected:** CI ts suite
 
 ### Phase 3: Contract-authoring docs + skill mirror + README sweep
@@ -87,4 +89,6 @@ None blocking (parent epic tracker#4295 lists A7 as independent). No new externa
 - **Risk:** mirror-copy drift between `.agents/skills` and `data/skills`. **Mitigation:** byte-identical copy in the same commit; CI guard verifies.
 
 ## Trace
+
+LOG Phase 1 gate: ruff scoped errored once (I001 import order, auto-fixed), then green; test_definition.py 110 passed; full python suite 1020 passed 1 skipped (main-checkout poetry venv; worktree lacks fastapi extra). GATE memo follows the phase commit.
 
