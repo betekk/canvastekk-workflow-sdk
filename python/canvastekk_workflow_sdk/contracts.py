@@ -35,6 +35,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from canvastekk_workflow_sdk.protocol import PROTOCOL_2_OUTCOMES
+
 CONTRACT_VERSION = "1.0.0"
 
 
@@ -78,6 +80,11 @@ def parse_node_execution_status(value: Any) -> NodeExecutionStatus:
             return NodeExecutionStatus(value)
         except ValueError:
             pass
+        # Node protocol 2 (engine#1300): the exact words SUCCEEDED / FAILED read
+        # as pass / fail. Still strict: no case folding, ACCEPTED is not a result.
+        legacy = PROTOCOL_2_OUTCOMES.get(value)
+        if legacy in (NodeExecutionStatus.PASS.value, NodeExecutionStatus.FAIL.value):
+            return NodeExecutionStatus(legacy)
     from canvastekk_workflow_sdk.exceptions import NodeValidationError
 
     raise NodeValidationError(

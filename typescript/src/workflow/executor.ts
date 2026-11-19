@@ -1,5 +1,6 @@
 import type { ExecutionContext } from "../context.js";
 import { NodeExecutionResponseSchema } from "../response.js";
+import { NODE_PROTOCOL_HEADER, NODE_PROTOCOL_VERSION, readOutcome } from "../protocol.js";
 
 /**
  * Abstract base for node execution strategies.
@@ -105,7 +106,7 @@ export class HttpExecutor extends NodeExecutor {
 
     const resp = await fetch(`${url}/execute`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", [NODE_PROTOCOL_HEADER]: String(NODE_PROTOCOL_VERSION) },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(this._timeout),
     });
@@ -118,7 +119,7 @@ export class HttpExecutor extends NodeExecutor {
     if (!parsed.success) {
       throw new Error(`Node '${slug}' returned malformed response: ${parsed.error.issues[0]?.message ?? "schema mismatch"}`);
     }
-    if (parsed.data.status === "pass") {
+    if (readOutcome(parsed.data.status) === "pass") {
       return parsed.data.outputs ?? {};
     }
     throw new Error(`Node '${slug}' returned failure: ${parsed.data.error ?? "unknown"}`);
