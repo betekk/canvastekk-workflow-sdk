@@ -86,11 +86,14 @@ jobs:
           python3 -c "
           import zipfile, sys
           with zipfile.ZipFile('${WHEEL_FILE}') as z:
-              def_path = [n for n in z.namelist() if n.endswith('definition.py')][0]
+              # ADR 0001 (#271): definition.py is now a deprecation shim; the
+              # manifest model lives in workflow_node_manifest.py. Checking the
+              # real module also proves the wheel carries definitions, not shims.
+              def_path = [n for n in z.namelist() if n.endswith('workflow_node_manifest.py')][0]
               source = z.read(def_path).decode()
               for symbol in ['WorkflowNodeManifest', 'WorkflowNodeStyles', 'WorkflowNodeRole']:
                   if symbol not in source:
-                      print(f'FAIL: {symbol} not found in wheel definition.py', file=sys.stderr)
+                      print(f'FAIL: {symbol} not found in wheel workflow_node_manifest.py', file=sys.stderr)
                       sys.exit(1)
               print('Pre-upload verification passed: all expected symbols present in wheel')
           "
