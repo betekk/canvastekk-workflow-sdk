@@ -37,18 +37,21 @@ Phases 2–4 each land **Python and TypeScript in the same commit** (ticket pari
 
 ### Phase 1: Vocabulary law — glossary, ADR, complete rename map (docs-only)
 
-- [ ] **1.1** Commit `docs/GLOSSARY.md` with the epic #4301 term table (workflow definition / workflow definition node / workflow node manifest / workflow node / workflow run / node execution·node call / node I/O data)
+- [x] **1.1** Commit `docs/GLOSSARY.md` with the epic #4301 term table (workflow definition / workflow definition node / workflow node manifest / workflow node / workflow run / node execution·node call / node I/O data)
     — **Why:** the vocabulary law every later step cites; the epic's AC requires it recorded in this repo.
     — **Done when:** file committed with the seven-term table verbatim from the epic.
     — **Consumers affected:** all phases (citation target); epic close-out.
-- [ ] **1.2** Commit `docs/adr/0001-explicit-node-naming.md`: the decision, the alias mechanism law, the complete rename map — every name in python `__all__` and the TS index classified `old → new` or `kept (already explicit)` — plus the two resolutions: (a) `NodeAuth` vs `TekkNodeAuth`: TS `TekkNodeAuth` is already `export const TekkNodeAuth = NodeAuth` (`auth.ts:476`) → TS keeps `TekkNodeAuth` canonical and marks `NodeAuth` deprecated; Python has two genuinely distinct classes (`auth/core.py:587 TekkNodeAuth` credential vs `auth/fastapi.py:113 NodeAuth` FastAPI dependency) → both kept, documented as distinct; (b) `NodeValidationError`: raised for both manifest (`definition.py:553`) and input (`base.py:181`, `contracts.py:90`) failures → keep `NodeValidationError` as base, add subclasses `WorkflowNodeManifestValidationError` and `NodeInputValidationError`, raise the specific ones (existing `except NodeValidationError` keeps catching both — zero behavior change)
+    — **Done:** docs/GLOSSARY.md written (seven-term table + rollout pointer); files: docs/GLOSSARY.md; fixes: none
+- [x] **1.2** Commit `docs/adr/0001-explicit-node-naming.md`: the decision, the alias mechanism law, the complete rename map — every name in python `__all__` and the TS index classified `old → new` or `kept (already explicit)` — plus the two resolutions: (a) `NodeAuth` vs `TekkNodeAuth`: TS `TekkNodeAuth` is already `export const TekkNodeAuth = NodeAuth` (`auth.ts:476`) → TS keeps `TekkNodeAuth` canonical and marks `NodeAuth` deprecated; Python has two genuinely distinct classes (`auth/core.py:587 TekkNodeAuth` credential vs `auth/fastapi.py:113 NodeAuth` FastAPI dependency) → both kept, documented as distinct; (b) `NodeValidationError`: raised for both manifest (`definition.py:553`) and input (`base.py:181`, `contracts.py:90`) failures → keep `NodeValidationError` as base, add subclasses `WorkflowNodeManifestValidationError` and `NodeInputValidationError`, raise the specific ones (existing `except NodeValidationError` keeps catching both — zero behavior change)
     — **Why:** the ticket demands the complete map before code changes; the two open names need decided, recorded resolutions before any phase can order its renames.
     — **Done when:** ADR committed; enumeration cross-check (1.3) confirms every `__all__` name and every `index.ts` export appears exactly once with a verdict.
     — **Consumers affected:** phases 2–5 (the map is their worklist); Step 7 reviewers.
-- [ ] **1.3** Cross-check the map by enumeration: parse `__all__` from `python/canvastekk_workflow_sdk/__init__.py` and exports from `typescript/src/index.ts`, diff against the ADR table
+    — **Done:** ADR written: decision, ambiguity rule, alias mechanism, both resolutions, module map (17 rows), renamed-symbol map (9 clusters), kept-symbol list, Schema-twin enumeration, N1 pin note; files: docs/adr/0001-explicit-node-naming.md; fixes: none
+- [x] **1.3** Cross-check the map by enumeration: parse `__all__` from `python/canvastekk_workflow_sdk/__init__.py` and exports from `typescript/src/index.ts`, diff against the ADR table
     — **Why:** a map that misses one name silently skips its rename — completeness must be proven, not assumed.
     — **Done when:** zero-name diff both directions; counts recorded in the ADR (py `__all__` N names, TS index M exports, every one classified).
     — **Consumers affected:** phase-5 guard tests re-pin this invariant permanently.
+    — **Done:** enumeration diff: py __all__ 85 names + ts index 122 names + 17 modules' publics → zero missing both directions (11 Schema/auth names added on first pass); counts recorded in ADR §Verification; files: docs/adr/0001-explicit-node-naming.md; fixes: none
 
 ### Phase 2: Manifest + registry cluster (py + ts, one commit)
 
@@ -144,3 +147,5 @@ Phases 2–4 each land **Python and TypeScript in the same commit** (ticket pari
 ## Trace
 
 _(gate memos + evidence appended during execution)_
+
+LOG Phase 1 gate (tier=light, docs-only diff): GLOSSARY + ADR committed; markdown carries no lint/unit surface; scoped ruff proof green on the tree; enumeration cross-check zero-missing both directions (py 85 / ts 122 / 17 modules' publics).
