@@ -185,7 +185,10 @@ function formatAjvErrors(errors: import("ajv").ErrorObject[]): Record<string, un
  * ```
  */
 export abstract class WorkflowNodeBase {
-  abstract definition: WorkflowNodeManifest;
+  // Manifest attribute contract (ADR 0001, #271): subclasses declare a
+  // `manifest` class field (legacy `definition` still resolves). Presence is
+  // enforced at runtime by getWorkflowNodeManifest's schema parse — TS
+  // cannot express "either attribute name" as an abstract member.
 
   private _middleware: NodeMiddleware[] = [new LoggingMiddleware()];
   private _metricsCollector: NodeExecutionMetricsCollector = new NodeExecutionMetricsCollector();
@@ -201,7 +204,31 @@ export abstract class WorkflowNodeBase {
   }
 
   get nodeDefinition(): WorkflowNodeManifest {
-    return this.getDefinition();
+    return this.getWorkflowNodeManifest();
+  }
+
+  /**
+   * @deprecated use getWorkflowNodeManifest (ADR 0001, #271; removal in 1.0.0, #272)
+   */
+  protected getDefinition(): WorkflowNodeManifest {
+    return this.getWorkflowNodeManifest();
+  }
+
+  /**
+   * The node's workflow node manifest (ADR 0001, #271). Canonical name for
+   * the class attribute; legacy `definition` fields still resolve here.
+   */
+  get manifest(): WorkflowNodeManifest {
+    return this.getWorkflowNodeManifest();
+  }
+
+  /**
+   * @deprecated legacy attribute name — use `manifest` (ADR 0001, #271;
+   * removal in 1.0.0, #272). Subclasses declaring their own `definition`
+   * field shadow this getter, which is exactly the legacy pattern.
+   */
+  get definition(): WorkflowNodeManifest {
+    return this.getWorkflowNodeManifest();
   }
 
   get metricsCollector(): NodeExecutionMetricsCollector {
@@ -213,9 +240,15 @@ export abstract class WorkflowNodeBase {
    * Caches the validated definition after first call.
    * @returns Validated workflow node manifest
    */
-  protected getDefinition(): WorkflowNodeManifest {
+  protected getWorkflowNodeManifest(): WorkflowNodeManifest {
     if (!this._validatedDefinition) {
-      this._validatedDefinition = WorkflowNodeManifestSchema.parse(this.definition);
+      // ADR 0001 (#271): prefer the canonical own `manifest` field; fall back
+      // to the legacy own `definition` field. Own-property reads only — the
+      // prototype `manifest` getter routes back here (recursion guard).
+      const self = this as unknown as Record<string, unknown>;
+      const hasOwn = Object.prototype.hasOwnProperty.call(this, "manifest");
+      const rawManifest = (hasOwn ? self.manifest : undefined) ?? self.definition;
+      this._validatedDefinition = WorkflowNodeManifestSchema.parse(rawManifest);
     }
     return this._validatedDefinition;
   }
@@ -253,7 +286,7 @@ export abstract class WorkflowNodeBase {
    * default (point clouds in this domain are multi-GB).
    */
   private maxDownloadBytes(fieldName: string): number {
-    const def = this.getDefinition();
+    const def = this.getWorkflowNodeManifest();
     const schema = (def.input_schema as Record<string, unknown>)?.properties as
       | Record<string, Record<string, unknown>>
       | undefined;
@@ -281,7 +314,7 @@ export abstract class WorkflowNodeBase {
     context: NodeExecutionContext,
   ): Promise<string> {
     const maxBytes = this.maxDownloadBytes(fieldName);
-    const deadline = downloadDeadline(effectiveRuntimeSeconds(this.getDefinition()));
+    const deadline = downloadDeadline(effectiveRuntimeSeconds(this.getWorkflowNodeManifest()));
 
     try {
       return await this.downloadOneInner(fieldName, url, context, maxBytes, deadline);
@@ -427,10 +460,10 @@ export abstract class WorkflowNodeBase {
    * @throws {NodeConfigurationError} If the node's sunset date has passed
    */
   private checkDeprecationLifecycle(): void {
-    const dep = this.getDefinition().deprecation;
+    const dep = this.getWorkflowNodeManifest().deprecation;
     if (!dep) return;
 
-    const name = this.getDefinition().slug;
+    const name = this.getWorkflowNodeManifest().slug;
     const replacement = dep.replacement_slug || "unspecified";
 
     if (dep.sunset_date) {
@@ -460,7 +493,7 @@ export abstract class WorkflowNodeBase {
    * @throws {NodeValidationError} If validation fails
    */
   private validateInputs(inputs: Record<string, unknown>): void {
-    const def = this.getDefinition();
+    const def = this.getWorkflowNodeManifest();
     const validate = compileSchema(def.input_schema as Record<string, unknown>);
     if (!validate) return;
 
@@ -479,7 +512,7 @@ export abstract class WorkflowNodeBase {
    * @throws {NodeOutputValidationError} If validation fails
    */
   private validateOutputs(outputs: Record<string, unknown>): void {
-    const def = this.getDefinition();
+    const def = this.getWorkflowNodeManifest();
     const validate = compileSchema(def.output_schema as Record<string, unknown>);
     if (!validate) return;
 
@@ -509,7 +542,7 @@ export abstract class WorkflowNodeBase {
     inputs: Record<string, unknown>,
     context: NodeExecutionContext,
   ): Promise<Record<string, unknown>> {
-    const def = this.getDefinition();
+    const def = this.getWorkflowNodeManifest();
     const fileFields = getFileInputFields(def);
     const downloaded: string[] = [];
 
@@ -632,7 +665,7 @@ export abstract class WorkflowNodeBase {
     enforceSupportHorizon();
     const executionId = request.execution_id ?? randomUUID();
     const startTime = performance.now();
-    const def = this.getDefinition();
+    const def = this.getWorkflowNodeManifest();
 
     try {
       this.checkDeprecationLifecycle();
@@ -751,7 +784,7 @@ export abstract class WorkflowNodeBase {
       createNodeExecutionMetric({
         runId: request.run_id,
         nodeId: request.node_id,
-        nodeName: this.getDefinition().slug,
+        nodeName: this.getWorkflowNodeManifest().slug,
         status: "fail",
         durationMs,
         errorType: wireErrorType(error),

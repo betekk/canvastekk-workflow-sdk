@@ -9,7 +9,7 @@ from canvastekk_workflow_sdk.multi_node_router import create_multi_workflow_node
 
 
 class EchoNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -23,7 +23,7 @@ class EchoNode(WorkflowNodeBase):
 
 
 class ReverseNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="reverse",
         version="1.0.0",
         name="Reverse",
@@ -37,7 +37,7 @@ class ReverseNode(WorkflowNodeBase):
 
 
 class UpperNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="upper",
         version="1.0.0",
         name="Upper",

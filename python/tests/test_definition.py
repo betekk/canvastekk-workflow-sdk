@@ -65,7 +65,7 @@ class TestWorkflowNodeRole:
         assert WorkflowNodeRole.OPERATION.value == "operation"
 
     def test_default_role_is_operation(self) -> None:
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -73,10 +73,10 @@ class TestWorkflowNodeRole:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.role == WorkflowNodeRole.OPERATION
+        assert manifest.role == WorkflowNodeRole.OPERATION
 
     def test_explicit_role(self) -> None:
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="start",
             version="1.0.0",
             name="Start",
@@ -85,15 +85,15 @@ class TestWorkflowNodeRole:
             output_schema={"type": "object"},
             role=WorkflowNodeRole.START,
         )
-        assert definition.role == WorkflowNodeRole.START
+        assert manifest.role == WorkflowNodeRole.START
 
 
 class TestWorkflowNodeManifest:
     """Tests for WorkflowNodeManifest model."""
 
     def test_minimal_definition(self) -> None:
-        """Test creating a minimal node definition."""
-        definition = WorkflowNodeManifest(
+        """Test creating a minimal node manifest."""
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -101,18 +101,18 @@ class TestWorkflowNodeManifest:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.id == "echo-v1.0.0"
-        assert definition.slug == "echo"
-        assert definition.version == "1.0.0"
-        assert definition.name == "Echo"
-        assert definition.token_cost == 0.0
-        assert definition.category == "utility"
-        assert definition.timeout_seconds == 30
-        assert definition.role == WorkflowNodeRole.OPERATION
+        assert manifest.id == "echo-v1.0.0"
+        assert manifest.slug == "echo"
+        assert manifest.version == "1.0.0"
+        assert manifest.name == "Echo"
+        assert manifest.token_cost == 0.0
+        assert manifest.category == "utility"
+        assert manifest.timeout_seconds == 30
+        assert manifest.role == WorkflowNodeRole.OPERATION
 
     def test_full_definition(self) -> None:
-        """Test creating a full node definition with all fields."""
-        definition = WorkflowNodeManifest(
+        """Test creating a full node manifest with all fields."""
+        manifest = WorkflowNodeManifest(
             slug="segmentation",
             version="2.0.0",
             name="Point Cloud Segmentation",
@@ -135,14 +135,14 @@ class TestWorkflowNodeManifest:
             category="inference",
             timeout_seconds=300,
         )
-        assert definition.token_cost == 5.0
-        assert definition.default_retry.max_attempts == 3
-        assert definition.category == "inference"
-        assert definition.timeout_seconds == 300
+        assert manifest.token_cost == 5.0
+        assert manifest.default_retry.max_attempts == 3
+        assert manifest.category == "inference"
+        assert manifest.timeout_seconds == 300
 
     def test_to_dict(self) -> None:
-        """Test converting definition to dictionary."""
-        definition = WorkflowNodeManifest(
+        """Test converting manifest to dictionary."""
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -150,7 +150,7 @@ class TestWorkflowNodeManifest:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        data = definition.to_dict()
+        data = manifest.to_dict()
         assert isinstance(data, dict)
         assert data["id"] == "echo-v1.0.0"
         assert data["slug"] == "echo"
@@ -158,7 +158,7 @@ class TestWorkflowNodeManifest:
 
     def test_control_flow_node(self) -> None:
         """Test creating a node with explicit role."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="if",
             version="1.0.0",
             name="IF Condition",
@@ -169,13 +169,13 @@ class TestWorkflowNodeManifest:
             role=WorkflowNodeRole.START,
             token_cost=0.0,
         )
-        assert definition.role == WorkflowNodeRole.START
-        assert definition.category == "control-flow"
-        assert definition.token_cost == 0.0
+        assert manifest.role == WorkflowNodeRole.START
+        assert manifest.category == "control-flow"
+        assert manifest.token_cost == 0.0
 
     def test_file_input_fields_with_file(self) -> None:
         """Test file_input_fields returns fields with format: file."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="upload",
             version="1.0.0",
             name="Upload Node",
@@ -190,11 +190,11 @@ class TestWorkflowNodeManifest:
             },
             output_schema={"type": "object"},
         )
-        assert sorted(definition.file_input_fields) == ["mask", "point_cloud"]
+        assert sorted(manifest.file_input_fields) == ["mask", "point_cloud"]
 
     def test_file_input_fields_no_file(self) -> None:
         """Test file_input_fields returns empty list when no file fields."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -208,11 +208,11 @@ class TestWorkflowNodeManifest:
             },
             output_schema={"type": "object"},
         )
-        assert definition.file_input_fields == []
+        assert manifest.file_input_fields == []
 
     def test_file_input_fields_empty_schema(self) -> None:
         """Test file_input_fields with schema that has no properties."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="empty",
             version="1.0.0",
             name="Empty",
@@ -220,11 +220,11 @@ class TestWorkflowNodeManifest:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.file_input_fields == []
+        assert manifest.file_input_fields == []
 
     def test_has_file_inputs_true(self) -> None:
         """Test has_file_inputs returns True when file fields exist."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="upload",
             version="1.0.0",
             name="Upload Node",
@@ -237,11 +237,11 @@ class TestWorkflowNodeManifest:
             },
             output_schema={"type": "object"},
         )
-        assert definition.has_file_inputs is True
+        assert manifest.has_file_inputs is True
 
     def test_has_file_inputs_false(self) -> None:
         """Test has_file_inputs returns False when no file fields."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -252,11 +252,11 @@ class TestWorkflowNodeManifest:
             },
             output_schema={"type": "object"},
         )
-        assert definition.has_file_inputs is False
+        assert manifest.has_file_inputs is False
 
     def test_file_output_fields_with_file(self) -> None:
         """Test file_output_fields returns fields with format: file in output_schema."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="segmentation",
             version="1.0.0",
             name="Segmentation",
@@ -271,11 +271,11 @@ class TestWorkflowNodeManifest:
                 },
             },
         )
-        assert sorted(definition.file_output_fields) == ["mask_path", "result_path"]
+        assert sorted(manifest.file_output_fields) == ["mask_path", "result_path"]
 
     def test_file_output_fields_with_array_file(self) -> None:
         """Array file outputs (items.format=file) are enumerated — S.1 mirror of the input side."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="url-loader",
             version="1.3.2",
             name="URL Loader",
@@ -290,11 +290,11 @@ class TestWorkflowNodeManifest:
                 },
             },
         )
-        assert sorted(definition.file_output_fields) == ["buffer", "buffers"]
+        assert sorted(manifest.file_output_fields) == ["buffer", "buffers"]
 
     def test_file_output_fields_no_file(self) -> None:
         """Test file_output_fields returns empty list when no file output fields."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -308,11 +308,11 @@ class TestWorkflowNodeManifest:
                 },
             },
         )
-        assert definition.file_output_fields == []
+        assert manifest.file_output_fields == []
 
     def test_file_output_fields_empty_schema(self) -> None:
         """Test file_output_fields with output_schema that has no properties."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="empty",
             version="1.0.0",
             name="Empty",
@@ -320,7 +320,7 @@ class TestWorkflowNodeManifest:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.file_output_fields == []
+        assert manifest.file_output_fields == []
 
     def test_file_input_fields_does_not_detect_binary(self) -> None:
         """Test that file_input_fields does NOT detect format: binary (breaking change)."""
@@ -340,7 +340,7 @@ class TestWorkflowNodeManifest:
             )
 
     def test_model_validator_rejects_binary_format(self) -> None:
-        """Test that WorkflowNodeManifest rejects format: binary at definition time."""
+        """Test that WorkflowNodeManifest rejects format: binary at manifest time."""
         with pytest.raises(ValueError, match="no longer supported"):
             WorkflowNodeManifest(
                 slug="bad",
@@ -434,7 +434,7 @@ class TestWorkflowNodeManifest:
 
     def test_to_dict_contains_file_format(self) -> None:
         """Test that to_dict() preserves format: file in schemas."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -452,7 +452,7 @@ class TestWorkflowNodeManifest:
                 },
             },
         )
-        data = definition.to_dict()
+        data = manifest.to_dict()
         assert data["input_schema"]["properties"]["file"]["format"] == "file"
         assert data["output_schema"]["properties"]["result"]["format"] == "file"
 
@@ -462,7 +462,7 @@ class TestExportDefinition:
 
     def test_export_definition_creates_registry_compatible_json(self) -> None:
         """Test that export_workflow_node_manifest creates registry-compatible JSON."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test Node",
@@ -482,7 +482,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            result_path = export_workflow_node_manifest(definition, output_path)
+            result_path = export_workflow_node_manifest(manifest, output_path)
 
             assert result_path == output_path
             assert output_path.exists()
@@ -493,8 +493,8 @@ class TestExportDefinition:
             assert data["label"] == "Test Node"
             assert data["description"] == "A test node"
             assert data["category"] == "utility"
-            assert data["input_schema"] == definition.input_schema
-            assert data["output_schema"] == definition.output_schema
+            assert data["input_schema"] == manifest.input_schema
+            assert data["output_schema"] == manifest.output_schema
             assert data["invoke_type"] == "http"
             assert "invoke_url" not in data
             assert data["token_cost"] == 5.0
@@ -502,7 +502,7 @@ class TestExportDefinition:
 
     def test_export_definition_maps_title_to_label(self) -> None:
         """Test that title field is mapped to label."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="My Test Node",
@@ -513,7 +513,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             data = json.loads(output_path.read_text())
             assert "label" in data
@@ -528,7 +528,7 @@ class TestExportDefinition:
             backoff_multiplier=1.5,
             max_delay_ms=10000,
         )
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -540,7 +540,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             data = json.loads(output_path.read_text())
             assert "retry" in data
@@ -551,7 +551,7 @@ class TestExportDefinition:
 
     def test_export_definition_includes_all_required_fields(self) -> None:
         """Test that export_workflow_node_manifest includes all required fields."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -562,7 +562,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             data = json.loads(output_path.read_text())
             required_fields = [
@@ -585,7 +585,7 @@ class TestExportDefinition:
 
     def test_export_definition_with_custom_invoke_type(self) -> None:
         """Test that custom invoke_type is included."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -599,12 +599,12 @@ class TestExportDefinition:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
             with _pytest.raises(ValueError, match="not a\\s+supported platform surface"):
-                export_workflow_node_manifest(definition, output_path, invoke_type="lambda")
+                export_workflow_node_manifest(manifest, output_path, invoke_type="lambda")
             assert not output_path.exists()
 
     def test_export_definition_with_invoke_url(self) -> None:
         """Test that invoke_url is included when provided."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -615,14 +615,14 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path, invoke_url="https://node.example.com")
+            export_workflow_node_manifest(manifest, output_path, invoke_url="https://node.example.com")
 
             data = json.loads(output_path.read_text())
             assert data["invoke_url"] == "https://node.example.com"
 
     def test_export_definition_with_custom_tags(self) -> None:
         """Test that custom tags are included."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -634,14 +634,14 @@ class TestExportDefinition:
         tags = ["machine-learning", "segmentation", "point-cloud"]
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path, tags=tags)
+            export_workflow_node_manifest(manifest, output_path, tags=tags)
 
             data = json.loads(output_path.read_text())
             assert data["tags"] == tags
 
     def test_export_definition_with_custom_styles(self) -> None:
-        """Test that custom styles override definition.styles."""
-        definition = WorkflowNodeManifest(
+        """Test that custom styles override manifest.styles."""
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -653,15 +653,15 @@ class TestExportDefinition:
         custom_styles = {"icon": "Brain", "color": "emerald"}
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path, styles=custom_styles)
+            export_workflow_node_manifest(manifest, output_path, styles=custom_styles)
 
             data = json.loads(output_path.read_text())
             assert data["styles"] == custom_styles
 
     def test_export_definition_uses_definition_styles_when_not_overridden(self) -> None:
-        """Test that definition.styles is used when not overridden."""
+        """Test that manifest.styles is used when not overridden."""
         styles = WorkflowNodeStyles(icon="Box", color="blue")
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -673,14 +673,14 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             data = json.loads(output_path.read_text())
             assert data["styles"] == {"icon": "Box", "color": "blue"}
 
     def test_export_definition_with_constraints(self) -> None:
         """Test that constraints are included when provided."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -692,16 +692,16 @@ class TestExportDefinition:
         constraints = {"gpu_required": True, "memory_gb": 8}
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path, constraints=constraints)
+            export_workflow_node_manifest(manifest, output_path, constraints=constraints)
 
             data = json.loads(output_path.read_text())
             assert data["constraints"]["gpu_required"] is True
             assert data["constraints"]["memory_gb"] == 8
-            assert data["constraints"].get("sdk_version") == definition.sdk_version
+            assert data["constraints"].get("sdk_version") == manifest.sdk_version
 
     def test_export_definition_with_node_status(self) -> None:
         """Test that node_status is included."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -712,14 +712,14 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path, node_status="inactive")
+            export_workflow_node_manifest(manifest, output_path, node_status="inactive")
 
             data = json.loads(output_path.read_text())
             assert data["node_status"] == "inactive"
 
     def test_export_definition_creates_parent_directories(self) -> None:
         """Test that export_workflow_node_manifest creates parent directories."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -730,7 +730,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "nested" / "dir" / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             assert output_path.exists()
             data = json.loads(output_path.read_text())
@@ -738,7 +738,7 @@ class TestExportDefinition:
 
     def test_export_definition_writes_formatted_json(self) -> None:
         """Test that export_workflow_node_manifest writes formatted JSON with newlines."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -749,7 +749,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
 
             content = output_path.read_text()
             assert content.endswith("\n")
@@ -779,30 +779,30 @@ class TestValidateFileInput:
         )
 
     def test_valid_file_passes(self, tmp_path) -> None:
-        definition = self._make_definition()
+        manifest = self._make_definition()
         f = tmp_path / "data.txt"
         f.write_text("hello")
-        definition.validate_file_input("file", f)
+        manifest.validate_file_input("file", f)
 
     def test_rejects_wrong_extension(self, tmp_path) -> None:
-        definition = self._make_definition()
+        manifest = self._make_definition()
         f = tmp_path / "data.json"
         f.write_text("{}")
         with pytest.raises(Exception, match="not allowed"):
-            definition.validate_file_input("file", f)
+            manifest.validate_file_input("file", f)
 
     def test_extensionless_file_passes(self, tmp_path) -> None:
-        definition = self._make_definition()
+        manifest = self._make_definition()
         f = tmp_path / "pcd_path_buffer"
         f.write_text("binary-ish content")
-        definition.validate_file_input("file", f)
+        manifest.validate_file_input("file", f)
 
     def test_rejects_oversized_file(self, tmp_path) -> None:
-        definition = self._make_definition()
+        manifest = self._make_definition()
         f = tmp_path / "data.txt"
         f.write_bytes(b"x" * 2000)
         with pytest.raises(Exception, match="exceeds maximum"):
-            definition.validate_file_input("file", f)
+            manifest.validate_file_input("file", f)
 
     def test_passes_when_no_extensions_defined(self, tmp_path) -> None:
         props = {
@@ -811,7 +811,7 @@ class TestValidateFileInput:
                 "format": "file",
             },
         }
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -821,7 +821,7 @@ class TestValidateFileInput:
         )
         f = tmp_path / "data.xyz"
         f.write_text("anything")
-        definition.validate_file_input("file", f)
+        manifest.validate_file_input("file", f)
 
 
 class TestSlugValidation:
@@ -983,7 +983,7 @@ class TestSemverValidation:
 
 class TestIdAutoDerivation:
     def test_id_auto_derived(self) -> None:
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.0.0",
             name="Echo",
@@ -991,10 +991,10 @@ class TestIdAutoDerivation:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.id == "echo-v1.0.0"
+        assert manifest.id == "echo-v1.0.0"
 
     def test_id_in_to_dict(self) -> None:
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="echo",
             version="1.2.0",
             name="Echo",
@@ -1002,12 +1002,12 @@ class TestIdAutoDerivation:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        assert definition.to_dict()["id"] == "echo-v1.2.0"
+        assert manifest.to_dict()["id"] == "echo-v1.2.0"
 
 
 class TestExportDefinitionNoId:
     def test_export_does_not_include_id(self) -> None:
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -1017,7 +1017,7 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
             data = json.loads(output_path.read_text())
             assert "id" not in data
             assert data["name"] == "test"
@@ -1025,7 +1025,7 @@ class TestExportDefinitionNoId:
 
     def test_export_omits_deprecation_when_none(self) -> None:
         """DA-1582 hardening: export_workflow_node_manifest routes through build_workflow_node_registry_payload (CR3)."""
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -1035,7 +1035,7 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
             data = json.loads(output_path.read_text())
             assert "deprecation" not in data
 
@@ -1043,7 +1043,7 @@ class TestExportDefinitionNoId:
         """DA-1582 hardening: export_workflow_node_manifest writes the deprecation field (CR3)."""
         from datetime import date
 
-        definition = WorkflowNodeManifest(
+        manifest = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
             name="Test",
@@ -1060,7 +1060,7 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_workflow_node_manifest(definition, output_path)
+            export_workflow_node_manifest(manifest, output_path)
             data = json.loads(output_path.read_text())
             assert data["deprecation"] == {
                 "deprecated_at": "2026-08-01",

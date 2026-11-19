@@ -23,7 +23,7 @@ from canvastekk_workflow_sdk import (
 class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -40,7 +40,7 @@ class EchoNode(WorkflowNodeBase):
 class StartupFlagNode(EchoNode):
     """Node whose on_startup hook records it ran (lifespan-chaining proof)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="startup-flag",
         version="1.0.0",
         name="StartupFlag",

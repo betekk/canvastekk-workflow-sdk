@@ -33,7 +33,7 @@ SHIMMED_MODULES = {
     "canvastekk_workflow_sdk.uploads": "canvastekk_workflow_sdk.node_output_uploads",
     "canvastekk_workflow_sdk.multipart": "canvastekk_workflow_sdk.cds_multipart_upload",
     "canvastekk_workflow_sdk.contracts": "canvastekk_workflow_sdk.node_io_data_contracts",
-    # Phase 4 — workflow definition + run
+    # Phase 4 — workflow manifest + run
     "canvastekk_workflow_sdk.workflow.models": "canvastekk_workflow_sdk.workflow.workflow_definition",
     "canvastekk_workflow_sdk.workflow.executor": "canvastekk_workflow_sdk.workflow.node_executor",
 }
@@ -89,7 +89,7 @@ ALIASED_NAMES: dict[str, tuple[str, str, str]] = {
     "CONTRACT_VERSION": ("contracts", "node_io_data_contracts", "NODE_IO_DATA_CONTRACT_VERSION"),
     "NodeExecutionStatus": ("contracts", "node_io_data_contracts", "WorkflowNodeCallOutcome"),
     "parse_node_execution_status": ("contracts", "node_io_data_contracts", "parse_workflow_node_call_outcome"),
-    # Phase 4 — workflow definition + run (old module, new module, new name)
+    # Phase 4 — workflow manifest + run (old module, new module, new name)
     "validate": ("workflow.validation", "workflow.validation", "validate_workflow_definition"),
     "ValidationResult": ("workflow.validation", "workflow.validation", "WorkflowDefinitionValidationResult"),
     "NodeResult": ("workflow.runner", "workflow.runner", "WorkflowRunNodeResult"),
@@ -211,3 +211,58 @@ def test_split_wire_names_unchanged() -> None:
     assert _wire_error_type(NodeInputValidationError("x")) == "NodeValidationError"
     assert _wire_error_type(WorkflowRunError("x")) == "WorkflowExecutionError"
     assert _wire_error_type(WorkflowDefinitionValidationError("x")) == "WorkflowValidationError"
+
+
+def test_legacy_definition_class_attribute_still_works_and_warns() -> None:
+    """ADR 0001: node classes may still name their manifest `definition`."""
+    from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class LegacyAttrNode(WorkflowNodeBase):
+            definition = WorkflowNodeManifest(  # noqa: N815 — deliberate legacy attribute name
+                slug="legacy-attr",
+                version="1.0.0",
+                name="Legacy Attr",
+                description="legacy attribute alias test",
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+            )
+
+            def execute(self, inputs, context):  # noqa: ANN001
+                return {}
+
+    assert any(
+        w.category is DeprecationWarning and "manifest" in str(w.message) for w in caught
+    ), "legacy `definition` attribute did not warn"
+    node = LegacyAttrNode()
+    assert node.manifest.slug == "legacy-attr"
+    # A legacy-declared class shadows the descriptor with its own attribute:
+    # the warning fired once at class definition, access itself is silent.
+    assert node.definition.slug == "legacy-attr"
+
+    # Canonical (`manifest =`) classes still serve old readers via the
+    # descriptor — and that access warns.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+
+        class CanonicalNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
+                slug="canonical",
+                version="1.0.0",
+                name="Canonical",
+                description="canonical attribute test",
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+            )
+
+            def execute(self, inputs, context):  # noqa: ANN001
+                return {}
+
+    canonical = CanonicalNode()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert canonical.definition.slug == "canonical"  # deprecated descriptor
+    assert any(w.category is DeprecationWarning for w in caught)
+    assert not [w for w in caught if "class attribute" in str(w.message)]  # no class-definition warning here

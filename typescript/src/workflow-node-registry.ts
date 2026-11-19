@@ -195,7 +195,7 @@ export function extractNodeData(payload: Record<string, unknown>): Record<string
  * @throws WorkflowNodeRegistrationError if registration fails
  */
 export async function registerWorkflowNode(
-  node: { definition: WorkflowNodeManifest },
+  node: { manifest?: WorkflowNodeManifest; definition?: WorkflowNodeManifest },
   registryUrl: string,
   opts: {
     invokeUrl?: string;
@@ -222,10 +222,10 @@ export async function registerWorkflowNode(
     );
   }
 
-  // #257: parse before payload — parse is otherwise lazy (base-node getDefinition)
+  // #257: parse before payload — parse is otherwise lazy (base-node getWorkflowNodeManifest)
   // and the CLI is the only eager parse site, so a raw literal definition would
   // otherwise ship to the registry unvalidated. Idempotent for parsed manifests.
-  const manifest = buildWorkflowNodeRegistryPayload(WorkflowNodeManifestSchema.parse(node.definition), {
+  const manifest = buildWorkflowNodeRegistryPayload(WorkflowNodeManifestSchema.parse(node.manifest ?? node.definition), {
     invokeType,
     invokeUrl,
     tags,

@@ -50,7 +50,7 @@ const baseManifest = (deprecation?: WorkflowNodeDeprecationInfo): WorkflowNodeMa
 
 function makeNode(deprecation?: WorkflowNodeDeprecationInfo): WorkflowNodeBase {
   class TestNode extends WorkflowNodeBase {
-    definition: WorkflowNodeManifest = baseManifest(deprecation);
+    manifest: WorkflowNodeManifest = baseManifest(deprecation);
 
     execute(inputs: Record<string, unknown>): Record<string, unknown> {
       return { message: inputs.message as string };

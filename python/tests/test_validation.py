@@ -6,7 +6,7 @@ from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, 
 
 
 class StrictNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         name="strict",
         version="1.0.0",
         title="Strict",
@@ -28,7 +28,7 @@ class StrictNode(WorkflowNodeBase):
 
 
 class LooseNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         name="loose",
         version="1.0.0",
         title="Loose",

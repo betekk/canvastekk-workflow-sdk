@@ -41,8 +41,8 @@ Full example of an inference node that downloads a point cloud, runs segmentatio
 from pathlib import Path
 
 import httpx
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
-from canvastekk_workflow_sdk.contracts import (
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
+from canvastekk_workflow_sdk.node_io_data_contracts import (
     BoundingBox3D,
     Instance,
     InstanceSet,
@@ -50,7 +50,7 @@ from canvastekk_workflow_sdk.contracts import (
 )
 from canvastekk_workflow_sdk.exceptions import NodeExecutionError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="segment",
     version="1.0.0",
     name="Point Cloud Segmentation",
@@ -95,10 +95,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class SegmentNode(BaseNode):
+class SegmentNode(WorkflowNodeBase):
     definition = definition
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # File inputs are auto-downloaded by SDK before execute()
         local_path = Path(inputs["point_cloud"])  # SDK provides local path
         threshold = inputs.get("confidence_threshold", 0.5)
@@ -174,8 +174,8 @@ Consumes an InstanceSet and computes measurements (heights, widths, distances).
 from pathlib import Path
 
 import httpx
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
-from canvastekk_workflow_sdk.contracts import (
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
+from canvastekk_workflow_sdk.node_io_data_contracts import (
     InstanceSet,
     Measurement,
     MeasurementSet,
@@ -183,7 +183,7 @@ from canvastekk_workflow_sdk.contracts import (
 )
 from canvastekk_workflow_sdk.exceptions import NodeIOError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="measure",
     version="1.0.0",
     name="Measurement",
@@ -221,10 +221,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class MeasureNode(BaseNode):
+class MeasureNode(WorkflowNodeBase):
     definition = definition
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # File inputs are auto-downloaded by SDK before execute()
         local_path = Path(inputs["instances"])
 
@@ -300,10 +300,10 @@ Detects planes in a point cloud and produces a PlaneSet.
 from pathlib import Path
 
 import httpx
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
-from canvastekk_workflow_sdk.contracts import Plane, PlaneSet, Point3D
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
+from canvastekk_workflow_sdk.node_io_data_contracts import Plane, PlaneSet, Point3D
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="plane-detect",
     version="1.0.0",
     name="Plane Detection",
@@ -341,10 +341,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class PlaneDetectNode(BaseNode):
+class PlaneDetectNode(WorkflowNodeBase):
     definition = definition
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # File inputs are auto-downloaded by SDK before execute()
         local_path = Path(inputs["point_cloud"])
         context.report_progress(0.1, "Processing point cloud")  # SDK already validated
@@ -395,10 +395,10 @@ Loads a model at startup, checks GPU health, and runs inference in execute().
 from pathlib import Path
 
 import httpx
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
 from canvastekk_workflow_sdk.exceptions import NodeConfigurationError, NodeExecutionError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="infer",
     version="1.0.0",
     name="Model Inference",
@@ -433,7 +433,7 @@ definition = WorkflowNodeManifest(
 )
 
 
-class InferenceNode(BaseNode):
+class InferenceNode(WorkflowNodeBase):
     definition = definition
 
     def __init__(self):
@@ -470,7 +470,7 @@ class InferenceNode(BaseNode):
         # return torch.load("model.pt")
         return "dummy_model"
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         if self.model is None:
             raise NodeConfigurationError("Model not loaded — startup may have failed")
 
@@ -516,9 +516,9 @@ A pure data transform node with no file uploads/downloads.
 ```python
 """Uppercase Node — converts text to uppercase (no file I/O)."""
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="uppercase",
     version="1.0.0",
     name="Uppercase",
@@ -540,10 +540,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class UppercaseNode(BaseNode):
+class UppercaseNode(WorkflowNodeBase):
     definition = definition
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         context.report_progress(0.5, "Processing text")
         return {"result": inputs["text"].upper()}
 
@@ -578,7 +578,7 @@ During development, set `CANVASTEKK_DEV_MODE=true` to bypass auth.
 
 ```python
 from typing import Any
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest
 from canvastekk_workflow_sdk.middleware import NodeMiddleware
 
 
@@ -586,7 +586,7 @@ class AuditMiddleware:
     """Logs execution details for auditing purposes."""
 
     def on_before_execute(
-        self, inputs: dict[str, Any], context: ExecutionContext
+        self, inputs: dict[str, Any], context: NodeExecutionContext
     ) -> dict[str, Any]:
         context.logger.info(
             "Audit: execution started",
@@ -598,7 +598,7 @@ class AuditMiddleware:
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         context.logger.info(
@@ -610,7 +610,7 @@ class AuditMiddleware:
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         context.logger.error(
@@ -628,10 +628,10 @@ app = node.create_app()
 ## Pattern 8: Webhook/Callback Handling
 
 ```python
-class AsyncTaskNode(BaseNode):
-    definition = WorkflowNodeManifest(...)
+class AsyncTaskNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(...)
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         """Start a long-running task and return immediately."""
         task_id = self._start_task(inputs)
         return {"task_id": task_id, "status": "processing"}
@@ -652,12 +652,12 @@ class AsyncTaskNode(BaseNode):
 Host multiple nodes under one server:
 
 ```python
-from canvastekk_workflow_sdk import create_multi_node_app
+from canvastekk_workflow_sdk import create_multi_workflow_node_app
 
 # Each node gets its own URL prefix:
 # POST /segment/execute, GET /segment/health, ...
 # POST /measure/execute, GET /measure/health, ...
-app = create_multi_node_app({
+app = create_multi_workflow_node_app({
     "segment": SegmentNode(),
     "measure": MeasureNode(),
 })
@@ -673,9 +673,9 @@ Converts between file formats (e.g., PLY to XYZ):
 from pathlib import Path
 
 import httpx
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="convert",
     version="1.0.0",
     name="Format Converter",
@@ -719,10 +719,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class ConvertNode(BaseNode):
+class ConvertNode(WorkflowNodeBase):
     definition = definition
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # File inputs are auto-downloaded by SDK before execute()
         input_path = Path(inputs["input_file"])
         output_format = inputs.get("output_format", "xyz")
@@ -810,7 +810,7 @@ def test_execute_downloads_and_processes(mock_stream, tmp_path):
 ### Testing Contract Serialization
 
 ```python
-from canvastekk_workflow_sdk.contracts import InstanceSet, Instance, Point3D, MeasurementSet, Measurement
+from canvastekk_workflow_sdk.node_io_data_contracts import InstanceSet, Instance, Point3D, MeasurementSet, Measurement
 
 
 def test_instance_set_roundtrip(tmp_path):
@@ -951,16 +951,16 @@ context.metadata[field_name] = {
 Read these in `execute()` for audit trails or size-based branching. Manual
 `httpx.stream()` downloads are for non-file URLs or opt-out scenarios only.
 
-## Upload target: `UploadSession`
+## Upload target: `NodeOutputUploadSession`
 
-Output upload targets come from the engine and are a multipart `UploadSession`
+Output upload targets come from the engine and are a multipart `NodeOutputUploadSession`
 descriptor. Since SDK 0.36.0 a legacy presigned PUT URL string is
 rejected with `NodeIOError` ("engine sent deprecated presigned target —
 upgrade the engine") — the fix is upgrading the engine, not node changes.
 Your node never constructs one:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     out = context.output_path("result.parquet")
     # ... write the file ...
     return {"output_file": str(out)}   # SDK uploads via the engine's session
@@ -968,5 +968,5 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 
 Rules: pass targets through untouched — no string slicing, concatenation, or
 `startswith("http")` checks; no URL prefetch or persistence. The SDK
-redeems `UploadSession` lazily (initiate → parallel part PUTs → complete,
+redeems `NodeOutputUploadSession` lazily (initiate → parallel part PUTs → complete,
 resume via status; see `uploads.py` / `multipart.py`).

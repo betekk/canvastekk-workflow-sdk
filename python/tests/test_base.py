@@ -20,7 +20,7 @@ from canvastekk_workflow_sdk.observability import NodeExecutionMetricsCollector
 class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -42,7 +42,7 @@ class EchoNode(WorkflowNodeBase):
 class FailingNode(WorkflowNodeBase):
     """Node that always fails for testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -58,7 +58,7 @@ class FailingNode(WorkflowNodeBase):
 class HealthyNode(WorkflowNodeBase):
     """Node with custom health checks."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="healthy",
         version="1.0.0",
         name="Healthy",
@@ -80,7 +80,7 @@ class HealthyNode(WorkflowNodeBase):
 class NodeIOErrorNode(WorkflowNodeBase):
     """Node that raises NodeIOError."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="io-err",
         version="1.0.0",
         name="IO Error",
@@ -96,7 +96,7 @@ class NodeIOErrorNode(WorkflowNodeBase):
 class NodeTimeoutErrorNode(WorkflowNodeBase):
     """Node that raises NodeTimeoutError."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="timeout-err",
         version="1.0.0",
         name="Timeout Error",
@@ -112,7 +112,7 @@ class NodeTimeoutErrorNode(WorkflowNodeBase):
 class TokenReportingNode(WorkflowNodeBase):
     """Node that reports token usage via context."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="token",
         version="1.0.0",
         name="Token",
@@ -130,7 +130,7 @@ class TokenReportingNode(WorkflowNodeBase):
 class ValidatedNode(WorkflowNodeBase):
     """Node with required input fields for validation testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="validated",
         version="1.0.0",
         name="Validated",
@@ -154,8 +154,8 @@ class TestBaseNode:
     """Tests for WorkflowNodeBase class."""
 
     def test_definition_required(self) -> None:
-        """Test that subclasses must define a definition."""
-        with pytest.raises(TypeError, match="must define a 'definition'"):
+        """Test that subclasses must define a manifest."""
+        with pytest.raises(TypeError, match="must define a 'manifest'"):
 
             class InvalidNode(WorkflowNodeBase):
                 def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
@@ -352,7 +352,7 @@ class TestBaseNodeInitSubclass:
 class OutputValidationNode(WorkflowNodeBase):
     """Node with strict output schema for validation testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="output-val",
         version="1.0.0",
         name="Output Validation",
@@ -379,7 +379,7 @@ class OutputValidationNode(WorkflowNodeBase):
 class OutputValidationErrorNode(WorkflowNodeBase):
     """Node that returns invalid output type."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="output-err",
         version="1.0.0",
         name="Output Error",
@@ -398,7 +398,7 @@ class OutputValidationErrorNode(WorkflowNodeBase):
 class OutputMissingRequiredNode(WorkflowNodeBase):
     """Node that returns missing required field."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="output-missing",
         version="1.0.0",
         name="Output Missing",
@@ -418,7 +418,7 @@ class OutputMissingRequiredNode(WorkflowNodeBase):
 class TrivialOutputSchemaNode(WorkflowNodeBase):
     """Node with trivial output schema."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="trivial",
         version="1.0.0",
         name="Trivial",
@@ -490,7 +490,7 @@ class TestLifecycleHooks:
         """Test that on_startup is called when the app starts."""
 
         class LifecycleNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="lifecycle",
                 version="1.0.0",
                 name="Lifecycle",
@@ -532,7 +532,7 @@ class TestLifecycleHooks:
         """Test that on_shutdown is called when the app stops."""
 
         class ShutdownNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="shutdown",
                 version="1.0.0",
                 name="Shutdown",
@@ -578,7 +578,7 @@ class TestLifecycleHooks:
         hook_order: list[str] = []
 
         class OrderedLifecycleNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="ordered",
                 version="1.0.0",
                 name="Ordered",
@@ -612,7 +612,7 @@ class TestLifecycleHooks:
         """Test that exceptions in on_startup propagate correctly."""
 
         class FailingStartupNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="failing-startup",
                 version="1.0.0",
                 name="Failing Startup",
@@ -642,7 +642,7 @@ class TestLifecycleHooks:
         """Test that exceptions in on_shutdown propagate correctly."""
 
         class FailingShutdownNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="failing-shutdown",
                 version="1.0.0",
                 name="Failing Shutdown",
@@ -672,7 +672,7 @@ class TestLifecycleHooks:
         """Test that lifespan hooks work with create_workflow_node_app function."""
 
         class LifecycleTestNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="lifespan-test",
                 version="1.0.0",
                 name="Lifespan Test",
@@ -713,7 +713,7 @@ class TestLifecycleHooks:
         """Test that multiple TestClient contexts invoke hooks multiple times."""
 
         class MultiLifecycleNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="multi-lifecycle",
                 version="1.0.0",
                 name="Multi Lifecycle",
@@ -758,7 +758,7 @@ class TestLifecycleHooks:
 class ProgressNode(WorkflowNodeBase):
     """Node that reports progress mid-run (DA-3230)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="progress-node",
         version="1.0.0",
         name="Progress",
@@ -778,7 +778,7 @@ class ProgressNode(WorkflowNodeBase):
 class SlowProgressNode(ProgressNode):
     """Progress node whose execute sleeps briefly so runs can overlap."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="slow-progress-node",
         version="1.0.0",
         name="SlowProgress",

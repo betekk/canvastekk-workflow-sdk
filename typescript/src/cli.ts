@@ -264,7 +264,7 @@ export async function applyRegistryDiff(
     if (changed.length > 0) {
       report.valid = false;
       report.errors.push(
-        `definition data changed but version is still ${localVersion} ` +
+        `manifest data changed but version is still ${localVersion} ` +
           `(changed: ${changed.join(", ")}) — bump the version before deploying`,
       );
     }
@@ -272,7 +272,7 @@ export async function applyRegistryDiff(
     report.registry_diff = { status: "newer-version", published_version: publishedVersion, changed_fields: changed };
     if (changed.length === 0) {
       report.warnings.push(
-        `version bumped ${publishedVersion} -> ${localVersion} but definition data is identical — intentional?`,
+        `version bumped ${publishedVersion} -> ${localVersion} but manifest data is identical — intentional?`,
       );
     }
   }

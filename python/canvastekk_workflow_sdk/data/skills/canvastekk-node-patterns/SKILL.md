@@ -50,7 +50,7 @@ from canvastekk_workflow_sdk.node_io_data_contracts import (
 )
 from canvastekk_workflow_sdk.exceptions import NodeExecutionError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="segment",
     version="1.0.0",
     name="Point Cloud Segmentation",
@@ -183,7 +183,7 @@ from canvastekk_workflow_sdk.node_io_data_contracts import (
 )
 from canvastekk_workflow_sdk.exceptions import NodeIOError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="measure",
     version="1.0.0",
     name="Measurement",
@@ -303,7 +303,7 @@ import httpx
 from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
 from canvastekk_workflow_sdk.node_io_data_contracts import Plane, PlaneSet, Point3D
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="plane-detect",
     version="1.0.0",
     name="Plane Detection",
@@ -398,7 +398,7 @@ import httpx
 from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
 from canvastekk_workflow_sdk.exceptions import NodeConfigurationError, NodeExecutionError
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="infer",
     version="1.0.0",
     name="Model Inference",
@@ -518,7 +518,7 @@ A pure data transform node with no file uploads/downloads.
 
 from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="uppercase",
     version="1.0.0",
     name="Uppercase",
@@ -629,7 +629,7 @@ app = node.create_app()
 
 ```python
 class AsyncTaskNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(...)
+    manifest = WorkflowNodeManifest(...)
 
     def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         """Start a long-running task and return immediately."""
@@ -675,7 +675,7 @@ from pathlib import Path
 import httpx
 from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest, WorkflowNodeStyles
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="convert",
     version="1.0.0",
     name="Format Converter",

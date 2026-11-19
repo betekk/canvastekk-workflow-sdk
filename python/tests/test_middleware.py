@@ -13,7 +13,7 @@ from canvastekk_workflow_sdk.middleware import LoggingMiddleware, TimingMiddlewa
 
 
 class EchoNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -27,7 +27,7 @@ class EchoNode(WorkflowNodeBase):
 
 
 class FailingNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",

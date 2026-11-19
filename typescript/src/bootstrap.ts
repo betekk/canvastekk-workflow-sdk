@@ -2,9 +2,9 @@
  * Canonical node-service bootstrap (sdk#220) — TypeScript parity.
  *
  * Mirrors `python/canvastekk_workflow_sdk/bootstrap.py`:
- * - `createAuthedApp` — `createWorkflowNodeApp` + `TekkNodeAuth.central()` (central-only
+ * - `createAuthedWorkflowNodeApp` — `createWorkflowNodeApp` + `TekkNodeAuth.central()` (central-only
  *   by default; `legacyKeyEnvVar` keeps a dual-accept window alive).
- * - `mountNode` — dual-purpose services: your routes stay on the root
+ * - `mountWorkflowNode` — dual-purpose services: your routes stay on the root
  *   express app; the authed node sub-app mounts under a prefix.
  *
  * `createLambdaHandler` is deliberately python-only — see the parity
@@ -16,7 +16,7 @@ import { createWorkflowNodeApp, type CreateNodeAppOptions } from "./workflow-nod
 import { TekkNodeAuth } from "./auth.js";
 import type { WorkflowNodeBase } from "./workflow-node-base.js";
 
-export interface AuthedAppOptions extends CreateNodeAppOptions {
+export interface AuthedWorkflowNodeAppOptions extends CreateNodeAppOptions {
   /** Env var holding the legacy static key during a dual-accept window. `null` (default) = central-only. */
   legacyKeyEnvVar?: string | null;
 }
@@ -27,11 +27,11 @@ export interface AuthedAppOptions extends CreateNodeAppOptions {
  * @throws If `extraRoutes` is passed — the SDK mounts them without the auth
  *   middleware, so auth would not cover them.
  */
-export function createAuthedApp(node: WorkflowNodeBase, opts: AuthedAppOptions = {}): Application {
+export function createAuthedWorkflowNodeApp(node: WorkflowNodeBase, opts: AuthedWorkflowNodeAppOptions = {}): Application {
   const { legacyKeyEnvVar = null, ...rest } = opts;
   if (rest.extraRoutes && rest.extraRoutes.length > 0) {
     throw new Error(
-      "createAuthedApp does not support extraRoutes — SDK mounts them without the auth middleware",
+      "createAuthedWorkflowNodeApp does not support extraRoutes — SDK mounts them without the auth middleware",
     );
   }
   // Auth is APPENDED to caller-supplied dependencies (python create_node_app semantics) —
@@ -42,7 +42,7 @@ export function createAuthedApp(node: WorkflowNodeBase, opts: AuthedAppOptions =
   });
 }
 
-export interface MountNodeOptions extends AuthedAppOptions {
+export interface MountWorkflowNodeOptions extends AuthedWorkflowNodeAppOptions {
   /** Mount path for the node sub-app (default "/node"). */
   prefix?: string;
 }
@@ -55,8 +55,14 @@ export interface MountNodeOptions extends AuthedAppOptions {
  *
  * @returns `rootApp` for chaining.
  */
-export function mountNode(rootApp: Application, node: WorkflowNodeBase, opts: MountNodeOptions = {}): Application {
+export function mountWorkflowNode(rootApp: Application, node: WorkflowNodeBase, opts: MountWorkflowNodeOptions = {}): Application {
   const { prefix = "/node", ...rest } = opts;
-  rootApp.use(prefix, createAuthedApp(node, rest));
+  rootApp.use(prefix, createAuthedWorkflowNodeApp(node, rest));
   return rootApp;
 }
+
+// Deprecated public names (ADR 0001, #271) — old name -> renamed symbol.
+/** @deprecated use mountWorkflowNode (ADR 0001, #271; removal in 1.0.0, #272) */
+export const mountNode: typeof mountWorkflowNode = mountWorkflowNode;
+/** @deprecated use createAuthedWorkflowNodeApp (ADR 0001, #271; removal in 1.0.0, #272) */
+export const createAuthedApp: typeof createAuthedWorkflowNodeApp = createAuthedWorkflowNodeApp;

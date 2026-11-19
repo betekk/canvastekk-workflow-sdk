@@ -19,7 +19,7 @@ from canvastekk_workflow_sdk import workflow_node_app as app_module
 class EchoNode(WorkflowNodeBase):
     """Minimal echo node (mirrors test_app.py)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo-trim",
         version="1.0.0",
         name="EchoTrim",
@@ -41,7 +41,7 @@ class EchoNode(WorkflowNodeBase):
 class FailingNode(WorkflowNodeBase):
     """Node whose execute always raises."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="fail-trim",
         version="1.0.0",
         name="FailTrim",
@@ -181,7 +181,7 @@ class TestExecuteTrimsExactlyOnce:
         monkeypatch.setattr(app_module, "_release_freed_heap", lambda: calls.append(1))
 
         class SlowNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="slow-trim",
                 version="1.0.0",
                 name="SlowTrim",

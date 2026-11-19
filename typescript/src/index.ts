@@ -15,10 +15,6 @@ export { VERSION } from "./version.js";
 // --- Deprecated name aliases, phase 3 (ADR 0001, #271; removal in 1.0.0, #272) ---
 /** @deprecated use WorkflowNodeBase */
 export { WorkflowNodeBase as BaseNode } from "./workflow-node-base.js";
-/** @deprecated use createWorkflowNodeApp */
-export { createWorkflowNodeApp as createNodeApp } from "./workflow-node-app.js";
-/** @deprecated use createMultiWorkflowNodeApp */
-export { createMultiWorkflowNodeApp as createMultiNodeApp } from "./workflow-node-app.js";
 /** @deprecated use NodeExecutionContext */
 export { NodeExecutionContext as ExecutionContext } from "./node-execution-context.js";
 /** @deprecated use WorkflowNodeHealthResponse */
@@ -52,6 +48,7 @@ export { WorkflowRunError as WorkflowExecutionError } from "./exceptions.js";
 /** @deprecated use WorkflowDefinitionValidationError */
 export { WorkflowDefinitionValidationError as WorkflowValidationError } from "./exceptions.js";
 // --- end phase-4 deprecated aliases ---
+export type { WorkflowNodeManifestContract, WorkflowNodeContractCapabilities } from "./workflow-node-manifest.js";
 
 // --- Deprecated name aliases (ADR 0001, #271; removal in 1.0.0, #272) ---
 /** @deprecated use WorkflowNodeColorPreset */

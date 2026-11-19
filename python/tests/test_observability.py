@@ -9,7 +9,7 @@ from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecu
 
 
 class EchoNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="echo-v1.0.0",
         slug="echo",
         version="1.0.0",
@@ -24,7 +24,7 @@ class EchoNode(WorkflowNodeBase):
 
 
 class FailingNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="fail-v1.0.0",
         slug="fail",
         version="1.0.0",

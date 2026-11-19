@@ -54,7 +54,7 @@ gating a creation; each row is a hard failure, not a style note.
 **Offline gate (must exit 0 before "done")**
 
 ```bash
-python -m canvastekk_workflow_sdk validate handler:definition
+python -m canvastekk_workflow_sdk validate handler:manifest
 ```
 
 ## CREATE — dependency decision (single source of truth)

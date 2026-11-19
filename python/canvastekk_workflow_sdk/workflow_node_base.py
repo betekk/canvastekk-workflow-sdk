@@ -12,6 +12,7 @@ import os
 import threading
 import time
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -84,6 +85,22 @@ def _download_deadline(timeout_seconds: int | None, started: float | None = None
     return start + budget
 
 
+class _DeprecatedManifestAlias:
+    """Descriptor: legacy `definition` attribute -> `manifest` (ADR 0001, #271)."""
+
+    def __get__(self, obj: WorkflowNodeBase | None, objtype: type | None = None) -> WorkflowNodeManifest:
+        warnings.warn(
+            "The 'definition' attribute is deprecated; use 'manifest'"
+            " (ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if obj is None:
+            assert objtype is not None
+            return objtype.manifest  # type: ignore[attr-defined]
+        return obj.manifest
+
+
 class WorkflowNodeBase(ABC):
     """
     Abstract base class for all nodes.
@@ -143,8 +160,24 @@ class WorkflowNodeBase(ABC):
         super().__init_subclass__(**kwargs)
         if ABC in cls.__bases__:
             return
-        if not hasattr(cls, "definition") or cls.definition is None:
-            raise TypeError(f"{cls.__name__} must define a 'definition' class attribute")
+        manifest = getattr(cls, "manifest", None)
+        if manifest is None:
+            legacy = getattr(cls, "definition", None)
+            if legacy is None:
+                raise TypeError(f"{cls.__name__} must define a 'manifest' class attribute")
+            warnings.warn(
+                f"{cls.__name__}.definition is deprecated; name the manifest"
+                " class attribute 'manifest' (ADR 0001; removal in 1.0.0).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            cls.manifest = legacy
+
+
+    # Deprecated class/instance attribute alias (ADR 0001, #271). A
+    # descriptor, not a property, so `NodeClass.definition` keeps working at
+    # class level (property objects are only bound on instances).
+    definition = _DeprecatedManifestAlias()
 
     @abstractmethod
     def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
@@ -180,7 +213,7 @@ class WorkflowNodeBase(ABC):
         Raises:
             NodeInputValidationError: If inputs do not match input_schema.
         """
-        schema = self.definition.input_schema
+        schema = self.manifest.input_schema
         if not schema or schema == {"type": "object"}:
             return
 
@@ -209,7 +242,7 @@ class WorkflowNodeBase(ABC):
         Raises:
             NodeOutputValidationError: If outputs do not match output_schema.
         """
-        schema = self.definition.output_schema
+        schema = self.manifest.output_schema
         if not schema or schema == {"type": "object"}:
             return
 
@@ -261,7 +294,7 @@ class WorkflowNodeBase(ABC):
         ``CANVASTEKK_MAX_DOWNLOAD_BYTES`` env override, then to the 10 GiB
         default. The cap is enforced mid-stream by ``_download_one``.
         """
-        schema = self.definition.input_schema.get("properties", {}).get(field_name, {})
+        schema = self.manifest.input_schema.get("properties", {}).get(field_name, {})
         declared = schema.get("x-maxSizeBytes")
         if isinstance(declared, int) and declared > 0:
             return declared
@@ -290,7 +323,7 @@ class WorkflowNodeBase(ABC):
         Returns the local path of the completed download.
         """
         max_bytes = self._max_download_bytes(field_name)
-        deadline = _download_deadline(self.definition.effective_runtime_seconds)
+        deadline = _download_deadline(self.manifest.effective_runtime_seconds)
         cancel_event = getattr(context, "cancel_event", None)
 
         current_url = validate_external_url(url)
@@ -406,7 +439,7 @@ class WorkflowNodeBase(ABC):
         downloaded: list[Path] = []
 
         try:
-            for field_name in self.definition.file_input_fields:
+            for field_name in self.manifest.file_input_fields:
                 value = inputs.get(field_name)
 
                 if isinstance(value, list):
@@ -417,7 +450,7 @@ class WorkflowNodeBase(ABC):
                             context.report_progress(0.05, f"Downloading {field_name}")
                             local_path = self._download_one(field_name, element, context)
                             downloaded.append(local_path)
-                            self.definition.validate_file_input(field_name, local_path)
+                            self.manifest.validate_file_input(field_name, local_path)
                             file_size = local_path.stat().st_size
                             entries.append(
                                 {
@@ -449,7 +482,7 @@ class WorkflowNodeBase(ABC):
                 local_path = self._download_one(field_name, value, context)
                 downloaded.append(local_path)
 
-                self.definition.validate_file_input(field_name, local_path)
+                self.manifest.validate_file_input(field_name, local_path)
 
                 file_size = local_path.stat().st_size
 
@@ -488,13 +521,13 @@ class WorkflowNodeBase(ABC):
             NodeConfigurationError: When the node's ``sunset_date`` is in
                 the past — the node has been sunset and must not run.
         """
-        dep = self.definition.deprecation
+        dep = self.manifest.deprecation
         if dep is None:
             return
         replacement = dep.replacement_slug or "unspecified"
         if dep.sunset_date is not None and datetime.now(UTC).date() > dep.sunset_date:
             raise NodeConfigurationError(
-                f"Node '{self.definition.slug}' was sunset on {dep.sunset_date.isoformat()} "
+                f"Node '{self.manifest.slug}' was sunset on {dep.sunset_date.isoformat()} "
                 f"and refuses to run; migrate to '{replacement}' ({dep.notice})",
                 error_code="NODE_SUNSET",
                 details={
@@ -504,7 +537,7 @@ class WorkflowNodeBase(ABC):
             )
         logger.warning(
             "Node '%s' is deprecated (since %s): %s — migrate to '%s'",
-            self.definition.slug,
+            self.manifest.slug,
             dep.deprecated_at.isoformat() if dep.deprecated_at else "unknown date",
             dep.notice,
             replacement,
@@ -575,10 +608,10 @@ class WorkflowNodeBase(ABC):
 
             if request.dry_run:
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
-                if not self.definition.effective_contract.capabilities.dry_run:
+                if not self.manifest.effective_contract.capabilities.dry_run:
                     logger.info(
                         "dry-run refused (capability not declared) slug=%s",
-                        self.definition.slug,
+                        self.manifest.slug,
                     )
                     return NodeExecutionResponse.failure(
                         execution_id=execution_id,
@@ -590,7 +623,7 @@ class WorkflowNodeBase(ABC):
                     )
                 logger.info(
                     "execution slug=%s status=pass duration_ms=%d dry_run=true",
-                    self.definition.slug,
+                    self.manifest.slug,
                     duration_ms,
                 )
                 return NodeExecutionResponse.success(
@@ -611,7 +644,7 @@ class WorkflowNodeBase(ABC):
             try:
                 inputs = dict(request.inputs)
 
-                if self.definition.has_file_inputs:
+                if self.manifest.has_file_inputs:
                     inputs = self._prepare_file_inputs(inputs, context)
 
                 for mw in self._middleware:
@@ -625,20 +658,20 @@ class WorkflowNodeBase(ABC):
 
                 logger.info(
                     "execution slug=%s status=pass duration_ms=%d",
-                    self.definition.slug,
+                    self.manifest.slug,
                     duration_ms,
                 )
 
                 for mw in self._middleware:
                     mw.on_after_execute(inputs, outputs, context, duration_ms)
 
-                token_usage = context.token_usage.get("total_tokens") or self.definition.token_cost
+                token_usage = context.token_usage.get("total_tokens") or self.manifest.token_cost
 
                 self._metrics_collector.record(
                     NodeExecutionMetric(
                         run_id=context.run_id,
                         node_id=context.node_id,
-                        node_name=self.definition.slug,
+                        node_name=self.manifest.slug,
                         status="pass",
                         duration_ms=duration_ms,
                         token_usage=token_usage,
@@ -732,7 +765,7 @@ class WorkflowNodeBase(ABC):
         error_code = getattr(error, "error_code", None)
         logger.info(
             "execution slug=%s status=fail duration_ms=%d error_type=%s",
-            self.definition.slug,
+            self.manifest.slug,
             duration_ms,
             type(error).__name__,
         )
@@ -740,7 +773,7 @@ class WorkflowNodeBase(ABC):
             NodeExecutionMetric(
                 run_id=request.run_id,
                 node_id=request.node_id,
-                node_name=self.definition.slug,
+                node_name=self.manifest.slug,
                 status="fail",
                 duration_ms=duration_ms,
                 error_type=type(error).__name__,

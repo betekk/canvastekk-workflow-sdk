@@ -24,7 +24,7 @@ from canvastekk_workflow_sdk import (
 class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -47,7 +47,7 @@ class EchoNode(WorkflowNodeBase):
 class FileProcessingNode(WorkflowNodeBase):
     """Node that accepts file uploads and scalar inputs."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-proc",
         version="1.0.0",
         name="File Processor",
@@ -88,7 +88,7 @@ class FileProcessingNode(WorkflowNodeBase):
 class FailingNode(WorkflowNodeBase):
     """Node that always fails."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -104,7 +104,7 @@ class FailingNode(WorkflowNodeBase):
 class DegradedNode(WorkflowNodeBase):
     """Node with mixed health checks."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="degraded",
         version="1.0.0",
         name="Degraded",
@@ -272,7 +272,7 @@ class TestManifestBasic:
 class FileOutputNode(WorkflowNodeBase):
     """Node that produces file outputs for S3 upload testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-output",
         version="1.0.0",
         name="File Output",
@@ -300,7 +300,7 @@ class FileOutputNode(WorkflowNodeBase):
 class FailingOutputNode(WorkflowNodeBase):
     """Node that always fails — for testing S3 upload skip on failure."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="fail-output",
         version="1.0.0",
         name="Fail Output",
@@ -321,7 +321,7 @@ class FailingOutputNode(WorkflowNodeBase):
 class BogusPathOutputNode(WorkflowNodeBase):
     """Node whose file output points at a missing path (DA-2337)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="bogus-path-output",
         version="1.0.0",
         name="Bogus Path Output",
@@ -974,7 +974,7 @@ class TestReadinessProbe:
 
     def test_readiness_returns_200_when_all_checks_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
         class HealthyNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="healthy",
                 version="1.0.0",
                 name="Healthy",
@@ -996,7 +996,7 @@ class TestReadinessProbe:
 
     def test_readiness_returns_503_when_check_fails(self) -> None:
         class UnhealthyNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="unhealthy",
                 version="1.0.0",
                 name="Unhealthy",
@@ -1151,7 +1151,7 @@ class TestCreateNodeAppAuthParam:
 class AccountEchoNode(WorkflowNodeBase):
     """Echoes context.account_id into outputs (DA-2242 header-capture tests)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="account-echo",
         version="1.0.0",
         name="Account Echo",
@@ -1275,7 +1275,7 @@ class TestManifestCodeDigest:
         base = (
             "from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest\n"
             "class DigestNode(WorkflowNodeBase):\n"
-            "    definition = WorkflowNodeManifest(\n"
+            "    manifest = WorkflowNodeManifest(\n"
             "        slug='digest-node', version='1.0.0', name='Digest',\n"
             "        description='digest probe',\n"
             "        input_schema={'type': 'object'},\n"
@@ -1293,7 +1293,7 @@ class TestManifestCodeDigest:
 class HangingNode(WorkflowNodeBase):
     """Sleeps past its budget — drives the inline wait_for timeout path."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="hang",
         version="1.0.0",
         name="Hang",
@@ -1382,7 +1382,7 @@ class TestDryRunExecution:
 
     def _declaring_client(self) -> TestClient:
         class DryEchoNode(EchoNode):
-            definition = EchoNode.definition.model_copy(deep=True)
+            manifest = EchoNode.definition.model_copy(deep=True)
 
         DryEchoNode.definition.contract = WorkflowNodeManifestContract(
             routes=["/execute", "/health", "/manifest"],
@@ -1425,7 +1425,7 @@ class TestDryRunExecution:
         from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 
         class BoomNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="boom",
                 version="1.0.0",
                 name="Boom",
@@ -1454,7 +1454,7 @@ class TestDryRunExecution:
 class HookedEchoNode(EchoNode):
     """EchoNode that overrides hook() — the webhook contract is real."""
 
-    definition = EchoNode.definition.model_copy()
+    manifest = EchoNode.definition.model_copy()
 
     def hook(self, payload: dict[str, Any]) -> dict[str, Any]:
         return {"received": True}
@@ -1463,7 +1463,7 @@ class HookedEchoNode(EchoNode):
 class DeclaredHookNode(EchoNode):
     """Author-declared contract including /hook, WITHOUT a hook override."""
 
-    definition = EchoNode.definition.model_copy(
+    manifest = EchoNode.definition.model_copy(
         update={"contract": WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/hook"])}
     )
 

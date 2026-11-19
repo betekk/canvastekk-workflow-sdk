@@ -417,7 +417,7 @@ class TestWorkflowRunner:
 
 
 class EchoNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -431,7 +431,7 @@ class EchoNode(WorkflowNodeBase):
 
 
 class FailingNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -445,7 +445,7 @@ class FailingNode(WorkflowNodeBase):
 
 
 class FileWriterNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-writer",
         version="1.0.0",
         name="File Writer",
@@ -464,7 +464,7 @@ class FileWriterNode(WorkflowNodeBase):
 
 
 class FileReaderNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-reader",
         version="1.0.0",
         name="File Reader",
@@ -485,7 +485,7 @@ class FileReaderNode(WorkflowNodeBase):
 
 
 class OutputDirCaptureNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="dir-capture",
         version="1.0.0",
         name="Dir Capture",
@@ -804,7 +804,7 @@ class TestPerNodeOutputSubdirs:
         captured: list[str] = []
 
         class CollisionNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 slug="collision",
                 version="1.0.0",
                 name="Collision",

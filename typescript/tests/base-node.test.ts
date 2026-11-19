@@ -6,7 +6,7 @@ import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import { TimingMiddleware } from "../src/middleware.js";
 
 class EchoNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "echo",
     version: "1.0.0",
     name: "Echo",
@@ -29,7 +29,7 @@ class EchoNode extends WorkflowNodeBase {
 }
 
 class FailingNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "fail-node",
     version: "1.0.0",
     name: "Fail",
@@ -44,7 +44,7 @@ class FailingNode extends WorkflowNodeBase {
 }
 
 class ValidatingNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "validating",
     version: "1.0.0",
     name: "Validating",
@@ -189,7 +189,7 @@ const PUBLIC_HOST = "s3.example.com";
 const PRIVATE_IP = ["192", "168", "1", "10"].join(".");
 
 class DownloadNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "download-node",
     version: "1.0.0",
     name: "Download",
@@ -379,7 +379,7 @@ describe("download policy (Phase 1)", () => {
 });
 
 class ProgressNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "progress-node",
     version: "1.0.0",
     name: "Progress",
@@ -400,7 +400,7 @@ class ProgressNode extends WorkflowNodeBase {
 
 class SlowProgressNode extends ProgressNode {
   override definition: WorkflowNodeManifest = {
-    ...new ProgressNode().definition,
+    ...new ProgressNode().manifest,
     slug: "slow-progress-node",
   };
 
@@ -557,8 +557,8 @@ describe("WorkflowNodeBase execution_id propagation (#3498)", () => {
 
 describe("run() dry-run (D10 #111)", () => {
   class DryEchoNode extends EchoNode {
-    definition: WorkflowNodeManifest = {
-      ...new EchoNode().definition,
+    manifest: WorkflowNodeManifest = {
+      ...new EchoNode().manifest,
       contract: {
         transport: "http",
         routes: ["/execute", "/health", "/manifest"],
@@ -615,7 +615,7 @@ describe("run() dry-run (D10 #111)", () => {
 
 describe("array file inputs (S.1, SDK#161)", () => {
   class ArrayDownloadNode extends WorkflowNodeBase {
-    definition: WorkflowNodeManifest = {
+    manifest: WorkflowNodeManifest = {
       slug: "array-download",
       version: "1.0.0",
       name: "Array Download",

@@ -27,7 +27,7 @@ def _stamped_sdk_version() -> str:
     return _sdk_version_stamp
 
 
-warnings.filterwarnings("default", category=DeprecationWarning, module=r"canvastekk_workflow_sdk\.definition")
+warnings.filterwarnings("default", category=DeprecationWarning, module=r"canvastekk_workflow_sdk\.workflow_node_manifest")
 
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.workflow_node_registry import InvokeType

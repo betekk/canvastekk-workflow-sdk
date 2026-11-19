@@ -38,10 +38,10 @@ def _manifest(deprecation: WorkflowNodeDeprecationInfo | None) -> WorkflowNodeMa
 
 
 def _make_node(deprecation: WorkflowNodeDeprecationInfo | None) -> WorkflowNodeBase:
-    """Build an instantiated echo node whose definition carries the given deprecation."""
+    """Build an instantiated echo node whose manifest carries the given deprecation."""
 
     class _DeprecationEchoNode(WorkflowNodeBase):
-        definition = _manifest(deprecation)
+        manifest = _manifest(deprecation)
 
         def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
             return {"echo": inputs.get("message", "")}

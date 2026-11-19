@@ -417,7 +417,7 @@ describe("registerWorkflowNode credential wire form (#239: ctk_ only)", () => {
       await expect(
         registerWorkflowNode(
           {
-            definition: {
+            manifest: {
               ...testDef,
               output_schema: {
                 type: "object",

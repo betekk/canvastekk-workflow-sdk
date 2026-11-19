@@ -11,7 +11,7 @@ from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, 
 
 
 class FileInputNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="file-input-v1.0.0",
         name="file-input",
         version="1.0.0",
@@ -42,7 +42,7 @@ class FileInputNode(WorkflowNodeBase):
 
 
 class MultiFileInputNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="multi-file-v1.0.0",
         name="multi-file",
         version="1.0.0",
@@ -73,7 +73,7 @@ class MultiFileInputNode(WorkflowNodeBase):
 
 
 class OptionalFileInputNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="opt-file-v1.0.0",
         name="opt-file",
         version="1.0.0",
@@ -101,7 +101,7 @@ class OptionalFileInputNode(WorkflowNodeBase):
 
 
 class NoFileInputNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="no-file-v1.0.0",
         name="no-file",
         version="1.0.0",
@@ -122,7 +122,7 @@ class NoFileInputNode(WorkflowNodeBase):
 
 
 class StrictValidationNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="strict-v1.0.0",
         name="strict",
         version="1.0.0",
@@ -267,7 +267,7 @@ class TestAutoDownload:
             node._validate_inputs(request.inputs)
 
         class LenientOptionalNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 id="lenient-opt-v1.0.0",
                 name="lenient-opt",
                 version="1.0.0",
@@ -439,7 +439,7 @@ class TestAutoDownload:
         mock_stream.return_value = _make_mock_stream(b"data", {})
 
         class NoExtNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 id="noext-v1.0.0",
                 name="noext",
                 version="1.0.0",
@@ -947,7 +947,7 @@ class TestIoSubcodesSdk161:
 class ArrayFileInputNode(WorkflowNodeBase):
     """S.1 (SDK#161): an array-of-file input field."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         id="array-file-v1.0.0",
         name="array-file",
         version="1.0.0",

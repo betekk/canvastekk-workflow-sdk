@@ -128,7 +128,7 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
     )
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
         def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
@@ -169,7 +169,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     )
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
         def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
@@ -191,7 +191,7 @@ def test_register_node_verify_requires_invoke_url(monkeypatch) -> None:
     _patch_client(monkeypatch)(_conforming_handler)
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
         def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
@@ -359,7 +359,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
 class _CentralEchoNode(WorkflowNodeBase):
     """Echo node used to probe central-mode authentication end to end."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",

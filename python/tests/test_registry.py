@@ -23,7 +23,7 @@ from canvastekk_workflow_sdk.workflow_node_registry import (
 CTK = "ctk_" + "k" * 43
 
 class DummyNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         name="test",
         version="1.0.0",
         title="Test Node",
@@ -404,8 +404,8 @@ class TestBuildRegistryPayload:
 
     def test_contract_rides_constraints_when_declared(self) -> None:
         """D8/#110: declared contract lands in constraints (engine extra=forbid wire-compat)."""
-        definition = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["constraints"]["contract"] == {
             "transport": "http",
             "routes": ["/execute", "/health", "/manifest"],
@@ -415,117 +415,117 @@ class TestBuildRegistryPayload:
         assert "contract" not in payload
 
     def test_contract_absent_when_undeclared(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "contract" not in payload.get("constraints", {})
 
     def test_caller_contract_wins(self) -> None:
-        definition = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
-        payload = build_workflow_node_registry_payload(definition, constraints={"contract": {"caller": True}})
+        manifest = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_workflow_node_registry_payload(manifest, constraints={"contract": {"caller": True}})
         assert payload["constraints"]["contract"] == {"caller": True}
 
     def test_maps_title_to_label(self) -> None:
-        definition = self._make_definition(title="My Node")
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition(title="My Node")
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["label"] == "My Node"
         assert "title" not in payload
 
     def test_retry_not_in_request_payload(self) -> None:
         """DA-1955 B1: engine RegisterWorkflowNodeRequest is extra='forbid' with no retry key."""
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "retry" not in payload
         assert "default_retry" not in payload
 
     def test_omits_id_field(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "id" not in payload
 
     def test_node_role_not_in_request_payload(self) -> None:
         """DA-1955 B1: node_role is not an engine request field."""
         from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeRole
 
-        definition = self._make_definition(role=WorkflowNodeRole.START)
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition(role=WorkflowNodeRole.START)
+        payload = build_workflow_node_registry_payload(manifest)
         assert "node_role" not in payload
 
     def test_hard_max_runtime_seconds_not_in_request_payload(self) -> None:
         """#3499: hard_max_runtime_seconds is a host-side contract — the
         engine's extra='forbid' register request would reject it."""
-        definition = self._make_definition(hard_max_runtime_seconds=14400)
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition(hard_max_runtime_seconds=14400)
+        payload = build_workflow_node_registry_payload(manifest)
         assert "hard_max_runtime_seconds" not in payload
-        assert definition.hard_max_runtime_seconds == 14400
+        assert manifest.hard_max_runtime_seconds == 14400
 
     def test_default_node_role_is_operation(self) -> None:
-        definition = self._make_definition()
-        assert definition.role.value == "operation"
+        manifest = self._make_definition()
+        assert manifest.role.value == "operation"
 
     def test_styles_none_produces_null(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["styles"] is None
 
     def test_styles_serialized_when_set(self) -> None:
         from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeStyles
 
-        definition = self._make_definition(styles=WorkflowNodeStyles(icon="Brain", color="emerald"))
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition(styles=WorkflowNodeStyles(icon="Brain", color="emerald"))
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["styles"] == {"icon": "Brain", "color": "emerald"}
 
     def test_default_tags_is_empty_list(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["tags"] == []
 
     def test_custom_tags(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition, tags=["ml", "segmentation"])
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, tags=["ml", "segmentation"])
         assert payload["tags"] == ["ml", "segmentation"]
 
     def test_invoke_url_omitted_when_none(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "invoke_url" not in payload
 
     def test_invoke_url_with_value(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition, invoke_url="https://node.example.com")
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, invoke_url="https://node.example.com")
         assert payload["invoke_url"] == "https://node.example.com"
 
     def test_invoke_config_included_when_provided(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition, invoke_config={"region": "us-east-1"})
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, invoke_config={"region": "us-east-1"})
         assert payload["invoke_config"] == {"region": "us-east-1"}
 
     def test_invoke_config_not_included_by_default(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "invoke_config" not in payload
 
     def test_constraints_included_when_provided(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition, constraints={"gpu": True})
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, constraints={"gpu": True})
         assert payload["constraints"]["gpu"] is True
-        assert payload["constraints"].get("sdk_version") == definition.sdk_version
+        assert payload["constraints"].get("sdk_version") == manifest.sdk_version
 
     def test_constraints_always_carry_stamp(self) -> None:
         """DA-3359/#123: provenance is always present — sdk_version is the sole version key."""
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
         assert "minimum_sdk_version" not in constraints
 
     def test_constraints_merges_manifest_docs_fields(self) -> None:
         """DA-1955/#123: docs fields land in constraints; legacy version keys never do."""
-        definition = self._make_definition(
+        manifest = self._make_definition(
             minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
             changelog_url="https://example.com/changelog",
         )
-        payload = build_workflow_node_registry_payload(definition)
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["constraints"]["docs_url"] == "https://example.com/docs"
         assert payload["constraints"]["changelog_url"] == "https://example.com/changelog"
         assert "minimum_sdk_version" not in payload["constraints"]
@@ -533,9 +533,9 @@ class TestBuildRegistryPayload:
 
     def test_constraints_caller_wins_on_key_collision(self) -> None:
         """DA-1955: caller-supplied constraints override manifest compat fields."""
-        definition = self._make_definition(minimum_sdk_version="0.22.0")
+        manifest = self._make_definition(minimum_sdk_version="0.22.0")
         payload = build_workflow_node_registry_payload(
-            definition,
+            manifest,
             constraints={"minimum_sdk_version": "0.21.0", "gpu_required": True},
         )
         assert payload["constraints"]["minimum_sdk_version"] == "0.21.0"
@@ -544,20 +544,20 @@ class TestBuildRegistryPayload:
     def test_constraints_stamp_when_all_none(self) -> None:
         """DA-3359: no manifest fields + no caller constraints -> stamped
         provenance still lands (the old "omitted" contract is retired)."""
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
 
     def test_node_status_not_in_request_payload(self) -> None:
         """DA-1955 B1: node_status is not an engine request field (param kept for compat)."""
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition, node_status="inactive")
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, node_status="inactive")
         assert "node_status" not in payload
 
     def test_all_standard_fields_present(self) -> None:
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         expected_keys = {
             "name",
             "label",
@@ -599,13 +599,13 @@ class TestBuildRegistryPayload:
             "timeout_seconds",
             "deprecation",
         }
-        definition = self._make_definition(
+        manifest = self._make_definition(
             minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
             deprecation=WorkflowNodeDeprecationInfo(deprecated_at=None, notice="soon"),
         )
         payload = build_workflow_node_registry_payload(
-            definition,
+            manifest,
             invoke_url="https://node.example.com",
             invoke_config={"region": "us-east-1"},
             constraints={"gpu": True},
@@ -614,21 +614,21 @@ class TestBuildRegistryPayload:
 
     def test_deprecation_omitted_when_none(self) -> None:
         """DA-1582: non-deprecated nodes never send the deprecation key."""
-        definition = self._make_definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "deprecation" not in payload
 
     def test_deprecation_in_request_payload_when_set(self) -> None:
         """DA-2305: deprecation IS emitted to the engine register endpoint."""
         from datetime import date
 
-        definition = self._make_definition(
+        manifest = self._make_definition(
             deprecation=WorkflowNodeDeprecationInfo(
                 deprecated_at=date(2026, 8, 1),
                 notice="use test-v2",
             )
         )
-        payload = build_workflow_node_registry_payload(definition)
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["deprecation"] == {
             "deprecated_at": "2026-08-01",
             "sunset_date": None,
@@ -1062,15 +1062,15 @@ class TestStampedDualWrite:
 
     def test_payload_carries_stamp_only(self) -> None:
         """#123: the dual-write is dead — sdk_version only."""
-        definition = self._definition()
-        payload = build_workflow_node_registry_payload(definition)
+        manifest = self._definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
         assert "minimum_sdk_version" not in constraints
 
     def test_explicit_caller_constraints_win(self) -> None:
-        definition = self._definition()
-        payload = build_workflow_node_registry_payload(definition, constraints={"minimum_sdk_version": "0.23.1"})
+        manifest = self._definition()
+        payload = build_workflow_node_registry_payload(manifest, constraints={"minimum_sdk_version": "0.23.1"})
         constraints = payload.get("constraints", {})
         assert constraints.get("minimum_sdk_version") == "0.23.1"
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version

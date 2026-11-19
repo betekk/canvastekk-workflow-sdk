@@ -120,3 +120,24 @@ describe("deprecated paths + names, phase 4 (ADR 0001)", () => {
     expect([r, n, p, e, i, h]).toEqual(Array(6).fill(undefined));
   });
 });
+
+describe("legacy `definition` class attribute (ADR 0001)", () => {
+  it("still resolves the manifest when `manifest` is absent", async () => {
+    const { WorkflowNodeBase, WorkflowNodeManifestSchema } = await import("../src/index.js");
+    class LegacyAttrNode extends WorkflowNodeBase {
+      definition = {
+        slug: "legacy-attr",
+        version: "1.0.0",
+        name: "Legacy Attr",
+        description: "legacy attribute alias test",
+        input_schema: { type: "object" },
+        output_schema: { type: "object" },
+      };
+      execute(): Record<string, unknown> {
+        return {};
+      }
+    }
+    const node = new LegacyAttrNode();
+    expect(WorkflowNodeManifestSchema.parse((node as unknown as { manifest: unknown }).manifest)).toBeTruthy();
+  });
+});

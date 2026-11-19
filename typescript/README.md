@@ -76,16 +76,16 @@ npm install canvastekk-workflow-sdk --registry https://npm.pkg.github.com/@betek
 
 ### Step 2: Define Your Node
 
-Create a file (e.g. `handler.ts`) and extend `BaseNode`:
+Create a file (e.g. `handler.ts`) and extend `WorkflowNodeBase`:
 
 ```typescript
 import {
-  BaseNode,
+  WorkflowNodeBase,
   WorkflowNodeManifest,
-  ExecutionContext,
+  NodeExecutionContext,
 } from "canvastekk-workflow-sdk";
 
-class UppercaseNode extends BaseNode {
+class UppercaseNode extends WorkflowNodeBase {
   static override definition: WorkflowNodeManifest = {
     slug: "uppercase",
     version: "1.0.0",
@@ -104,7 +104,7 @@ class UppercaseNode extends BaseNode {
 
   override async execute(
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Promise<Record<string, unknown>> {
     context.reportProgress(0.5, "Processing text");
     return { result: (inputs["text"] as string).toUpperCase() };
@@ -117,7 +117,7 @@ export default app;
 
 The four requirements:
 
-1. **Extend `BaseNode`** — inherit from `canvastekk-workflow-sdk`'s `BaseNode`
+1. **Extend `WorkflowNodeBase`** — inherit from `canvastekk-workflow-sdk`'s `WorkflowNodeBase`
 2. **Define `definition`** — a `WorkflowNodeManifest` with all required fields (`slug`, `version`, `name`, `description`, `input_schema`, `output_schema`). Note: `id` is auto-derived from `slug` + `version` and must NOT be provided manually. The schema parse rejects `output_schema` entries that list `error` / `error_type` / `error_code` in `required` — those are response-envelope fields, never outputs (#257).
 3. **Implement `execute(inputs, context)`** — return an object matching your `output_schema`
 4. **Call `.createApp()`** — get a ready-to-run Express application
@@ -187,7 +187,7 @@ NodeExecutionRequest
         |
      (pass)
         v
-  ExecutionContext created
+  NodeExecutionContext created
         |
         v
   Middleware: onBeforeExecute(inputs, context)
@@ -271,8 +271,8 @@ The SDK provides structured exceptions. When thrown inside `execute()`, they pro
 | `NodeTimeoutError` | `TIMEOUT` | 408 | Execution exceeded time limit |
 | `NodeIOError` | `IO_ERROR` | 500 | File read/write failure |
 | `NodeConfigurationError` | `CONFIGURATION_ERROR` | 500 | Invalid node configuration |
-| `WorkflowExecutionError` | `WORKFLOW_EXECUTION_ERROR` | 500 | Local workflow execution failure |
-| `WorkflowValidationError` | `WORKFLOW_VALIDATION_ERROR` | 422 | Workflow spec validation failure |
+| `WorkflowRunError` | `WORKFLOW_EXECUTION_ERROR` | 500 | Local workflow execution failure |
+| `WorkflowDefinitionValidationError` | `WORKFLOW_VALIDATION_ERROR` | 422 | Workflow spec validation failure |
 
 Note: When thrown inside `execute()`, the SDK catches them and returns `status: "fail"` with HTTP 200. The structured error codes appear in the `error_code` field.
 
@@ -280,14 +280,14 @@ Usage example:
 
 ```typescript
 import {
-  BaseNode,
+  WorkflowNodeBase,
   WorkflowNodeManifest,
-  ExecutionContext,
+  NodeExecutionContext,
   NodeIOError,
 } from "canvastekk-workflow-sdk";
 import { existsSync } from "node:fs";
 
-class FileProcessorNode extends BaseNode {
+class FileProcessorNode extends WorkflowNodeBase {
   static override definition: WorkflowNodeManifest = {
     slug: "file-proc",
     version: "1.0.0",
@@ -305,7 +305,7 @@ class FileProcessorNode extends BaseNode {
 
   override async execute(
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Promise<Record<string, unknown>> {
     const filePath = inputs["path"] as string;
     if (!existsSync(filePath)) {
@@ -366,7 +366,7 @@ When the workflow engine executes your node, file input values are presigned GET
 ```typescript
 override async execute(
   inputs: Record<string, unknown>,
-  context: ExecutionContext,
+  context: NodeExecutionContext,
 ): Promise<Record<string, unknown>> {
   // inputs["point_cloud"] is now a LOCAL FILE PATH (auto-downloaded by SDK)
   const cloudPath = inputs["point_cloud"] as string;
@@ -387,7 +387,7 @@ Use `context.outputPath(filename)` for output files:
 ```typescript
 override async execute(
   inputs: Record<string, unknown>,
-  context: ExecutionContext,
+  context: NodeExecutionContext,
 ): Promise<Record<string, unknown>> {
   const outputFile = context.outputPath("result.json");
   const { writeFileSync } = await import("node:fs");
@@ -428,13 +428,13 @@ Array outputs still upload one MPU per element, and `element.suffix` must match 
 
 ```typescript
 import {
-  BaseNode,
+  WorkflowNodeBase,
   WorkflowNodeManifest,
-  ExecutionContext,
+  NodeExecutionContext,
 } from "canvastekk-workflow-sdk";
 import { readFileSync, writeFileSync } from "node:fs";
 
-class PointCloudSegmenter extends BaseNode {
+class PointCloudSegmenter extends WorkflowNodeBase {
   static override definition: WorkflowNodeManifest = {
     slug: "segment",
     version: "1.0.0",
@@ -464,7 +464,7 @@ class PointCloudSegmenter extends BaseNode {
 
   override async execute(
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Promise<Record<string, unknown>> {
     const cloudPath = inputs["point_cloud"] as string;
     const cloudData = readFileSync(cloudPath);
@@ -506,7 +506,7 @@ CLI — both bins (`ctk` / `canvastekk-workflow-sdk`) are identical. Registry
 credentials are `ctk_` API keys (47 chars: `ctk_` + 43): treat yours like a
 password; the SDK validates its shape locally and fails fast with a rotation
 hint. `GET /manifest` also serves `code_digest` (sha256
-of the module calling `createNodeApp`, computed at startup, never author-settable).
+of the module calling `createWorkflowNodeApp`, computed at startup, never author-settable).
 
 **Pre-flight registry diff (v0.63+, `probe --engine-url`):** with the engine URL
 and `CANVASTEKK_NODE_REGISTRATION_KEY` set, `probe` also fetches the published
@@ -553,16 +553,16 @@ Optional fields with defaults:
 | `category` | `"utility"` | Node category (`transform`, `inference`, `utility`, `control-flow`) |
 | `timeout_seconds` | `30` | Max execution time |
 | `styles` | `undefined` | Icon/color for UI |
-| `deprecation` | `undefined` | Optional `DeprecationInfo` — advisory migration signal (RFC 9745/8594). Omitted from the registry payload when unset. Distinct from the registry's `node_status`; a deprecated node stays `active` until retired. |
+| `deprecation` | `undefined` | Optional `WorkflowNodeDeprecationInfo` — advisory migration signal (RFC 9745/8594). Omitted from the registry payload when unset. Distinct from the registry's `node_status`; a deprecated node stays `active` until retired. |
 
-### DeprecationInfo
+### WorkflowNodeDeprecationInfo
 
 Mark a node deprecated so workflow-definition authors get a migration signal.
 `deprecation` is **additive metadata** — setting it does not change the node's
 behavior and does not require a `major` version bump.
 
 ```typescript
-import { WorkflowNodeManifestSchema, type DeprecationInfo } from "canvastekk-workflow-sdk";
+import { WorkflowNodeManifestSchema, type WorkflowNodeDeprecationInfo } from "canvastekk-workflow-sdk";
 
 const definition = WorkflowNodeManifestSchema.parse({
   slug: "floor-flatness-assessment",
@@ -574,7 +574,7 @@ const definition = WorkflowNodeManifestSchema.parse({
     replacement_slug: "floor-flatness-per-check-assessment",
     migration_url: "https://docs.example.com/ff-migration",
     notice: "Use floor-flatness-per-check-assessment for per-check-type outputs.",
-  } satisfies DeprecationInfo,
+  } satisfies WorkflowNodeDeprecationInfo,
 });
 ```
 
@@ -586,14 +586,14 @@ const definition = WorkflowNodeManifestSchema.parse({
 | `migration_url` | `null` | URL to migration docs (RFC 9745 §3 / RFC 8594 §6) |
 | `notice` | *(required)* | Human-readable notice shown to workflow-def authors |
 
-### ExecutionContext
+### NodeExecutionContext
 
 Provided to `execute()` method:
 
 ```typescript
 override async execute(
   inputs: Record<string, unknown>,
-  context: ExecutionContext,
+  context: NodeExecutionContext,
 ): Promise<Record<string, unknown>> {
   // Identifiers
   context.runId;    // "workflow-run-abc123"
@@ -853,15 +853,15 @@ npx vitest run tests/my-node.test.ts
 
 The SDK provides utilities for registering nodes with the CanvasTEKK Workflow Engine registry.
 
-### `registerNode()`
+### `registerWorkflowNode()`
 
 Register a node with the workflow engine registry:
 
 ```typescript
-import { registerNode } from "canvastekk-workflow-sdk";
+import { registerWorkflowNode } from "canvastekk-workflow-sdk";
 
 const node = new MyNode();
-const result = await registerNode(node, {
+const result = await registerWorkflowNode(node, {
   registryUrl: "https://engine.example.com/api/workflows/nodes/",
   invokeUrl: "https://my-node.example.com",
   serviceToken: "svs_your-token-here",
@@ -874,21 +874,21 @@ console.log(result.revision_id); // "rev-abc123"
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `node` | `BaseNode` | Yes | The node instance to register |
+| `node` | `WorkflowNodeBase` | Yes | The node instance to register |
 | `registryUrl` | `string` | Yes | Engine registry endpoint |
 | `invokeUrl` | `string` | No | URL where the node is reachable |
 | `invokeType` | `InvokeType` | No | `"http"`, `"lambda"`, `"sagemaker"`, or `"in-process"` (default: `"http"`) |
 | `serviceToken` | `string` | Yes | Registry credential — a `ctk_` API key (`Authorization: Bearer`, validated locally; #239) |
 | `tags` | `string[]` | No | Searchable tags for the registry |
 
-### `exportDefinition()`
+### `exportWorkflowNodeManifest()`
 
 Export a `WorkflowNodeManifest` as a registry-compatible JSON file:
 
 ```typescript
-import { exportDefinition } from "canvastekk-workflow-sdk";
+import { exportWorkflowNodeManifest } from "canvastekk-workflow-sdk";
 
-const path = exportDefinition(node.definition, "node-manifest.json", {
+const path = exportWorkflowNodeManifest(node.definition, "node-manifest.json", {
   invokeUrl: "https://my-node.example.com",
   tags: ["ci-cd"],
 });
@@ -906,7 +906,7 @@ Build, validate, and test-run workflow DAGs locally — without the engine, Temp
 import {
   WorkflowBuilder,
   WorkflowRunner,
-  InProcessExecutor,
+  InProcessNodeExecutor,
 } from "canvastekk-workflow-sdk";
 
 // Build a workflow
@@ -921,7 +921,7 @@ const spec = await new WorkflowBuilder()
   .build(); // validates the DAG
 
 // Test run locally
-const executor = new InProcessExecutor();
+const executor = new InProcessNodeExecutor();
 executor.register("segmentation-v1.0.0", {
   execute: async (inputs, ctx) => ({ instances: "processed" }),
 });
@@ -976,27 +976,27 @@ builder.connect("start", "segment", {
 
 #### `build(opts?)`
 
-Construct the `WorkflowSpec`. If `validate` is not `false`, validates the graph and throws `WorkflowValidationError` on failure.
+Construct the `WorkflowSpec`. If `validate` is not `false`, validates the graph and throws `WorkflowDefinitionValidationError` on failure.
 
-### NodeExecutor Strategy
+### WorkflowRunNodeExecutor Strategy
 
-#### `InProcessExecutor` — Direct Execution
+#### `InProcessNodeExecutor` — Direct Execution
 
 ```typescript
-import { InProcessExecutor } from "canvastekk-workflow-sdk";
+import { InProcessNodeExecutor } from "canvastekk-workflow-sdk";
 
-const executor = new InProcessExecutor();
+const executor = new InProcessNodeExecutor();
 executor.register("segmentation-v1.0.0", {
   execute: async (inputs, ctx) => ({ result: "done" }),
 });
 ```
 
-#### `HttpExecutor` — HTTP Calls
+#### `HttpNodeExecutor` — HTTP Calls
 
 ```typescript
-import { HttpExecutor } from "canvastekk-workflow-sdk";
+import { HttpNodeExecutor } from "canvastekk-workflow-sdk";
 
-const executor = new HttpExecutor();
+const executor = new HttpNodeExecutor();
 executor.registerUrl("segmentation-v1.0.0", "http://localhost:8001");
 executor.registerUrl("measurement-v1.0.0", "http://localhost:8002");
 ```
@@ -1012,7 +1012,7 @@ const result = await runner.run(spec, { point_cloud: "/data/scan.las" });
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `executor` | `NodeExecutor` | required | Execution strategy |
+| `executor` | `WorkflowRunNodeExecutor` | required | Execution strategy |
 | `errorPolicy` | `"fail_fast" \| "continue"` | `"fail_fast"` | `fail_fast` stops on first error; `continue` runs all levels |
 
 ### WorkflowRunResult
@@ -1021,7 +1021,7 @@ const result = await runner.run(spec, { point_cloud: "/data/scan.las" });
 |-------|------|-------------|
 | `status` | `"completed" \| "failed"` | Overall workflow status |
 | `final_outputs` | `Record<string, unknown>` | Outputs collected from END nodes |
-| `node_results` | `NodeResult[]` | Per-node execution results |
+| `node_results` | `WorkflowRunNodeResult[]` | Per-node execution results |
 | `duration_ms` | `number` | Total execution time |
 | `output_dir` | `string \| null` | Output directory path |
 
@@ -1163,7 +1163,7 @@ The SDK provides production-ready structured logging out of the box. Configured 
 ```typescript
 override async execute(
   inputs: Record<string, unknown>,
-  context: ExecutionContext,
+  context: NodeExecutionContext,
 ): Promise<Record<string, unknown>> {
   context.logger.info("Processing started");
 
@@ -1223,9 +1223,9 @@ const app = node.createApp({
 Host multiple nodes behind a single Express server:
 
 ```typescript
-import { createMultiNodeApp } from "canvastekk-workflow-sdk";
+import { createMultiWorkflowNodeApp } from "canvastekk-workflow-sdk";
 
-const app = createMultiNodeApp([new NodeA(), new NodeB(), new NodeC()]);
+const app = createMultiWorkflowNodeApp([new NodeA(), new NodeB(), new NodeC()]);
 export default app;
 ```
 
@@ -1238,7 +1238,7 @@ Each node is mounted at `/node/{node-name}`.
 ### Custom Middleware
 
 ```typescript
-import type { NodeMiddleware, ExecutionContext } from "canvastekk-workflow-sdk";
+import type { NodeMiddleware, NodeExecutionContext } from "canvastekk-workflow-sdk";
 
 const auditMiddleware: NodeMiddleware = {
   onBeforeExecute(inputs, context) {
@@ -1261,7 +1261,7 @@ node.addMiddleware(auditMiddleware);
 Override `healthCheck()` to report on external dependencies:
 
 ```typescript
-class ModelInferenceNode extends BaseNode {
+class ModelInferenceNode extends WorkflowNodeBase {
   // ...
   override healthCheck(): Record<string, boolean> {
     return {

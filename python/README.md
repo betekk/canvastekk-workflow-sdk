@@ -96,7 +96,7 @@ from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest, Node
 
 
 class UppercaseNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="uppercase",
         version="1.0.0",
         name="Uppercase",
@@ -320,7 +320,7 @@ from canvastekk_workflow_sdk.exceptions import NodeIOError, NodeExecutionError
 
 
 class FileProcessorNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-proc",
         version="1.0.0",
         name="File Processor",
@@ -352,7 +352,7 @@ app = FileProcessorNode().create_app()
 Mark input fields as files using `"format": "file"` in `input_schema`. Use `x-accept` and `x-maxSizeBytes` extensions to specify accepted file types and size limits:
 
 ```python
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="segment",
     version="1.0.0",
     name="Segment",
@@ -487,7 +487,7 @@ Session descriptor example (legacy shown; capabilities differ only in `kind`):
 Failure semantics are unchanged from DA-1711: a terminal upload failure produces `fail`/`UPLOAD_FAILED` at the router layer (outside `ErrorOutputNode`).
 
 ```python
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="converter",
     version="1.0.0",
     name="Converter",
@@ -533,7 +533,7 @@ from pathlib import Path
 
 
 class PointCloudSegmenter(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="segment",
         version="1.0.0",
         name="Segment",
@@ -860,7 +860,7 @@ Defines what a node is. Maps to the engine's **registry-level node type** (`Work
 from canvastekk_workflow_sdk import WorkflowNodeManifest, WorkflowNodeRetryConfig, WorkflowNodeStyles
 from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeColorPreset
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="my-node",
     version="1.0.0",
     name="My Node",
@@ -905,7 +905,7 @@ the same version — adding the field on a new version is a normal registration)
 from canvastekk_workflow_sdk import WorkflowNodeDeprecationInfo, WorkflowNodeManifest
 from datetime import date
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="floor-flatness-assessment",
     version="1.4.2",
     # ...required fields...
@@ -1106,13 +1106,13 @@ Response from `POST /execute`:
 
 ```bash
 # Offline registration probes (validate + engine-request mirror)
-python -m canvastekk_workflow_sdk probe my_node.handler:definition
+python -m canvastekk_workflow_sdk probe my_node.handler:manifest
 # …or straight from a manifest file (same probes, no import needed)
 ctk probe --manifest manifest.json --engine-url https://cwe.example.com
 
 # Publish to the engine registry from CI (service identity)
 export CANVASTEKK_NODE_REGISTRATION_KEY=<ctk_ key>
-ctk register my_node.handler:definition \
+ctk register my_node.handler:manifest \
   --engine-url https://cwe.example.com [--invoke-url URL] [--name-suffix -lambda]
 ```
 
@@ -1135,10 +1135,10 @@ Validate your node definition offline without starting the server:
 
 ```bash
 # Basic validation
-python -m canvastekk_workflow_sdk validate my_node.handler:definition
+python -m canvastekk_workflow_sdk validate my_node.handler:manifest
 
 # Structured JSON output (for CI)
-python -m canvastekk_workflow_sdk validate my_node.handler:definition --json
+python -m canvastekk_workflow_sdk validate my_node.handler:manifest --json
 ```
 
 The validator checks:
@@ -1694,7 +1694,7 @@ Override `health_check()` to report on external dependencies:
 
 ```python
 class ModelInferenceNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(...)
+    manifest = WorkflowNodeManifest(...)
 
     def __init__(self):
         super().__init__()
@@ -1731,7 +1731,7 @@ Override `hook()` to handle async callbacks:
 
 ```python
 class AsyncTaskNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(...)
+    manifest = WorkflowNodeManifest(...)
 
     def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # Start a long-running task, return immediately

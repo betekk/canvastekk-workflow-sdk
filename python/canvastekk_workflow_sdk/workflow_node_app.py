@@ -269,9 +269,9 @@ def create_workflow_node_app(
             has_auth_dependency = True
 
     default_kwargs: dict[str, Any] = {
-        "title": node.definition.name,
-        "version": node.definition.version,
-        "description": node.definition.description,
+        "title": node.manifest.name,
+        "version": node.manifest.version,
+        "description": node.manifest.description,
         "openapi_tags": _NODE_OPENAPI_TAGS,
     }
     default_kwargs.update(fastapi_kwargs)
@@ -404,7 +404,7 @@ def create_workflow_node_app(
             )
 
         try:
-            timeout = node.definition.effective_runtime_seconds
+            timeout = node.manifest.effective_runtime_seconds
             if timeout and timeout > 0:
                 cancel_event = threading.Event()
                 cancel_key = id(exec_request)
@@ -428,11 +428,11 @@ def create_workflow_node_app(
                     raise NodeTimeoutError(
                         timeout,
                         details={
-                            "slug": node.definition.slug,
+                            "slug": node.manifest.slug,
                             "execution_id": exec_request.execution_id,
                             "run_id": exec_request.run_id,
-                            "declared_budget_s": node.definition.timeout_seconds,
-                            "hard_ceiling_s": node.definition.hard_max_runtime_seconds,
+                            "declared_budget_s": node.manifest.timeout_seconds,
+                            "hard_ceiling_s": node.manifest.hard_max_runtime_seconds,
                             "enforced_at_s": timeout,
                             "host": "inline-lambda",
                         },
@@ -443,7 +443,7 @@ def create_workflow_node_app(
                 response = await asyncio.to_thread(node.run, exec_request)
 
             if exec_request.output_upload_url and response.status == "pass" and not response.dry_run:
-                file_output_fields = node.definition.file_output_fields
+                file_output_fields = node.manifest.file_output_fields
                 if file_output_fields:
                     try:
                         await asyncio.to_thread(
@@ -503,8 +503,8 @@ def create_workflow_node_app(
 
         return WorkflowNodeHealthResponse(
             status=status,
-            node_id=node.definition.id,
-            version=node.definition.version,
+            node_id=node.manifest.id,
+            version=node.manifest.version,
             checks=checks,
         )
 
@@ -535,7 +535,7 @@ def create_workflow_node_app(
         """
         import canvastekk_workflow_sdk
 
-        content = node.definition.to_dict()
+        content = node.manifest.to_dict()
         content["sdk_version"] = canvastekk_workflow_sdk.__version__
         if code_digest is not None:
             content["code_digest"] = code_digest
@@ -547,10 +547,10 @@ def create_workflow_node_app(
         else:
             mode = "production"
         content["mode"] = mode
-        effective = node.definition.effective_contract
+        effective = node.manifest.effective_contract
         from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase as _BaseNode
 
-        if node.definition.contract is None and type(node).hook is _BaseNode.hook:
+        if node.manifest.contract is None and type(node).hook is _BaseNode.hook:
             effective = effective.model_copy(update={"routes": [r for r in effective.routes if r != "/hook"]})
         content["contract"] = effective.model_dump(mode="json")
         return JSONResponse(content=content)
@@ -632,10 +632,10 @@ def create_workflow_node_app(
         """Readiness probe — returns 200 when the node can accept traffic."""
         checks = node.health_check()
         if not checks or all(checks.values()):
-            return JSONResponse(content={"status": "ready", "node_id": node.definition.id, "checks": checks})
+            return JSONResponse(content={"status": "ready", "node_id": node.manifest.id, "checks": checks})
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "node_id": node.definition.id, "checks": checks},
+            content={"status": "not_ready", "node_id": node.manifest.id, "checks": checks},
         )
 
     app.include_router(router)

@@ -8,7 +8,7 @@ import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import { NodeAuth } from "../src/auth.js";
 
 class TestNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "test-node",
     version: "1.0.0",
     name: "Test Node",
@@ -29,7 +29,7 @@ class TestNode extends WorkflowNodeBase {
 }
 
 class HealthCheckNode extends WorkflowNodeBase {
-  definition: WorkflowNodeManifest = {
+  manifest: WorkflowNodeManifest = {
     slug: "health-node",
     version: "2.0.0",
     name: "Health Node",
@@ -75,8 +75,8 @@ describe("Express endpoints", () => {
 
     it("enforces the effective runtime bound, not the raw timeout_seconds (DA-3609)", async () => {
       class SlowNode extends TestNode {
-        definition: WorkflowNodeManifest = {
-          ...this.definition,
+        manifest: WorkflowNodeManifest = {
+          ...this.manifest,
           slug: "slow-node",
           name: "Slow Node",
           timeout_seconds: 5,
@@ -280,7 +280,7 @@ describe("Auth middleware", () => {
 
 describe("POST /execute upload failure (DA-1711 parity)", () => {
   class FileOutputNode extends WorkflowNodeBase {
-    definition: WorkflowNodeManifest = {
+    manifest: WorkflowNodeManifest = {
       slug: "file-out-node",
       version: "1.0.0",
       name: "File Out",
@@ -337,7 +337,7 @@ describe("POST /execute upload failure (DA-1711 parity)", () => {
 describe("GET /manifest null-key stripping (DA-1955)", () => {
   it("omits null optional keys instead of leaking explicit nulls", async () => {
     class NullOptionalsNode extends WorkflowNodeBase {
-      definition: WorkflowNodeManifest = {
+      manifest: WorkflowNodeManifest = {
         slug: "null-opt-node",
         version: "1.0.0",
         name: "Null Optionals",
@@ -385,7 +385,7 @@ describe("manifest code_digest (DA-2603)", () => {
     const { createHash } = await import("node:crypto");
     const { readFileSync } = await import("node:fs");
     const node = new (class extends WorkflowNodeBase {
-      definition = {
+      manifest = {
         slug: "digest-node",
         version: "1.0.0",
         name: "Digest",
@@ -411,7 +411,7 @@ describe("manifest code_digest (DA-2603)", () => {
 describe("dry-run upload guard (D10 #111)", () => {
   it("never uploads on a dry-run pass even with output_upload_url", async () => {
     class DryFileNode extends WorkflowNodeBase {
-      definition: WorkflowNodeManifest = {
+      manifest: WorkflowNodeManifest = {
         slug: "dry-file-node",
         version: "1.0.0",
         name: "Dry File Node",
@@ -476,7 +476,7 @@ describe("dry-run upload guard (D10 #111)", () => {
 
 describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
   class CapabilityCaptureNode extends WorkflowNodeBase {
-    definition: WorkflowNodeManifest = {
+    manifest: WorkflowNodeManifest = {
       slug: "cap-node",
       version: "1.0.0",
       name: "Cap Node",

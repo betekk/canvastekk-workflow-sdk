@@ -626,7 +626,7 @@ def register_workflow_node(
             raise WorkflowNodeRegistrationError("Node failed conformance verification; refusing to register.\n" + report.summary())
 
     manifest = build_workflow_node_registry_payload(
-        node.definition,
+        node.manifest,
         invoke_type=invoke_type,
         invoke_url=invoke_url,
         tags=tags,

@@ -25,14 +25,14 @@ const manifest = (slug: string): WorkflowNodeManifest => ({
 });
 
 class EchoNode extends WorkflowNodeBase {
-  definition = manifest("echo");
+  manifest = manifest("echo");
   execute(inputs: Record<string, unknown>, _ctx: NodeExecutionContext): Record<string, unknown> {
     return { message: inputs.message };
   }
 }
 
 class FailingNode extends WorkflowNodeBase {
-  definition = manifest("failing");
+  manifest = manifest("failing");
   execute(): Record<string, unknown> {
     throw new Error("Intentional failure");
   }

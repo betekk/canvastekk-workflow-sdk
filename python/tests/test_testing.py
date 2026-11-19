@@ -14,7 +14,7 @@ from canvastekk_workflow_sdk import (
 
 
 class _FileReaderNode(WorkflowNodeBase):
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         name="file-reader-test",
         version="1.0.0",
         title="File Reader Test",

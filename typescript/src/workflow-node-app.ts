@@ -99,7 +99,7 @@ export function createWorkflowNodeApp(
   }
 
   enforceSupportHorizon();
-  const sdkVersion = new SDKVersionMiddleware(VERSION, node.definition.slug);
+  const sdkVersion = new SDKVersionMiddleware(VERSION, node.manifest.slug);
   app.use(sdkVersion.handler());
 
   if (opts.dependencies) {
