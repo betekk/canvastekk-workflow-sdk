@@ -1146,6 +1146,7 @@ The validator checks:
 - File fields have `type: "string"` (not `"object"` or `"array"`)
 - Warns on file fields missing `x-accept` or `x-maxSizeBytes` extensions
 - Reports detected file input/output fields and their constraints
+- `output_schema` `required` lists no envelope fields (`error` / `error_type` / `error_code` — response-envelope fields, never outputs; #257)
 
 Exit codes: `0` = valid, `1` = validation errors.
 

@@ -131,6 +131,45 @@ function validateFileFieldFormats(
   }
 }
 
+/**
+ * Envelope-reserved output names (#257): the node protocol returns these on
+ * the NodeExecutionResponse envelope, never inside `outputs` — an
+ * output_schema requiring them can never be satisfied by a passing run.
+ */
+export const ENVELOPE_RESERVED_OUTPUT_FIELDS: ReadonlySet<string> = new Set([
+  "error",
+  "error_type",
+  "error_code",
+]);
+
+/**
+ * Reject envelope-reserved fields listed in output_schema `required` (#257).
+ *
+ * `outputs` is populated only on `status: "pass"` and is validated against
+ * output_schema; error/error_type/error_code travel on the response envelope.
+ * Optional properties with these names remain legal (the check-node
+ * contract's nullable `error` property, populated by the engine's
+ * ErrorOutputNode error-append rewrite).
+ *
+ * @param schema - Output JSON Schema object to validate
+ * @throws {Error} If `required` lists an envelope-reserved field
+ */
+export function validateOutputSchemaRequiredFields(
+  schema: Record<string, unknown>,
+): void {
+  const required = schema.required;
+  if (!Array.isArray(required)) return;
+  const offending = required.filter((name) => ENVELOPE_RESERVED_OUTPUT_FIELDS.has(String(name)));
+  if (offending.length > 0) {
+    throw new Error(
+      `output_schema must not list envelope field(s) [${offending.join(", ")}] in 'required' — ` +
+        "the node protocol returns error/error_type/error_code on the response envelope, " +
+        "never in outputs; remove them from 'required' (optional properties are fine). " +
+        "See docs/EXTERNAL-AUTHOR-GUIDE.md (#257)",
+    );
+  }
+}
+
 export const CONTRACT_ROUTE_VOCABULARY = [
   "/execute",
   "/health",
@@ -276,6 +315,7 @@ const WorkflowNodeManifestObjectSchema = z
     try {
       validateFileFieldFormats(rest.input_schema as Record<string, unknown>);
       validateFileFieldFormats(rest.output_schema as Record<string, unknown>);
+      validateOutputSchemaRequiredFields(rest.output_schema as Record<string, unknown>);
     } catch (e) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

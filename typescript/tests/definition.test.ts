@@ -83,6 +83,59 @@ describe("WorkflowNodeManifestSchema", () => {
     ).toThrow(/binary.*no longer supported/);
   });
 
+  it.each(["error", "error_type", "error_code"])(
+    "rejects envelope field %s required in output_schema (#257)",
+    (field) => {
+      expect(() =>
+        WorkflowNodeManifestSchema.parse({
+          ...validDefinition,
+          output_schema: {
+            type: "object",
+            properties: { error: { type: "string" } },
+            required: [field],
+          },
+        }),
+      ).toThrow(/envelope field/);
+    },
+  );
+
+  it("allows optional error property in output_schema (#257)", () => {
+    const def = WorkflowNodeManifestSchema.parse({
+      ...validDefinition,
+      output_schema: {
+        type: "object",
+        properties: {
+          verdict: { type: "string", enum: ["PASS", "FAIL", "NOT_EVALUABLE"] },
+          error: { type: ["object", "null"], description: "Error detail on failure." },
+        },
+        required: ["verdict"],
+      },
+    });
+    expect(Object.keys(def.output_schema.properties ?? {})).toContain("error");
+  });
+
+  it("allows error required in input_schema (#257 — guard scopes to outputs)", () => {
+    const def = WorkflowNodeManifestSchema.parse({
+      ...validDefinition,
+      input_schema: {
+        type: "object",
+        properties: { error: { type: "string" } },
+        required: ["error"],
+      },
+    });
+    expect(def.input_schema.required).toEqual(["error"]);
+  });
+
+  it("does not raise when required is absent or non-list (#257)", () => {
+    expect(() => WorkflowNodeManifestSchema.parse(validDefinition)).not.toThrow();
+    expect(() =>
+      WorkflowNodeManifestSchema.parse({
+        ...validDefinition,
+        output_schema: { type: "object", required: "error" },
+      }),
+    ).not.toThrow();
+  });
+
   it("rejects file field with non-string type", () => {
     expect(() =>
       WorkflowNodeManifestSchema.parse({

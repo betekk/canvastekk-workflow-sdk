@@ -405,6 +405,36 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
       registerNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/"),
     ).rejects.toThrow(/serviceToken/);
   });
+
+  it("parses the definition before payload build — raw literal with required-error outputs rejected before any fetch (#257)", async () => {
+    let fetched = false;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => {
+      fetched = true;
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    try {
+      await expect(
+        registerNode(
+          {
+            definition: {
+              ...testDef,
+              output_schema: {
+                type: "object",
+                properties: { error: { type: "string" } },
+                required: ["error"],
+              },
+            } as unknown as WorkflowNodeManifest,
+          },
+          "https://engine.example.com/api/workflows/nodes/",
+          { serviceToken: CTK },
+        ),
+      ).rejects.toThrow(/envelope field/);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(fetched).toBe(false);
+  });
 });
 
 describe("fetchPublishedDefinition (#233)", () => {

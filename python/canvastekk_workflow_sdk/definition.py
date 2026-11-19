@@ -35,6 +35,12 @@ if TYPE_CHECKING:
 _SLUG_PATTERN = re.compile(r"^[a-z]([a-z0-9-]*[a-z0-9])?$")
 _SEMVER_PATTERN = re.compile(r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$")
 
+# Envelope-reserved output names (#257): the node protocol returns these on
+# the NodeExecutionResponse envelope, never inside ``outputs`` — an
+# ``output_schema`` requiring them can never be satisfied by a passing run.
+ENVELOPE_RESERVED_OUTPUT_FIELDS = frozenset({"error", "error_type", "error_code"})
+
+
 _LEGACY_DEPRECATION_MSG = (
     "NodeDefinition legacy construction (name=<slug>, title=<display>) is deprecated; "
     "use slug=<id> and name=<display>. The legacy mapping keeps working but will be removed "
@@ -590,6 +596,36 @@ class WorkflowNodeManifest(BaseModel):
                         f"File fields must have type 'string'."
                     )
 
+        return self
+
+    @model_validator(mode="after")
+    def _validate_output_schema_required_fields(self) -> WorkflowNodeManifest:
+        """Reject envelope-reserved fields required in ``output_schema`` (#257).
+
+        ``outputs`` is populated only on ``status="pass"`` and is validated
+        against ``output_schema``; ``error`` / ``error_type`` / ``error_code``
+        travel on the response envelope. A schema requiring an envelope field
+        can never be satisfied by a passing run, so construction fails here
+        (definition time — node authors see it at app startup / CLI validate,
+        and such manifests can no longer reach the registry). Optional
+        properties with these names remain legal: e.g. the check-node
+        contract's nullable ``error`` property, which the engine's
+        ErrorOutputNode error-append rewrite populates.
+
+        Raises:
+            ValueError: When ``output_schema["required"]`` lists an
+                envelope-reserved field.
+        """
+        required = self.output_schema.get("required")
+        if isinstance(required, list):
+            offending = sorted(set(required) & ENVELOPE_RESERVED_OUTPUT_FIELDS)
+            if offending:
+                raise ValueError(
+                    f"output_schema must not list envelope field(s) {offending} in 'required' — "
+                    "the node protocol returns error/error_type/error_code on the response "
+                    "envelope, never in outputs; remove them from 'required' (optional "
+                    "properties are fine). See docs/EXTERNAL-AUTHOR-GUIDE.md (#257)"
+                )
         return self
 
     def to_dict(self) -> dict[str, Any]:
