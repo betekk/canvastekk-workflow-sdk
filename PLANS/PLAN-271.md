@@ -6,12 +6,12 @@
 
 ## Acceptance Criteria
 
-- [ ] ADR and glossary committed; the complete rename map (every public name in `__all__` and the TS index) committed before code changes
-- [ ] Every module and public name in the map renamed in Python and TypeScript
-- [ ] Old module paths and names still import and work, warning as deprecated (tests in both languages)
-- [ ] Guard tests: Python/TypeScript name parity for renamed modules and symbols; no node-level module or public name contains "definition"
-- [ ] `NodeAuth` / `TekkNodeAuth` and `NodeValidationError` resolved
-- [ ] No behavior or wire change: existing suites green with only import updates; README, CLI help and bundled skills use the new names
+- [x] ADR and glossary committed; the complete rename map (every public name in `__all__` and the TS index) committed before code changes
+- [x] Every module and public name in the map renamed in Python and TypeScript
+- [x] Old module paths and names still import and work, warning as deprecated (tests in both languages)
+- [x] Guard tests: Python/TypeScript name parity for renamed modules and symbols; no node-level module or public name contains "definition"
+- [x] `NodeAuth` / `TekkNodeAuth` and `NodeValidationError` resolved
+- [x] No behavior or wire change: existing suites green with only import updates; README, CLI help and bundled skills use the new names
 - [ ] Released as 0.67.0
 
 ## Dependency & Consumer Map
@@ -169,3 +169,5 @@ LOG wire-safety decision (Phase 4): NodeValidationError split + workflow excepti
 LOG gate-escalation Phase 5 (exit gate): full tier — unconditional; ladder: ruff, pytest 1168, poetry build, tsc, eslint, vitest 506, tsup, pack-test — all green; verification greps clean.
 LOG scope addition (Phase 5): manifest class-attribute dual-support added (manifest canonical / legacy definition warns, py+ts) — the committed ADR map missed the attribute because it is not an __all__/index symbol; the epic's core confusion lived in the base class. Wire names and legacy construction unchanged; tests pin both paths.
 LOG pack-test catch (Phase 5): TS index eager-exports of app factories (added for parity) pulled express into the core tarball import — pack-test failed; reverted to express.ts subpath architecture (py lazy / TS subpath is the documented asymmetry); parity pairs rescoped.
+LOG Step 9 code review round 1: 1 Major (workflow_node_app.py:304 read node.definition — internal code routing through its own fresh deprecated alias; spurious warnings on the serving path, suite warnings 221→86 after fix) + 2 Minor (docstrings teaching legacy attribute) — all fixed in 23c9338; re-gate full tier green. Direct-caller coverage complete (suites + freeze + alias + parity guards + greps). Requirements Gaps: none.
+GATE 23c9338 tier=full lint=t typecheck=t build=t unit=t e2e=n.a — exit gate + post-review-fix re-gate; 23c9338 is the gated final implementation SHA Step 10 cites (py 1168 / ts 506 / pack-test green).
