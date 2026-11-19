@@ -84,3 +84,5 @@ No structural/code change; no cross-module behavior → zero reviewers selected 
 
 LOG gate-escalation exit gate: full tier — CI/workflow file touched (string-only delta; anchor rule applies regardless).
 LOG requirements gate: zero-reviewer rule fired (new work, no reviewers); interrogation round 1/2 — doc home confirmed (expand README Versioning in place).
+LOG rebase: origin/dev advanced (#267 squash) after branch cut; rebased onto c98c115 — content-identical for this branch's files; full ladder re-run green on the rebased tree.
+GATE 2fa7b66 tier=full lint=t typecheck=t build=t unit=t e2e=n.a — exit gate on the rebased tree (actionlint ×4, tsc ×2, tsup, poetry build, pytest 1042, vitest 489).
