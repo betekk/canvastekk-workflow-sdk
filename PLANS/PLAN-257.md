@@ -6,8 +6,8 @@
 
 ## Acceptance Criteria
 
-- [ ] Generated schemas no longer require `error` — the SDK rejects, at definition time (both packages), any `output_schema` whose `required` array lists an envelope-reserved field (`error`, `error_type`, `error_code`), so protocol-invalid schemas cannot reach the registry; optional envelope-shaped properties stay legal (ErrorOutputNode error-append compat, `contracts.build_check_output_schema`)
-- [ ] Contract-authoring docs updated — `docs/EXTERNAL-AUTHOR-GUIDE.md` documents where `error` lives (response envelope, never `outputs`); assistant skill contract table gains the rule (mirrored to `.agents/skills`); README sweeps (root + python + typescript)
+- [x] Generated schemas no longer require `error` — the SDK rejects, at definition time (both packages), any `output_schema` whose `required` array lists an envelope-reserved field (`error`, `error_type`, `error_code`), so protocol-invalid schemas cannot reach the registry; optional envelope-shaped properties stay legal (ErrorOutputNode error-append compat, `contracts.build_check_output_schema`)
+- [x] Contract-authoring docs updated — `docs/EXTERNAL-AUTHOR-GUIDE.md` documents where `error` lives (response envelope, never `outputs`); assistant skill contract table gains the rule (mirrored to `.agents/skills`); README sweeps (root + python + typescript)
 
 ## Dependency & Consumer Map
 
@@ -72,10 +72,11 @@
 
 ### Phase 4: Exit gate + trace
 
-- [ ] **4.1** Run the ticket exit gate at `tier=full` (python: ruff + pytest from `python/`; ts: lint + typecheck + build + vitest from `typescript/`; skill-mirror `diff -r`), append the `GATE <sha> tier=full` memo line and phase LOG lines to this PLAN's Trace, commit ticks + trace, push.
+- [x] **4.1** Run the ticket exit gate at `tier=full` (python: ruff + pytest from `python/`; ts: lint + typecheck + build + vitest from `typescript/`; skill-mirror `diff -r`), append the `GATE <sha> tier=full` memo line and phase LOG lines to this PLAN's Trace, commit ticks + trace, push.
     — **Why:** the ticket exit gate is the run's last gate and must be full (verification-loop-skill tiered gating); Step 10a cites this memo line for the pushed SHA
     — **Done when:** green `tier=full` memo line exists for the final pushed SHA
     — **Consumers affected:** PR gate citation
+    — **Done:** exit gate green on final tree — TS eslint full, tsc x2, tsup build, 27 files/480 tests; python ruff full clean, 1020 passed 1 skipped, wheel/sdist build OK; skill-mirror diff -r exit 0; both ACs ticked; files: `PLANS/PLAN-257.md`; fixes: none
 
 ## Technical Notes
 
@@ -100,4 +101,6 @@ LOG Phase 1 gate: ruff scoped errored once (I001 import order, auto-fixed), then
 LOG Phase 2 gate (green first try): eslint scoped on definition/registry + tests, tsc typecheck + typecheck:tests, definition+registry 107 passed, full ts suite 480 passed (npm ci run in worktree — node_modules is untracked and not inherited).
 GATE 8d8c3d1 tier=light lint=t typecheck=t build=- unit=t e2e=n.a
 LOG Phase 3 gate (docs-only): skill-mirror diff -r exit 0; rg "envelope" hits guide (3) and all three READMEs mention the guard; no contradicting claims found.
+GATE f1d1d28 tier=light lint=t typecheck=n.a build=- unit=n.a e2e=n.a
+LOG Exit gate (ticket, tier=full): TS lint full green, tsc source+tests green, tsup build green (pre-existing import.meta cjs warning in cli.ts unchanged), vitest 27 files/480 tests; python ruff full clean, pytest 1020 passed 1 skipped, wheel/sdist build OK; skill-mirror diff -r exit 0.
 
