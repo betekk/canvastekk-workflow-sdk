@@ -127,8 +127,8 @@ language). `*Schema` twins rename with their type (`RetryConfig` →
 | `SDK_SERVED_CONTRACT_ROUTES` → `WORKFLOW_NODE_MANIFEST_CONTRACT_ROUTES` | — |
 | `diff_manifests` → `diff_workflow_node_manifests` | `diffManifests` → `diffWorkflowNodeManifests` |
 | `ManifestDiff` → `WorkflowNodeManifestDiff` | `ManifestDiff` → `WorkflowNodeManifestDiff` |
-| `fetch_published_definition` → `fetch_published_workflow_node_manifest` | — |
-| `diff_against_published` → `diff_against_published_workflow_node_manifest` | — |
+| `fetch_published_definition` → `fetch_published_workflow_node_manifest` | `fetchPublishedDefinition` → `fetchPublishedWorkflowNodeManifest` |
+| `diff_against_published` → `diff_against_published_workflow_node_manifest` | `diffAgainstPublished` → `diffAgainstPublishedWorkflowNodeManifest` |
 
 **Registry cluster**
 

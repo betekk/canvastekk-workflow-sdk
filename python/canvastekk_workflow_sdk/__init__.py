@@ -62,17 +62,6 @@ from canvastekk_workflow_sdk.contracts import (
     Point3D,
     parse_node_execution_status,
 )
-from canvastekk_workflow_sdk.definition import (
-    ColorPreset,
-    ContractCapabilities,
-    DeprecationInfo,
-    NodeContract,
-    RetryConfig,
-    WorkflowNodeManifest,
-    WorkflowNodeRole,
-    WorkflowNodeStyles,
-    export_definition,
-)
 from canvastekk_workflow_sdk.exceptions import (
     ERROR_CATEGORIES,
     ERROR_ENVELOPE_KEYS,
@@ -92,12 +81,6 @@ from canvastekk_workflow_sdk.exceptions import (
 from canvastekk_workflow_sdk.logging import StructuredJsonFormatter, configure_logging, get_node_logger
 from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware, TimingMiddleware
 from canvastekk_workflow_sdk.observability import ExecutionMetric, MetricsCollector
-from canvastekk_workflow_sdk.registry import (
-    RegisterNodeResult,
-    RegistrationError,
-    build_registry_payload,
-    register_node,
-)
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
 from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionResponse
 from canvastekk_workflow_sdk.testing import LocalFileServer, serve_files
@@ -123,19 +106,36 @@ from canvastekk_workflow_sdk.workflow import (
     WorkflowRunResult,
     validate,
 )
+from canvastekk_workflow_sdk.workflow_node_manifest import (
+    WorkflowNodeColorPreset,
+    WorkflowNodeContractCapabilities,
+    WorkflowNodeDeprecationInfo,
+    WorkflowNodeManifest,
+    WorkflowNodeManifestContract,
+    WorkflowNodeRetryConfig,
+    WorkflowNodeRole,
+    WorkflowNodeStyles,
+    export_workflow_node_manifest,
+)
+from canvastekk_workflow_sdk.workflow_node_registry import (
+    WorkflowNodeRegistrationError,
+    WorkflowNodeRegistrationResult,
+    build_workflow_node_registry_payload,
+    register_workflow_node,
+)
 
 __all__ = [
     "BaseContract",
     "BaseNode",
     "BoundingBox3D",
-    "ColorPreset",
+    "WorkflowNodeColorPreset",
     "ERROR_CATEGORIES",
     "ERROR_ENVELOPE_KEYS",
     "IO_SUBCODE_DOWNLOAD_FAILED",
     "IO_SUBCODE_SIZE_EXCEEDED",
     "IO_SUBCODE_URL_POLICY_BLOCKED",
-    "ContractCapabilities",
-    "DeprecationInfo",
+    "WorkflowNodeContractCapabilities",
+    "WorkflowNodeDeprecationInfo",
     "EdgeType",
     "ExecutionContext",
     "ExecutionMetric",
@@ -151,7 +151,7 @@ __all__ = [
     "MetricsCollector",
     "NodeAuth",
     "NodeConfigurationError",
-    "NodeContract",
+    "WorkflowNodeManifestContract",
     "NodeExecutionError",
     "NodeExecutionRequest",
     "NodeExecutionResponse",
@@ -169,9 +169,9 @@ __all__ = [
     "Plane",
     "PlaneSet",
     "Point3D",
-    "RegisterNodeResult",
-    "RegistrationError",
-    "RetryConfig",
+    "WorkflowNodeRegistrationResult",
+    "WorkflowNodeRegistrationError",
+    "WorkflowNodeRetryConfig",
     "S3PresignedUploader",
     "UploadSession",
     "UploadTarget",
@@ -197,17 +197,17 @@ __all__ = [
     "WorkflowRunResult",
     "WorkflowRunner",
     "WorkflowValidationError",
-    "build_registry_payload",
+    "build_workflow_node_registry_payload",
     "configure_logging",
     "create_authed_app",
     "create_lambda_handler",
     "create_multi_node_app",
     "create_node_app",
     "mount_node",
-    "export_definition",
+    "export_workflow_node_manifest",
     "get_default_uploader",
     "get_node_logger",
-    "register_node",
+    "register_workflow_node",
     "serve_files",
     "validate",
 ]
@@ -225,8 +225,39 @@ _LAZY_SERVER_EXPORTS = {
     "create_lambda_handler": "canvastekk_workflow_sdk.bootstrap",
 }
 
+# Deprecated public-name aliases (ADR 0001, #271): old name -> (module, new
+# name). Resolved lazily so new-name users never see a DeprecationWarning.
+_DEPRECATED_NAME_ALIASES = {
+    "export_definition": ("canvastekk_workflow_sdk.workflow_node_manifest", "export_workflow_node_manifest"),
+    "NodeContract": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeManifestContract"),
+    "ContractCapabilities": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeContractCapabilities"),
+    "RetryConfig": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeRetryConfig"),
+    "ColorPreset": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeColorPreset"),
+    "DeprecationInfo": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeDeprecationInfo"),
+    "SDK_SERVED_CONTRACT_ROUTES": ("canvastekk_workflow_sdk.workflow_node_manifest", "WORKFLOW_NODE_MANIFEST_CONTRACT_ROUTES"),
+    "RegisterNodeResult": ("canvastekk_workflow_sdk.workflow_node_registry", "WorkflowNodeRegistrationResult"),
+    "RegistrationError": ("canvastekk_workflow_sdk.workflow_node_registry", "WorkflowNodeRegistrationError"),
+    "register_node": ("canvastekk_workflow_sdk.workflow_node_registry", "register_workflow_node"),
+    "build_registry_payload": ("canvastekk_workflow_sdk.workflow_node_registry", "build_workflow_node_registry_payload"),
+}
+
 
 def __getattr__(name: str):
+    alias = _DEPRECATED_NAME_ALIASES.get(name)
+    if alias is not None:
+        import importlib
+        import warnings
+
+        module_path, new_name = alias
+        warnings.warn(
+            f"{name!r} is deprecated; use {new_name!r} from {module_path} "
+            "(ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        value = getattr(importlib.import_module(module_path), new_name)
+        globals()[name] = value
+        return value
     if name in _LAZY_SERVER_EXPORTS:
         try:
             import fastapi  # noqa: F401

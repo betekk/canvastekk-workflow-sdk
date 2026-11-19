@@ -12,25 +12,52 @@
  * @see https://github.com/betekk/canvastekk-workflow-sdk
  */
 export { VERSION } from "./version.js";
+
+// --- Deprecated name aliases (ADR 0001, #271; removal in 1.0.0, #272) ---
+/** @deprecated use WorkflowNodeColorPreset */
+export { WorkflowNodeColorPresetSchema as ColorPresetSchema, type WorkflowNodeColorPreset as ColorPreset } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeRetryConfig */
+export { WorkflowNodeRetryConfigSchema as RetryConfigSchema, type WorkflowNodeRetryConfig as RetryConfig } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeDeprecationInfo */
+export { WorkflowNodeDeprecationInfoSchema as DeprecationInfoSchema, type WorkflowNodeDeprecationInfo as DeprecationInfo } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeManifestContract */
+export { type WorkflowNodeManifestContract as NodeContract } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeContractCapabilities */
+export { type WorkflowNodeContractCapabilities as ContractCapabilities } from "./workflow-node-manifest.js";
+/** @deprecated use getWorkflowNodeManifestId */
+export { getWorkflowNodeManifestId as getNodeId } from "./workflow-node-manifest.js";
+/** @deprecated use diffWorkflowNodeManifests / WorkflowNodeManifestDiff */
+export { diffWorkflowNodeManifests as diffManifests, type WorkflowNodeManifestDiff as ManifestDiff } from "./workflow-node-manifest-diff.js";
+/** @deprecated use registerWorkflowNode */
+export { registerWorkflowNode as registerNode } from "./workflow-node-registry.js";
+/** @deprecated use WorkflowNodeRegistrationResult */
+export { type WorkflowNodeRegistrationResult as RegisterNodeResult } from "./workflow-node-registry.js";
+/** @deprecated use WorkflowNodeRegistrationError */
+export { WorkflowNodeRegistrationError as RegistrationError } from "./exceptions.js";
+/** @deprecated use buildWorkflowNodeRegistryPayload */
+export { buildWorkflowNodeRegistryPayload as buildRegistryPayload } from "./workflow-node-registry.js";
+/** @deprecated use exportWorkflowNodeManifest */
+export { exportWorkflowNodeManifest as exportDefinition } from "./workflow-node-registry.js";
+// --- end deprecated aliases ---
 export {
-  ColorPresetSchema,
+  WorkflowNodeColorPresetSchema,
   WorkflowNodeStylesSchema,
-  RetryConfigSchema,
+  WorkflowNodeRetryConfigSchema,
   WorkflowNodeManifestSchema,
   WorkflowNodeRoleSchema,
-  DeprecationInfoSchema,
-  getNodeId,
+  WorkflowNodeDeprecationInfoSchema,
+  getWorkflowNodeManifestId,
   getFileInputFields,
   getFileOutputFields,
   validateFileInput,
   effectiveRuntimeSeconds,
-  type ColorPreset,
+  type WorkflowNodeColorPreset,
   type WorkflowNodeStyles,
-  type RetryConfig,
+  type WorkflowNodeRetryConfig,
   type WorkflowNodeManifest,
   type WorkflowNodeRole,
-  type DeprecationInfo,
-} from "./definition.js";
+  type WorkflowNodeDeprecationInfo,
+} from "./workflow-node-manifest.js";
 export {
   NodeExecutionError,
   NodeTimeoutError,
@@ -40,7 +67,7 @@ export {
   NodeConfigurationError,
   WorkflowExecutionError,
   WorkflowValidationError,
-  RegistrationError,
+  WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
   ERROR_CATEGORIES,
@@ -131,16 +158,16 @@ export type {
   PlaneSetData,
 } from "./contracts/index.js";
 export {
-  buildRegistryPayload,
-  registerNode,
-  exportDefinition,
+  buildWorkflowNodeRegistryPayload,
+  registerWorkflowNode,
+  exportWorkflowNodeManifest,
   extractNodeData,
   registerNodeResultGet,
   registerNodeResultHas,
-} from "./registry.js";
-export type { InvokeType, RegisterNodeResult } from "./registry.js";
-export { diffManifests } from "./diff.js";
-export type { ManifestDiff } from "./diff.js";
+} from "./workflow-node-registry.js";
+export type { InvokeType, WorkflowNodeRegistrationResult } from "./workflow-node-registry.js";
+export { diffWorkflowNodeManifests } from "./workflow-node-manifest-diff.js";
+export type { WorkflowNodeManifestDiff } from "./workflow-node-manifest-diff.js";
 export {
   WorkflowBuilder,
   InProcessExecutor,

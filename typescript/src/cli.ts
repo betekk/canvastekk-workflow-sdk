@@ -29,15 +29,15 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
 
-import { WorkflowNodeManifestSchema, type WorkflowNodeManifest } from "./definition.js";
+import { WorkflowNodeManifestSchema, type WorkflowNodeManifest } from "./workflow-node-manifest.js";
 import {
-  buildRegistryPayload,
+  buildWorkflowNodeRegistryPayload,
   registryAuthHeader,
-  fetchPublishedDefinition,
-  diffAgainstPublished,
+  fetchPublishedWorkflowNodeManifest,
+  diffAgainstPublishedWorkflowNodeManifest,
   invalidCtkReason,
-} from "./registry.js";
-import { versionTuple, compareVersionTuples } from "./diff.js";
+} from "./workflow-node-registry.js";
+import { versionTuple, compareVersionTuples } from "./workflow-node-manifest-diff.js";
 
 const ENGINE_REQUEST_ALLOWED = new Set([
   "name",
@@ -89,14 +89,14 @@ export interface BuildEngineRequestOptions {
 /** Map a canonical manifest to the engine registration request (DA-2666 semantics).
  *
  * Delegates the field mapping to the shipped, engine-boundary-tested
- * buildRegistryPayload (single source of truth — the engine request is
+ * buildWorkflowNodeRegistryPayload (single source of truth — the engine request is
  * extra="forbid"), then applies the CLI-only name suffix.
  */
 export function buildEngineRequest(
   def: WorkflowNodeManifest,
   opts: BuildEngineRequestOptions = {},
 ): Record<string, unknown> {
-  const payload = buildRegistryPayload(def, { invokeUrl: opts.invokeUrl });
+  const payload = buildWorkflowNodeRegistryPayload(def, { invokeUrl: opts.invokeUrl });
   if (opts.nameSuffix) payload.name = def.slug + opts.nameSuffix;
   return payload;
 }
@@ -227,7 +227,7 @@ export async function applyRegistryDiff(
   }
   let published: Record<string, unknown> | null;
   try {
-    published = await fetchPublishedDefinition(engineUrl, String(payload.name ?? ""), { token });
+    published = await fetchPublishedWorkflowNodeManifest(engineUrl, String(payload.name ?? ""), { token });
   } catch (e) {
     report.warnings.push(`registry diff skipped (engine error: ${(e as Error).message})`);
     return;
@@ -247,7 +247,7 @@ export async function applyRegistryDiff(
     );
     return;
   }
-  const changed = diffAgainstPublished(payload, published).filter((f) => f !== "version");
+  const changed = diffAgainstPublishedWorkflowNodeManifest(payload, published).filter((f) => f !== "version");
   if (older) {
     report.registry_diff = { status: "older-version", published_version: publishedVersion, changed_fields: changed };
     report.valid = false;

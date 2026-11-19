@@ -30,7 +30,6 @@ from canvastekk_workflow_sdk._url import (
     validate_external_url,
 )
 from canvastekk_workflow_sdk.context import ExecutionContext, execution_context_var
-from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
 from canvastekk_workflow_sdk.exceptions import (
     IO_SUBCODE_DOWNLOAD_FAILED,
     IO_SUBCODE_SIZE_EXCEEDED,
@@ -46,6 +45,7 @@ from canvastekk_workflow_sdk.middleware import LoggingMiddleware, NodeMiddleware
 from canvastekk_workflow_sdk.observability import ExecutionMetric, MetricsCollector
 from canvastekk_workflow_sdk.request import NodeExecutionRequest
 from canvastekk_workflow_sdk.response import NodeExecutionResponse
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 logger = logging.getLogger(__name__)
 

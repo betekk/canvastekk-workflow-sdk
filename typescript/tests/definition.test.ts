@@ -2,16 +2,16 @@ import { describe, it, expect, vi } from "vitest";
 import {
   WorkflowNodeManifestSchema,
   WorkflowNodeRoleSchema,
-  DeprecationInfoSchema,
+  WorkflowNodeDeprecationInfoSchema,
   NodeContractSchema,
-  getNodeId,
+  getWorkflowNodeManifestId,
   getFileInputFields,
   getFileOutputFields,
   validateFileInput,
   effectiveRuntimeSeconds,
 } from "../src/definition.js";
 import { NodeValidationError } from "../src/exceptions.js";
-import { diffManifests } from "../src/diff.js";
+import { diffWorkflowNodeManifests } from "../src/diff.js";
 
 const validDefinition = {
   slug: "my-node",
@@ -203,9 +203,9 @@ describe("WorkflowNodeManifestSchema", () => {
   });
 });
 
-describe("getNodeId", () => {
+describe("getWorkflowNodeManifestId", () => {
   it("derives id from name and version", () => {
-    expect(getNodeId({ slug: "segment", version: "1.2.0" })).toBe(
+    expect(getWorkflowNodeManifestId({ slug: "segment", version: "1.2.0" })).toBe(
       "segment-v1.2.0",
     );
   });
@@ -359,13 +359,13 @@ describe("WorkflowNodeStylesSchema", () => {
   });
 });
 
-describe("DeprecationInfoSchema (DA-1582)", () => {
+describe("WorkflowNodeDeprecationInfoSchema (DA-1582)", () => {
   it("notice is required", () => {
-    expect(() => DeprecationInfoSchema.parse({})).toThrow();
+    expect(() => WorkflowNodeDeprecationInfoSchema.parse({})).toThrow();
   });
 
   it("optional fields default to null", () => {
-    const info = DeprecationInfoSchema.parse({ notice: "use echo-v2" });
+    const info = WorkflowNodeDeprecationInfoSchema.parse({ notice: "use echo-v2" });
     expect(info.notice).toBe("use echo-v2");
     expect(info.deprecated_at).toBeNull();
     expect(info.sunset_date).toBeNull();
@@ -374,7 +374,7 @@ describe("DeprecationInfoSchema (DA-1582)", () => {
   });
 
   it("parses a fully-populated deprecation (dates as ISO strings)", () => {
-    const info = DeprecationInfoSchema.parse({
+    const info = WorkflowNodeDeprecationInfoSchema.parse({
       deprecated_at: "2026-08-01",
       sunset_date: "2027-01-01",
       replacement_slug: "echo-v2",
@@ -512,7 +512,7 @@ describe("WorkflowNodeManifestSchema vocabulary compatibility (DA-2627)", () => 
 
   it("wire shape: standard fields + slug-derived id, no alias keys", () => {
     const def = WorkflowNodeManifestSchema.parse(validDefinition);
-    expect(getNodeId(def)).toBe("my-node-v1.0.0");
+    expect(getWorkflowNodeManifestId(def)).toBe("my-node-v1.0.0");
     expect(def.slug).toBe("my-node");
     expect(def.name).toBe("My Node");
     for (const absent of ["title", "node_name", "node_version"] as const) {
@@ -536,9 +536,9 @@ describe("WorkflowNodeManifestSchema safeParse parity (DA-2627 review)", () => {
     }
   });
 
-  it("diffManifests flags identity mismatch in registry-shaped (name-keyed) manifests", () => {
+  it("diffWorkflowNodeManifests flags identity mismatch in registry-shaped (name-keyed) manifests", () => {
     const base = { version: "1.0.0", input_schema: {}, output_schema: {} };
-    const diff = diffManifests(
+    const diff = diffWorkflowNodeManifests(
       { name: "old-node", ...base },
       { name: "new-node", version: "2.0.0", input_schema: {}, output_schema: {} },
     );

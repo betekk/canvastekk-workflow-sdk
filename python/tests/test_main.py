@@ -491,7 +491,7 @@ class TestProbeRegistryDiff:
                 return self._payload or {}
 
         return patch(
-            "canvastekk_workflow_sdk.registry.httpx.get",
+            "canvastekk_workflow_sdk.workflow_node_registry.httpx.get",
             return_value=_Resp(published),
         )
 
@@ -553,7 +553,7 @@ class TestProbeRegistryDiff:
         import httpx as _httpx
 
         with patch(
-            "canvastekk_workflow_sdk.registry.httpx.get",
+            "canvastekk_workflow_sdk.workflow_node_registry.httpx.get",
             side_effect=_httpx.ConnectError("engine unreachable"),
         ):
             report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)

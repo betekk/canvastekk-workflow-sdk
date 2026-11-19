@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from canvastekk_workflow_sdk.convergence import (
+from canvastekk_workflow_sdk.workflow_node_registry_convergence import (
     _delete,
     assert_staged,
     canonical_from_invoke_url,

@@ -13,9 +13,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from canvastekk_workflow_sdk import BaseNode
-from canvastekk_workflow_sdk.conformance import verify_node
-from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
-from canvastekk_workflow_sdk.registry import RegistrationError, register_node
+from canvastekk_workflow_sdk.workflow_node_conformance import verify_node
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
+from canvastekk_workflow_sdk.workflow_node_registry import WorkflowNodeRegistrationError, register_workflow_node
 
 MANIFEST = {
     "slug": "echo",
@@ -123,18 +123,18 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
 
     _patch_client(monkeypatch)(handler)
     monkeypatch.setattr(
-        "canvastekk_workflow_sdk.registry.httpx.post",
+        "canvastekk_workflow_sdk.workflow_node_registry.httpx.post",
         lambda url, **kw: post_urls.append(url) or httpx.Response(201, json={}, request=httpx.Request("POST", url)),
     )
 
     class FakeNode:
         definition = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
-    with pytest.raises(RegistrationError, match="conformance verification"):
-        register_node(
+    with pytest.raises(WorkflowNodeRegistrationError, match="conformance verification"):
+        register_workflow_node(
             FakeNode(),  # type: ignore[arg-type]
             "https://engine.test/api/workflows/nodes/",
             invoke_url="http://node.test",
@@ -157,7 +157,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     client = _transport(handler)
     monkeypatch.setattr(httpx, "Client", lambda **kw: client)
     monkeypatch.setattr(
-        "canvastekk_workflow_sdk.registry.httpx.post",
+        "canvastekk_workflow_sdk.workflow_node_registry.httpx.post",
         lambda url, **kw: (
             post_calls.append(url)
             or httpx.Response(
@@ -171,10 +171,10 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     class FakeNode:
         definition = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
-    result = register_node(
+    result = register_workflow_node(
         FakeNode(),  # type: ignore[arg-type]
         "https://engine.test/api/workflows/nodes/",
         invoke_url="http://node.test",
@@ -193,11 +193,11 @@ def test_register_node_verify_requires_invoke_url(monkeypatch) -> None:
     class FakeNode:
         definition = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
     with pytest.raises(ValueError, match="invoke_url"):
-        register_node(
+        register_workflow_node(
             FakeNode(),  # type: ignore[arg-type]
             "https://engine.test/api/workflows/nodes/",
             invoke_type="http",
@@ -344,7 +344,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
         return _R()
 
     _patch_client(monkeypatch)(_dry_run_handler)
-    import canvastekk_workflow_sdk.conformance as conf
+    import canvastekk_workflow_sdk.workflow_node_conformance as conf
 
     monkeypatch.setattr(conf, "verify_node", fake_verify)
     from canvastekk_workflow_sdk.__main__ import main

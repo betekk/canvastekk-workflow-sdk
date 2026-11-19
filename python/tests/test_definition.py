@@ -1,4 +1,4 @@
-"""Tests for WorkflowNodeManifest and RetryConfig models."""
+"""Tests for WorkflowNodeManifest and WorkflowNodeRetryConfig models."""
 
 import json
 import tempfile
@@ -8,24 +8,24 @@ import pytest
 from pydantic import ValidationError
 
 from canvastekk_workflow_sdk import (
-    ContractCapabilities,
-    DeprecationInfo,
-    NodeContract,
-    RetryConfig,
+    WorkflowNodeContractCapabilities,
+    WorkflowNodeDeprecationInfo,
     WorkflowNodeManifest,
+    WorkflowNodeManifestContract,
+    WorkflowNodeRetryConfig,
     WorkflowNodeRole,
     WorkflowNodeStyles,
 )
 from canvastekk_workflow_sdk.contracts import build_check_output_schema
-from canvastekk_workflow_sdk.definition import export_definition
+from canvastekk_workflow_sdk.workflow_node_manifest import export_workflow_node_manifest
 
 
 class TestRetryConfig:
-    """Tests for RetryConfig model."""
+    """Tests for WorkflowNodeRetryConfig model."""
 
     def test_default_values(self) -> None:
         """Test default retry configuration."""
-        config = RetryConfig()
+        config = WorkflowNodeRetryConfig()
         assert config.max_attempts == 1
         assert config.initial_delay_ms == 1000
         assert config.backoff_multiplier == 2.0
@@ -33,7 +33,7 @@ class TestRetryConfig:
 
     def test_custom_values(self) -> None:
         """Test custom retry configuration."""
-        config = RetryConfig(
+        config = WorkflowNodeRetryConfig(
             max_attempts=3,
             initial_delay_ms=500,
             backoff_multiplier=1.5,
@@ -47,12 +47,12 @@ class TestRetryConfig:
     def test_validation_max_attempts_minimum(self) -> None:
         """Test that max_attempts must be at least 1."""
         with pytest.raises(ValueError):
-            RetryConfig(max_attempts=0)
+            WorkflowNodeRetryConfig(max_attempts=0)
 
     def test_validation_backoff_multiplier_minimum(self) -> None:
         """Test that backoff_multiplier must be at least 1.0."""
         with pytest.raises(ValueError):
-            RetryConfig(backoff_multiplier=0.5)
+            WorkflowNodeRetryConfig(backoff_multiplier=0.5)
 
 
 class TestWorkflowNodeRole:
@@ -131,7 +131,7 @@ class TestWorkflowNodeManifest:
                 },
             },
             token_cost=5.0,
-            default_retry=RetryConfig(max_attempts=3),
+            default_retry=WorkflowNodeRetryConfig(max_attempts=3),
             category="inference",
             timeout_seconds=300,
         )
@@ -458,10 +458,10 @@ class TestWorkflowNodeManifest:
 
 
 class TestExportDefinition:
-    """Tests for export_definition function (Phase 3)."""
+    """Tests for export_workflow_node_manifest function (Phase 3)."""
 
     def test_export_definition_creates_registry_compatible_json(self) -> None:
-        """Test that export_definition creates registry-compatible JSON."""
+        """Test that export_workflow_node_manifest creates registry-compatible JSON."""
         definition = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
@@ -482,7 +482,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            result_path = export_definition(definition, output_path)
+            result_path = export_workflow_node_manifest(definition, output_path)
 
             assert result_path == output_path
             assert output_path.exists()
@@ -513,7 +513,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             data = json.loads(output_path.read_text())
             assert "label" in data
@@ -522,7 +522,7 @@ class TestExportDefinition:
 
     def test_export_definition_maps_default_retry_to_retry(self) -> None:
         """Test that default_retry field is mapped to retry."""
-        retry_config = RetryConfig(
+        retry_config = WorkflowNodeRetryConfig(
             max_attempts=3,
             initial_delay_ms=500,
             backoff_multiplier=1.5,
@@ -540,7 +540,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             data = json.loads(output_path.read_text())
             assert "retry" in data
@@ -550,7 +550,7 @@ class TestExportDefinition:
             assert data["retry"]["max_delay_ms"] == 10000
 
     def test_export_definition_includes_all_required_fields(self) -> None:
-        """Test that export_definition includes all required fields."""
+        """Test that export_workflow_node_manifest includes all required fields."""
         definition = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
@@ -562,7 +562,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             data = json.loads(output_path.read_text())
             required_fields = [
@@ -599,7 +599,7 @@ class TestExportDefinition:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
             with _pytest.raises(ValueError, match="not a\\s+supported platform surface"):
-                export_definition(definition, output_path, invoke_type="lambda")
+                export_workflow_node_manifest(definition, output_path, invoke_type="lambda")
             assert not output_path.exists()
 
     def test_export_definition_with_invoke_url(self) -> None:
@@ -615,7 +615,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, invoke_url="https://node.example.com")
+            export_workflow_node_manifest(definition, output_path, invoke_url="https://node.example.com")
 
             data = json.loads(output_path.read_text())
             assert data["invoke_url"] == "https://node.example.com"
@@ -634,7 +634,7 @@ class TestExportDefinition:
         tags = ["machine-learning", "segmentation", "point-cloud"]
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, tags=tags)
+            export_workflow_node_manifest(definition, output_path, tags=tags)
 
             data = json.loads(output_path.read_text())
             assert data["tags"] == tags
@@ -653,7 +653,7 @@ class TestExportDefinition:
         custom_styles = {"icon": "Brain", "color": "emerald"}
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, styles=custom_styles)
+            export_workflow_node_manifest(definition, output_path, styles=custom_styles)
 
             data = json.loads(output_path.read_text())
             assert data["styles"] == custom_styles
@@ -673,7 +673,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             data = json.loads(output_path.read_text())
             assert data["styles"] == {"icon": "Box", "color": "blue"}
@@ -692,7 +692,7 @@ class TestExportDefinition:
         constraints = {"gpu_required": True, "memory_gb": 8}
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, constraints=constraints)
+            export_workflow_node_manifest(definition, output_path, constraints=constraints)
 
             data = json.loads(output_path.read_text())
             assert data["constraints"]["gpu_required"] is True
@@ -712,13 +712,13 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path, node_status="inactive")
+            export_workflow_node_manifest(definition, output_path, node_status="inactive")
 
             data = json.loads(output_path.read_text())
             assert data["node_status"] == "inactive"
 
     def test_export_definition_creates_parent_directories(self) -> None:
-        """Test that export_definition creates parent directories."""
+        """Test that export_workflow_node_manifest creates parent directories."""
         definition = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
@@ -730,14 +730,14 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "nested" / "dir" / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             assert output_path.exists()
             data = json.loads(output_path.read_text())
             assert data["name"] == "test"
 
     def test_export_definition_writes_formatted_json(self) -> None:
-        """Test that export_definition writes formatted JSON with newlines."""
+        """Test that export_workflow_node_manifest writes formatted JSON with newlines."""
         definition = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
@@ -749,7 +749,7 @@ class TestExportDefinition:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
 
             content = output_path.read_text()
             assert content.endswith("\n")
@@ -1017,14 +1017,14 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
             data = json.loads(output_path.read_text())
             assert "id" not in data
             assert data["name"] == "test"
             assert data["version"] == "1.0.0"
 
     def test_export_omits_deprecation_when_none(self) -> None:
-        """DA-1582 hardening: export_definition routes through build_registry_payload (CR3)."""
+        """DA-1582 hardening: export_workflow_node_manifest routes through build_workflow_node_registry_payload (CR3)."""
         definition = WorkflowNodeManifest(
             slug="test",
             version="1.0.0",
@@ -1035,12 +1035,12 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
             data = json.loads(output_path.read_text())
             assert "deprecation" not in data
 
     def test_export_includes_deprecation_when_set(self) -> None:
-        """DA-1582 hardening: export_definition writes the deprecation field (CR3)."""
+        """DA-1582 hardening: export_workflow_node_manifest writes the deprecation field (CR3)."""
         from datetime import date
 
         definition = WorkflowNodeManifest(
@@ -1050,7 +1050,7 @@ class TestExportDefinitionNoId:
             description="Test",
             input_schema={"type": "object"},
             output_schema={"type": "object"},
-            deprecation=DeprecationInfo(
+            deprecation=WorkflowNodeDeprecationInfo(
                 deprecated_at=date(2026, 8, 1),
                 sunset_date=date(2027, 1, 1),
                 replacement_slug="test-v2",
@@ -1060,7 +1060,7 @@ class TestExportDefinitionNoId:
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "test.json"
-            export_definition(definition, output_path)
+            export_workflow_node_manifest(definition, output_path)
             data = json.loads(output_path.read_text())
             assert data["deprecation"] == {
                 "deprecated_at": "2026-08-01",
@@ -1072,15 +1072,15 @@ class TestExportDefinitionNoId:
 
 
 class TestDeprecationInfo:
-    """Tests for DeprecationInfo model (DA-1582)."""
+    """Tests for WorkflowNodeDeprecationInfo model (DA-1582)."""
 
     def test_notice_is_required(self) -> None:
         """notice is the only required field."""
         with pytest.raises(ValueError):
-            DeprecationInfo()  # type: ignore[call-arg]
+            WorkflowNodeDeprecationInfo()  # type: ignore[call-arg]
 
     def test_optional_fields_default_none(self) -> None:
-        info = DeprecationInfo(notice="use echo-v2")
+        info = WorkflowNodeDeprecationInfo(notice="use echo-v2")
         assert info.deprecated_at is None
         assert info.sunset_date is None
         assert info.replacement_slug is None
@@ -1090,7 +1090,7 @@ class TestDeprecationInfo:
     def test_full_population(self) -> None:
         from datetime import date
 
-        info = DeprecationInfo(
+        info = WorkflowNodeDeprecationInfo(
             deprecated_at=date(2026, 8, 1),
             sunset_date=date(2027, 1, 1),
             replacement_slug="echo-v2",
@@ -1131,7 +1131,7 @@ class TestManifestDeprecationSerialization:
 
         manifest = self._minimal().model_copy(
             update={
-                "deprecation": DeprecationInfo(
+                "deprecation": WorkflowNodeDeprecationInfo(
                     deprecated_at=date(2026, 8, 1),
                     sunset_date=date(2027, 1, 1),
                     replacement_slug="echo-v2",
@@ -1150,7 +1150,7 @@ class TestManifestDeprecationSerialization:
         }
 
     def test_model_dump_includes_deprecation_when_set(self) -> None:
-        manifest = self._minimal().model_copy(update={"deprecation": DeprecationInfo(notice="retire soon")})
+        manifest = self._minimal().model_copy(update={"deprecation": WorkflowNodeDeprecationInfo(notice="retire soon")})
         assert manifest.model_dump(mode="json")["deprecation"] == {
             "deprecated_at": None,
             "sunset_date": None,
@@ -1166,7 +1166,7 @@ class TestManifestDeprecationSerialization:
 
         manifest = self._minimal().model_copy(
             update={
-                "deprecation": DeprecationInfo(
+                "deprecation": WorkflowNodeDeprecationInfo(
                     deprecated_at=date(2026, 8, 1),
                     sunset_date=date(2027, 1, 1),
                     replacement_slug="echo-v2",
@@ -1189,7 +1189,7 @@ class TestManifestDeprecationSerialization:
         from datetime import date
 
         manifest = self._minimal().model_copy(
-            update={"deprecation": DeprecationInfo(sunset_date=date(2027, 1, 1), notice="x")}
+            update={"deprecation": WorkflowNodeDeprecationInfo(sunset_date=date(2027, 1, 1), notice="x")}
         )
         sunset = manifest.to_dict()["deprecation"]["sunset_date"]
         assert sunset == "2027-01-01"
@@ -1439,11 +1439,11 @@ class TestHardMaxRuntimeSeconds:
         assert dump["hard_max_runtime_seconds"] == 7200
 
     def test_export_round_trip_preserves_override(self, tmp_path) -> None:
-        from canvastekk_workflow_sdk.definition import export_definition
+        from canvastekk_workflow_sdk.workflow_node_manifest import export_workflow_node_manifest
 
         m = self._manifest(timeout_seconds=9000, hard_max=14400)
         out = tmp_path / "manifest.json"
-        export_definition(m, out)
+        export_workflow_node_manifest(m, out)
         data = json.loads(out.read_text())
         assert data["hard_max_runtime_seconds"] == 14400
         reloaded = WorkflowNodeManifest.model_validate({**data, "slug": "echo"})
@@ -1467,20 +1467,20 @@ class TestNodeContract:
         return WorkflowNodeManifest(**defaults)
 
     def test_valid_minimum_subset_accepted(self) -> None:
-        contract = NodeContract(routes=["/execute", "/health", "/manifest"])
+        contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"])
         assert contract.transport == "http"
         assert contract.openapi == "3.2"
         assert contract.capabilities.dry_run is False
 
     def test_full_vocabulary_accepted(self) -> None:
         routes = ["/execute", "/health", "/manifest", "/hook", "/metrics", "/live", "/ready"]
-        assert NodeContract(routes=routes).routes == routes
+        assert WorkflowNodeManifestContract(routes=routes).routes == routes
 
     def test_optional_openapi_route_accepted(self) -> None:
         """#113: /openapi joins the vocabulary as an OPTIONAL (non-minimum) route."""
-        contract = NodeContract(routes=["/execute", "/health", "/manifest", "/openapi"])
+        contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/openapi"])
         assert "/openapi" in contract.routes
-        assert NodeContract(routes=["/execute", "/health", "/manifest"]).routes == [
+        assert WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]).routes == [
             "/execute",
             "/health",
             "/manifest",
@@ -1488,22 +1488,22 @@ class TestNodeContract:
 
     def test_unknown_route_rejected_with_named_error(self) -> None:
         with pytest.raises(ValidationError, match=r"routes.*vocabulary"):
-            NodeContract(routes=["/execute", "/health", "/manifest", "/nope"])
+            WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/nope"])
 
     def test_missing_minimum_route_rejected_with_named_error(self) -> None:
         with pytest.raises(ValidationError, match=r"routes.*missing required route"):
-            NodeContract(routes=["/health", "/manifest"])
+            WorkflowNodeManifestContract(routes=["/health", "/manifest"])
 
     def test_duplicate_route_rejected_with_named_error(self) -> None:
         with pytest.raises(ValidationError, match=r"routes.*duplicate"):
-            NodeContract(routes=["/execute", "/health", "/manifest", "/health"])
+            WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/health"])
 
     def test_contract_omitted_when_unset(self) -> None:
         """Legacy nodes serialize byte-identically (no contract key)."""
         assert "contract" not in self._manifest().to_dict()
 
     def test_contract_serialized_when_set(self) -> None:
-        manifest = self._manifest(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        manifest = self._manifest(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
         data = manifest.to_dict()
         assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
         assert data["contract"]["capabilities"] == {"dry_run": False}
@@ -1511,9 +1511,9 @@ class TestNodeContract:
 
     def test_round_trip(self) -> None:
         manifest = self._manifest(
-            contract=NodeContract(
+            contract=WorkflowNodeManifestContract(
                 routes=["/execute", "/health", "/manifest"],
-                capabilities=ContractCapabilities(dry_run=True),
+                capabilities=WorkflowNodeContractCapabilities(dry_run=True),
             )
         )
         rebuilt = WorkflowNodeManifest.model_validate(manifest.to_dict())
@@ -1533,5 +1533,5 @@ class TestNodeContract:
         ]
 
     def test_effective_contract_declared_wins(self) -> None:
-        manifest = self._manifest(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
+        manifest = self._manifest(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
         assert manifest.effective_contract.routes == ["/execute", "/health", "/manifest"]

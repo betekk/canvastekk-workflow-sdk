@@ -8,7 +8,7 @@ import {
   NodeConfigurationError,
   WorkflowExecutionError,
   WorkflowValidationError,
-  RegistrationError,
+  WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
   ERROR_CATEGORIES,
@@ -120,16 +120,16 @@ describe("WorkflowValidationError", () => {
   });
 });
 
-describe("RegistrationError", () => {
+describe("WorkflowNodeRegistrationError", () => {
   it("extracts message from body", () => {
-    const err = new RegistrationError(400, { detail: "Already exists" });
+    const err = new WorkflowNodeRegistrationError(400, { detail: "Already exists" });
     expect(err.statusCode).toBe(400);
     expect(err.message).toBe("Already exists");
     expect(err.body).toEqual({ detail: "Already exists" });
   });
 
   it("falls back to generic message", () => {
-    const err = new RegistrationError(500, {});
+    const err = new WorkflowNodeRegistrationError(500, {});
     expect(err.message).toBe("Registration failed with status 500");
   });
 });

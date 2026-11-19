@@ -44,19 +44,19 @@ def _py_public(path: Path) -> set[str]:
 # (a) The mirror cluster: explicit pairs. Every pair must exist on BOTH sides.
 # ---------------------------------------------------------------------------
 MIRROR_PAIRS: dict[tuple[str, str], dict[str, str]] = {
-    ("registry.py", "registry.ts"): {
+    ("workflow_node_registry.py", "workflow-node-registry.ts"): {
         "registry_auth_header": "registryAuthHeader",
         "invalid_ctk_reason": "invalidCtkReason",
-        "register_node": "registerNode",
-        "fetch_published_definition": "fetchPublishedDefinition",
-        "diff_against_published": "diffAgainstPublished",
-        "build_registry_payload": "buildRegistryPayload",
+        "register_workflow_node": "registerWorkflowNode",
+        "fetch_published_workflow_node_manifest": "fetchPublishedWorkflowNodeManifest",
+        "diff_against_published_workflow_node_manifest": "diffAgainstPublishedWorkflowNodeManifest",
+        "build_workflow_node_registry_payload": "buildWorkflowNodeRegistryPayload",
         "ENGINE_NON_COMPARISON_FIELDS": "ENGINE_NON_COMPARISON_FIELDS",
         "CTK_PREFIX": "CTK_PREFIX",
         "CTK_BODY_LENGTH": "CTK_BODY_LENGTH",
     },
-    ("diff.py", "diff.ts"): {
-        "diff_manifests": "diffManifests",
+    ("workflow_node_manifest_diff.py", "workflow-node-manifest-diff.ts"): {
+        "diff_workflow_node_manifests": "diffWorkflowNodeManifests",
     },
     ("__main__.py", "cli.ts"): {
         "main": "cliMain",
@@ -69,12 +69,12 @@ PY_ONLY = {
     # py exposes the validator's alphabet; ts keeps its Set private.
     "CTK_BODY_ALPHABET",
     # py result/error are classes; ts shapes are types/interfaces (not runtime exports).
-    "RegisterNodeResult",
-    "RegistrationError",
+    "WorkflowNodeRegistrationResult",
+    "WorkflowNodeRegistrationError",
     # py diff internals are data/typedefs; ts inlines them.
-    "ManifestDiff",
+    "WorkflowNodeManifestDiff",
     "VERSION_BUMPS",
-    # invoke-type gates: py uses module constants; ts uses a private Set in registry.ts.
+    # invoke-type gates: py uses module constants; ts uses a private Set in workflow-node-registry.ts.
     "VALID_INVOKE_TYPES",
     "UNSUPPORTED_INVOKE_TYPES",
 }
@@ -82,7 +82,10 @@ TS_ONLY = {
     # exported by #237 for the probe wiring; py keeps _version_tuple private (visibility asymmetry, accepted).
     "versionTuple",
     "compareVersionTuples",
-    # ts result accessors; py's RegisterNodeResult is dict-like instead.
+    # ts registry module re-exports the manifest exporter for the CLI probe;
+    # py keeps export_workflow_node_manifest in workflow_node_manifest.py (ADR 0001).
+    "exportWorkflowNodeManifest",
+    # ts result accessors; py's WorkflowNodeRegistrationResult is dict-like instead.
     "registerNodeResultGet",
     "registerNodeResultHas",
     "extractNodeData",
@@ -161,8 +164,8 @@ def test_ctk_bin_on_both_packages() -> None:
 #     runtimes) with no guard — this pins the SDK two equal.
 # ---------------------------------------------------------------------------
 def test_ctk_shape_literals_identical_across_runtimes() -> None:
-    py_src = (PY / "registry.py").read_text()
-    ts_src = (TS / "registry.ts").read_text()
+    py_src = (PY / "workflow_node_registry.py").read_text()
+    ts_src = (TS / "workflow-node-registry.ts").read_text()
 
     def const(src: str, name: str) -> str:
         m = re.search(rf'{name}(?::[^=\n]+)?\s*=\s*(\d+|"[^"]*")', src)

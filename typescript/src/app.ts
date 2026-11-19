@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { VERSION } from "./version.js";
-import { getNodeId, getFileOutputFields, effectiveRuntimeSeconds, effectiveContract } from "./definition.js";
+import { getWorkflowNodeManifestId, getFileOutputFields, effectiveRuntimeSeconds, effectiveContract } from "./workflow-node-manifest.js";
 import { NodeTimeoutError, NodeExecutionError, getHttpStatusForError } from "./exceptions.js";
 import { configureLogging } from "./logging.js";
 import { enforceSupportHorizon } from "./support-horizon.js";
@@ -208,7 +208,7 @@ export function createNodeApp(
       const def = node.nodeDefinition;
       const resp = HealthResponseSchema.parse({
         status,
-        node_id: getNodeId(def),
+        node_id: getWorkflowNodeManifestId(def),
         version: def.version,
         checks,
       });
@@ -223,7 +223,7 @@ export function createNodeApp(
     try {
       const def = node.nodeDefinition;
       const content: Record<string, unknown> = { ...def };
-      content.id = getNodeId(def);
+      content.id = getWorkflowNodeManifestId(def);
       content.sdk_version = VERSION;
       if (codeDigest !== null) content.code_digest = codeDigest;
 
@@ -287,9 +287,9 @@ export function createNodeApp(
       const checks = node.healthCheck();
       const def = node.nodeDefinition;
       if (Object.keys(checks).length === 0 || Object.values(checks).every(Boolean)) {
-        res.json({ status: "ready", node_id: getNodeId(def), checks });
+        res.json({ status: "ready", node_id: getWorkflowNodeManifestId(def), checks });
       } else {
-        res.status(503).json({ status: "not_ready", node_id: getNodeId(def), checks });
+        res.status(503).json({ status: "not_ready", node_id: getWorkflowNodeManifestId(def), checks });
       }
     } catch (err) {
       next(err);

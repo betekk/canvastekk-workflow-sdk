@@ -19,10 +19,10 @@ vi.mock("../src/logging.js", () => ({
 
 import { BaseNode } from "../src/base-node.js";
 import { WorkflowNodeManifestSchema } from "../src/definition.js";
-import { buildRegistryPayload } from "../src/registry.js";
-import type { WorkflowNodeManifest, DeprecationInfo } from "../src/definition.js";
+import { buildWorkflowNodeRegistryPayload } from "../src/registry.js";
+import type { WorkflowNodeManifest, WorkflowNodeDeprecationInfo } from "../src/definition.js";
 
-const fullDeprecation: DeprecationInfo = {
+const fullDeprecation: WorkflowNodeDeprecationInfo = {
   deprecated_at: "2026-09-03",
   sunset_date: "2027-01-01",
   replacement_slug: "echo-v2",
@@ -30,7 +30,7 @@ const fullDeprecation: DeprecationInfo = {
   notice: "use echo-v2",
 };
 
-const baseManifest = (deprecation?: DeprecationInfo): WorkflowNodeManifest => ({
+const baseManifest = (deprecation?: WorkflowNodeDeprecationInfo): WorkflowNodeManifest => ({
   slug: "echo",
   version: "1.0.0",
   name: "Echo",
@@ -48,7 +48,7 @@ const baseManifest = (deprecation?: DeprecationInfo): WorkflowNodeManifest => ({
   ...(deprecation !== undefined ? { deprecation } : {}),
 });
 
-function makeNode(deprecation?: DeprecationInfo): BaseNode {
+function makeNode(deprecation?: WorkflowNodeDeprecationInfo): BaseNode {
   class TestNode extends BaseNode {
     definition: WorkflowNodeManifest = baseManifest(deprecation);
 
@@ -66,7 +66,7 @@ describe("deprecation pipeline (DA-2312, parity with Python v0.25.0)", () => {
 
   describe("registry payload emission", () => {
     it("emits the full 5-key dump when deprecation is set", () => {
-      const payload = buildRegistryPayload(baseManifest(fullDeprecation));
+      const payload = buildWorkflowNodeRegistryPayload(baseManifest(fullDeprecation));
       expect(payload.deprecation).toEqual({
         deprecated_at: "2026-09-03",
         sunset_date: "2027-01-01",
@@ -77,12 +77,12 @@ describe("deprecation pipeline (DA-2312, parity with Python v0.25.0)", () => {
     });
 
     it("omits deprecation when null", () => {
-      const payload = buildRegistryPayload(baseManifest());
+      const payload = buildWorkflowNodeRegistryPayload(baseManifest());
       expect(payload).not.toHaveProperty("deprecation");
     });
   });
 
-  describe("DeprecationInfo validation", () => {
+  describe("WorkflowNodeDeprecationInfo validation", () => {
     it("rejects sunset_date before deprecated_at", () => {
       expect(() =>
         WorkflowNodeManifestSchema.parse(

@@ -7,8 +7,8 @@ import { once } from "node:events";
 import AjvModule from "ajv";
 const Ajv = AjvModule.default ?? AjvModule;
 import type { ValidateFunction } from "ajv";
-import type { WorkflowNodeManifest } from "./definition.js";
-import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds, effectiveContract } from "./definition.js";
+import type { WorkflowNodeManifest } from "./workflow-node-manifest.js";
+import { WorkflowNodeManifestSchema, getFileInputFields, validateFileInput, effectiveRuntimeSeconds, effectiveContract } from "./workflow-node-manifest.js";
 import {
   DEFAULT_MAX_DOWNLOAD_BYTES,
   MAX_REDIRECT_HOPS,

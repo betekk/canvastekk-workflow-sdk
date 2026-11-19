@@ -296,7 +296,7 @@ export class WorkflowValidationError extends NodeExecutionError {
 /**
  * Error thrown when node registration fails.
  */
-export class RegistrationError extends Error {
+export class WorkflowNodeRegistrationError extends Error {
   readonly statusCode: number;
   readonly body: Record<string, unknown>;
   /** Engine error code from the envelope, or null when unmapped. */
@@ -305,14 +305,14 @@ export class RegistrationError extends Error {
   readonly guidance: string | null;
 
   /**
-   * Creates a new RegistrationError.
+   * Creates a new WorkflowNodeRegistrationError.
    * @param statusCode - HTTP status code
    * @param body - Response body with error details
    */
   constructor(statusCode: number, body: Record<string, unknown>) {
     const message = body.detail?.toString() ?? body.message?.toString() ?? `Registration failed with status ${statusCode}`;
     super(message);
-    this.name = "RegistrationError";
+    this.name = "WorkflowNodeRegistrationError";
     this.statusCode = statusCode;
     this.body = body;
     const derived = deriveCodeAndGuidance(body, statusCode);

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { diffManifests } from "../src/diff.js";
+import { diffWorkflowNodeManifests } from "../src/diff.js";
 
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -19,7 +19,7 @@ describe("breaking classification", () => {
     const old = manifest({ output_schema: { type: "object", properties: { result: { type: "string" } } } });
     const next = manifest({ version: "2.0.0", output_schema: { type: "object", properties: {} } });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(true);
     expect(diff.breakingChanges.some((e) => e.includes("removed output") && e.includes("result"))).toBe(true);
@@ -36,7 +36,7 @@ describe("breaking classification", () => {
       },
     });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(true);
     expect(diff.breakingChanges.some((e) => e.includes("new required input") && e.includes("data"))).toBe(true);
@@ -46,7 +46,7 @@ describe("breaking classification", () => {
     const old = manifest({ output_schema: { type: "object", properties: { result: { type: "string" } } } });
     const next = manifest({ version: "2.0.0", output_schema: { type: "object", properties: {} } });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(true);
     expect(diff.errors.some((e) => e.includes("MAJOR"))).toBe(false);
@@ -61,7 +61,7 @@ describe("non-breaking classification", () => {
       input_schema: { type: "object", properties: { opt: { type: "string" } }, required: [] },
     });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(false);
     expect(diff.nonBreakingChanges.some((e) => e.includes("new optional input") && e.includes("opt"))).toBe(true);
@@ -72,7 +72,7 @@ describe("non-breaking classification", () => {
     const old = manifest();
     const next = manifest({ version: "1.1.0", output_schema: { type: "object", properties: { extra: { type: "string" } } } });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(false);
     expect(diff.nonBreakingChanges.some((e) => e.includes("new output") && e.includes("extra"))).toBe(true);
@@ -82,7 +82,7 @@ describe("non-breaking classification", () => {
     const old = manifest({ name: "Old Title" });
     const next = manifest({ version: "1.0.1", name: "New Title" });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(false);
     expect(diff.nonBreakingChanges.some((e) => e.includes("metadata") && e.includes("name"))).toBe(true);
@@ -91,14 +91,14 @@ describe("non-breaking classification", () => {
 
 describe("version rules", () => {
   it("same version with change is error", () => {
-    const diff = diffManifests(manifest({ name: "Old" }), manifest({ name: "New" }));
+    const diff = diffWorkflowNodeManifests(manifest({ name: "Old" }), manifest({ name: "New" }));
 
     expect(diff.breaking).toBe(false);
     expect(diff.errors.some((e) => e.includes("same version"))).toBe(true);
   });
 
   it("same version identical is clean", () => {
-    const diff = diffManifests(manifest(), manifest());
+    const diff = diffWorkflowNodeManifests(manifest(), manifest());
 
     expect(diff.breaking).toBe(false);
     expect(diff.breakingChanges).toEqual([]);
@@ -110,21 +110,21 @@ describe("version rules", () => {
     const old = manifest({ output_schema: { type: "object", properties: { result: { type: "string" } } } });
     const next = manifest({ version: "1.1.0", output_schema: { type: "object", properties: {} } });
 
-    const diff = diffManifests(old, next);
+    const diff = diffWorkflowNodeManifests(old, next);
 
     expect(diff.breaking).toBe(true);
     expect(diff.errors.some((e) => e.includes("MAJOR version bump"))).toBe(true);
   });
 
   it("version bump classification", () => {
-    expect(diffManifests(manifest(), manifest({ version: "2.0.0" })).versionBump).toBe("major");
-    expect(diffManifests(manifest(), manifest({ version: "1.1.0" })).versionBump).toBe("minor");
-    expect(diffManifests(manifest(), manifest({ version: "1.0.1" })).versionBump).toBe("patch");
-    expect(diffManifests(manifest(), manifest()).versionBump).toBeNull();
+    expect(diffWorkflowNodeManifests(manifest(), manifest({ version: "2.0.0" })).versionBump).toBe("major");
+    expect(diffWorkflowNodeManifests(manifest(), manifest({ version: "1.1.0" })).versionBump).toBe("minor");
+    expect(diffWorkflowNodeManifests(manifest(), manifest({ version: "1.0.1" })).versionBump).toBe("patch");
+    expect(diffWorkflowNodeManifests(manifest(), manifest()).versionBump).toBeNull();
   });
 
   it("versions recorded on result", () => {
-    const diff = diffManifests(manifest(), manifest({ version: "1.1.0" }));
+    const diff = diffWorkflowNodeManifests(manifest(), manifest({ version: "1.1.0" }));
 
     expect(diff.oldVersion).toBe("1.0.0");
     expect(diff.newVersion).toBe("1.1.0");
@@ -133,24 +133,24 @@ describe("version rules", () => {
 
 describe("error cases", () => {
   it("name mismatch is error", () => {
-    const diff = diffManifests(manifest({ slug: "old-node" }), manifest({ slug: "new-node", version: "2.0.0" }));
+    const diff = diffWorkflowNodeManifests(manifest({ slug: "old-node" }), manifest({ slug: "new-node", version: "2.0.0" }));
 
     expect(diff.errors.some((e) => e.includes("slug mismatch"))).toBe(true);
   });
 
   it("missing version is error", () => {
-    const diff = diffManifests({ slug: "test-node", input_schema: {} }, manifest({ version: "1.1.0" }));
+    const diff = diffWorkflowNodeManifests({ slug: "test-node", input_schema: {} }, manifest({ version: "1.1.0" }));
 
     expect(diff.errors.some((e) => e.includes("version"))).toBe(true);
   });
 
   it("non-strict version is error", () => {
-    const diff = diffManifests(manifest({ version: "1.0" }), manifest({ version: "1.1" }));
+    const diff = diffWorkflowNodeManifests(manifest({ version: "1.0" }), manifest({ version: "1.1" }));
 
     expect(diff.errors.some((e) => e.includes("MAJOR.MINOR.PATCH"))).toBe(true);
   });
 
   it("non-object input throws TypeError", () => {
-    expect(() => diffManifests("not an object", manifest())).toThrow(TypeError);
+    expect(() => diffWorkflowNodeManifests("not an object", manifest())).toThrow(TypeError);
   });
 });

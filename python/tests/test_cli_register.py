@@ -15,7 +15,7 @@ from canvastekk_workflow_sdk.__main__ import (
     _run_register,
     main,
 )
-from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 
 def _manifest(**overrides) -> WorkflowNodeManifest:
@@ -188,10 +188,10 @@ class TestProbeValueDomain:
         assert any("timeout_seconds" in e for e in report["errors"])
 
     def test_build_delegates_to_shipped_builder(self) -> None:
-        from canvastekk_workflow_sdk.registry import build_registry_payload
+        from canvastekk_workflow_sdk.workflow_node_registry import build_workflow_node_registry_payload
 
         m = _manifest(minimum_sdk_version="0.27.0", docs_url="https://docs.example.com")
-        assert _build_engine_request(m) == build_registry_payload(m, invoke_url=None)
+        assert _build_engine_request(m) == build_workflow_node_registry_payload(m, invoke_url=None)
 
 
 class TestRegisterManifestFileInput:
@@ -244,7 +244,7 @@ class TestRegistryConvergenceCommand:
     """DA-3086: the registry-convergence subcommand routes to convergence.main."""
 
     def test_help_exits_zero(self, capsys) -> None:
-        from canvastekk_workflow_sdk.convergence import main as convergence_main
+        from canvastekk_workflow_sdk.workflow_node_registry_convergence import main as convergence_main
 
         with pytest.raises(SystemExit) as exc:
             convergence_main(["--help"])
@@ -252,7 +252,7 @@ class TestRegistryConvergenceCommand:
         assert "--registry-base" in capsys.readouterr().out
 
     def test_missing_required_args_exit_2(self) -> None:
-        from canvastekk_workflow_sdk.convergence import main as convergence_main
+        from canvastekk_workflow_sdk.workflow_node_registry_convergence import main as convergence_main
 
         with pytest.raises(SystemExit) as exc:
             convergence_main([])

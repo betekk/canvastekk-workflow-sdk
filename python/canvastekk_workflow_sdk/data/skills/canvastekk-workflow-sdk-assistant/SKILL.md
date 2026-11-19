@@ -65,7 +65,7 @@ never install an extra "just in case".
 
 | You are doing | Install | Why |
 |---|---|---|
-| Defining / validating / testing a node, building workflows locally, registering via `register_node` | `canvastekk-workflow-sdk` | Base install is complete for everything except serving HTTP |
+| Defining / validating / testing a node, building workflows locally, registering via `register_workflow_node` | `canvastekk-workflow-sdk` | Base install is complete for everything except serving HTTP |
 | Serving the HTTP contract through the SDK (`create_node_app` / `create_app()`) | `canvastekk-workflow-sdk[fastapi,serve]` | Since SDK 0.43 the base install ships without fastapi; `[serve]` adds uvicorn |
 | Hosting the routes yourself (any web framework you already use) | base + your framework | The SDK validates/verifies/registers; it never serves |
 | `NodeAuth.jwt()` | `[jwt]` | Adds PyJWT |
@@ -93,7 +93,7 @@ Run each check; report a PASS/FAIL table with the fix for every FAIL.
    missing extras (import crashes) and unused extras (cost).
 3. **Change review** — classify what changed between versions:
    ```bash
-   python -c "from canvastekk_workflow_sdk import export_definition; from handler import definition; export_definition(definition, 'new.json')"
+   python -c "from canvastekk_workflow_sdk import export_workflow_node_manifest; from handler import definition; export_workflow_node_manifest(definition, 'new.json')"
    python -m canvastekk_workflow_sdk diff old.json new.json
    ```
    Exit 0 clean · 1 breaking/errors · 2 load failure. Breaking (removed
@@ -129,7 +129,7 @@ presigned URLs and validates against `x-*` first); outputs are written with
 `context.output_path(...)` and returned as `str(path)` — the SDK uploads them
 via the engine-minted session. Never slice/inspect upload targets.
 
-**Registration** (CI/CD): `register_node(node, registry_url=…,
+**Registration** (CI/CD): `register_workflow_node(node, registry_url=…,
 invoke_url=…, invoke_type="http", service_token=…, verify=True)` — `verify`
 probes the served contract first; failures raise before anything registers.
 Exactly one of `service_token`/`api_key` for registry auth; `api_key` is also

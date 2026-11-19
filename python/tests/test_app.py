@@ -12,10 +12,10 @@ from fastapi.testclient import TestClient
 
 from canvastekk_workflow_sdk import (
     BaseNode,
-    ContractCapabilities,
     ExecutionContext,
-    NodeContract,
+    WorkflowNodeContractCapabilities,
     WorkflowNodeManifest,
+    WorkflowNodeManifestContract,
     __version__,
     create_node_app,
 )
@@ -1363,10 +1363,10 @@ class TestManifestContract:
 
     def test_manifest_declared_contract_wins(self) -> None:
         """A declared subset is served verbatim — the default never overrides it."""
-        from canvastekk_workflow_sdk.definition import NodeContract
+        from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifestContract
 
         node = EchoNode()
-        node.definition.contract = NodeContract(routes=["/execute", "/health", "/manifest"])
+        node.definition.contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"])
         client = TestClient(create_node_app(node))
         data = client.get("/manifest").json()
         assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
@@ -1384,9 +1384,9 @@ class TestDryRunExecution:
         class DryEchoNode(EchoNode):
             definition = EchoNode.definition.model_copy(deep=True)
 
-        DryEchoNode.definition.contract = NodeContract(
+        DryEchoNode.definition.contract = WorkflowNodeManifestContract(
             routes=["/execute", "/health", "/manifest"],
-            capabilities=ContractCapabilities(dry_run=True),
+            capabilities=WorkflowNodeContractCapabilities(dry_run=True),
         )
         return TestClient(create_node_app(DryEchoNode()))
 
@@ -1432,9 +1432,9 @@ class TestDryRunExecution:
                 description="explodes if executed",
                 input_schema={"type": "object"},
                 output_schema={"type": "object"},
-                contract=NodeContract(
+                contract=WorkflowNodeManifestContract(
                     routes=["/execute", "/health", "/manifest"],
-                    capabilities=ContractCapabilities(dry_run=True),
+                    capabilities=WorkflowNodeContractCapabilities(dry_run=True),
                 ),
             )
 
@@ -1464,7 +1464,7 @@ class DeclaredHookNode(EchoNode):
     """Author-declared contract including /hook, WITHOUT a hook override."""
 
     definition = EchoNode.definition.model_copy(
-        update={"contract": NodeContract(routes=["/execute", "/health", "/manifest", "/hook"])}
+        update={"contract": WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/hook"])}
     )
 
 

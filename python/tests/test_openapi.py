@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 GOLDEN = Path(__file__).parent / "golden" / "openapi-3.2-echo.json"
 

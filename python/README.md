@@ -857,8 +857,8 @@ Defines what a node is. Maps to the engine's **registry-level node type** (`Work
 **Versioning:** The `version` field is a semantic version string (e.g., `"1.0.0"`) validated against the X.Y.Z pattern. The engine uses this version directly and enforces immutability: re-registering with the same version and changed data is rejected. Bump the version for any schema or metadata changes.
 
 ```python
-from canvastekk_workflow_sdk import WorkflowNodeManifest, RetryConfig, WorkflowNodeStyles
-from canvastekk_workflow_sdk.definition import ColorPreset
+from canvastekk_workflow_sdk import WorkflowNodeManifest, WorkflowNodeRetryConfig, WorkflowNodeStyles
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeColorPreset
 
 definition = WorkflowNodeManifest(
     slug="my-node",
@@ -874,7 +874,7 @@ definition = WorkflowNodeManifest(
         "properties": {"output": {"type": "string"}},
     },
     token_cost=0.5,
-    default_retry=RetryConfig(max_attempts=3, initial_delay_ms=1000),
+    default_retry=WorkflowNodeRetryConfig(max_attempts=3, initial_delay_ms=1000),
     category="inference",
     timeout_seconds=60,
     styles=WorkflowNodeStyles(icon="Brain", color="emerald"),
@@ -886,14 +886,14 @@ Optional fields with defaults:
 | Field | Default | Description |
 |-------|---------|-------------|
 | `token_cost` | 0.0 | Cost per execution |
-| `default_retry` | `RetryConfig(1 attempt)` | Retry policy |
+| `default_retry` | `WorkflowNodeRetryConfig(1 attempt)` | Retry policy |
 | `category` | `"utility"` | Node category (`transform`, `inference`, `utility`, `control-flow`) |
 | `timeout_seconds` | 30 | Max execution time |
 | `role` | `WorkflowNodeRole.OPERATION` | Node role (`start`, `end`, `error_gate`, `operation`) |
 | `styles` | `None` | Icon/color for UI |
-| `deprecation` | `None` | Optional `DeprecationInfo` — advisory migration signal (RFC 9745/8594). Omitted from serialization when `None`. Distinct from the registry's `node_status`; a deprecated node stays `active` until retired. |
+| `deprecation` | `None` | Optional `WorkflowNodeDeprecationInfo` — advisory migration signal (RFC 9745/8594). Omitted from serialization when `None`. Distinct from the registry's `node_status`; a deprecated node stays `active` until retired. |
 
-### DeprecationInfo
+### WorkflowNodeDeprecationInfo
 
 Mark a node deprecated so workflow-definition authors get a migration signal.
 `deprecation` is **additive metadata** — setting it does not change the node's
@@ -902,14 +902,14 @@ sufficient, since engine version-immutability only rejects *changed data* on
 the same version — adding the field on a new version is a normal registration).
 
 ```python
-from canvastekk_workflow_sdk import DeprecationInfo, WorkflowNodeManifest
+from canvastekk_workflow_sdk import WorkflowNodeDeprecationInfo, WorkflowNodeManifest
 from datetime import date
 
 definition = WorkflowNodeManifest(
     slug="floor-flatness-assessment",
     version="1.4.2",
     # ...required fields...
-    deprecation=DeprecationInfo(
+    deprecation=WorkflowNodeDeprecationInfo(
         deprecated_at=date(2026, 8, 1),          # RFC 9745 — when deprecation took effect
         sunset_date=date(2027, 1, 1),            # RFC 8594 — planned removal date
         replacement_slug="floor-flatness-per-check-assessment",
@@ -1206,15 +1206,15 @@ Old names still work as aliases and will not be removed:
 
 The `WorkflowNodeManifest.version` field (semantic version string) is the node's authoritative version. The engine stores and enforces this version — re-registering with the same version and changed data is rejected (HTTP 409). Node authors must bump the version for any changes.
 
-### `register_node()`
+### `register_workflow_node()`
 
 Register a node with the workflow engine registry via `POST /api/workflows/nodes/`:
 
 ```python
-from canvastekk_workflow_sdk.registry import register_node
+from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node
 
 node = MyNode()
-result = register_node(
+result = register_workflow_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
@@ -1239,12 +1239,12 @@ print(result["name"])        # dict-like access for backward compat
 | `invoke_config` | `dict \| None` | No | Extra invocation parameters (e.g., Lambda region) |
 | `timeout` | `int` | No | Request timeout in seconds (default: 30) |
 
-### `RegisterNodeResult`
+### `WorkflowNodeRegistrationResult`
 
-The return type of `register_node()`. Contains the node data and registration metadata:
+The return type of `register_workflow_node()`. Contains the node data and registration metadata:
 
 ```python
-class RegisterNodeResult(BaseModel):
+class WorkflowNodeRegistrationResult(BaseModel):
     node: dict[str, Any]             # Registered node definition
     action: str | None               # "created", "updated", or "unchanged"
     revision_id: str | None          # Engine revision ID
@@ -1254,14 +1254,14 @@ class RegisterNodeResult(BaseModel):
 
 Supports dict-like access (`result["name"]`, `"name" in result`, `result.get("name")`) for backward compatibility.
 
-### `build_registry_payload()`
+### `build_workflow_node_registry_payload()`
 
-Build a registry-compatible payload dict from a `WorkflowNodeManifest`. Used internally by both `register_node()` and `export_definition()` to ensure consistent field mapping:
+Build a registry-compatible payload dict from a `WorkflowNodeManifest`. Used internally by both `register_workflow_node()` and `export_workflow_node_manifest()` to ensure consistent field mapping:
 
 ```python
-from canvastekk_workflow_sdk.registry import build_registry_payload
+from canvastekk_workflow_sdk.workflow_node_registry import build_workflow_node_registry_payload
 
-payload = build_registry_payload(
+payload = build_workflow_node_registry_payload(
     node.definition,
     invoke_type="lambda",
     invoke_url="arn:aws:lambda:ap-southeast-1:123456789:function:my-node",
@@ -1281,14 +1281,14 @@ payload = build_registry_payload(
 | — | `tags` | New optional field |
 | — | `invoke_config` | New optional field |
 
-### `export_definition()`
+### `export_workflow_node_manifest()`
 
 Export a `WorkflowNodeManifest` as a registry-compatible JSON file:
 
 ```python
-from canvastekk_workflow_sdk.definition import export_definition
+from canvastekk_workflow_sdk.workflow_node_manifest import export_workflow_node_manifest
 
-path = export_definition(
+path = export_workflow_node_manifest(
     node.definition,
     "node-manifest.json",
     invoke_url="https://my-node.example.com",
@@ -1301,23 +1301,23 @@ path = export_definition(
 A `Literal` type for valid invocation types:
 
 ```python
-from canvastekk_workflow_sdk.registry import InvokeType
+from canvastekk_workflow_sdk.workflow_node_registry import InvokeType
 
 # Valid values: "http", "lambda", "sagemaker", "in-process"
 ```
 
-`register_node()` validates `invoke_type` at runtime and raises `ValueError` for invalid values.
+`register_workflow_node()` validates `invoke_type` at runtime and raises `ValueError` for invalid values.
 
-### `RegistrationError`
+### `WorkflowNodeRegistrationError`
 
 Raised when registration fails. Contains `status_code` and `body` attributes for debugging:
 
 ```python
-from canvastekk_workflow_sdk.registry import register_node, RegistrationError
+from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node, WorkflowNodeRegistrationError
 
 try:
-    result = register_node(node, registry_url=url, service_token="svs_xxx")
-except RegistrationError as e:
+    result = register_workflow_node(node, registry_url=url, service_token="svs_xxx")
+except WorkflowNodeRegistrationError as e:
     print(f"Status: {e.status_code}, Body: {e.body}")
 ```
 
@@ -1852,7 +1852,7 @@ git commit -m "feat: new endpoint with BREAKING CHANGE"   # major bump
 - [x] File field constraint validation (v0.6.0 — `validate_file_input()` with `x-accept`, `x-maxSizeBytes`)
 - [x] Auto-download of presigned URL file inputs (v0.7.0 — SDK auto-downloads file inputs before execute())
 - [x] Node definition versioning with auto-derived `id` field (v0.8.0 — `id` computed from `name` + `version`)
-- [x] Registry field mapping for new engine API (v0.9.0 — `title`→`label`, `default_retry`→`retry`, `RegisterNodeResult`, `InvokeType` validation, `tags`, `invoke_config`)
+- [x] Registry field mapping for new engine API (v0.9.0 — `title`→`label`, `default_retry`→`retry`, `WorkflowNodeRegistrationResult`, `InvokeType` validation, `tags`, `invoke_config`)
 - [x] SDK naming convention alignment with engine WorkflowNode/WorkflowDefinitionNode model (v0.10.0 — docstrings, versioning semantics, type mapping documentation)
 - [x] Template variable substitution documentation for node authors (DA-1038 — `{{variable}}` syntax, schema constraints, security notes)
 - [x] Workflow Builder & Local Runner (DA-1087 — `WorkflowBuilder`, `WorkflowRunner`, `InProcessExecutor`, `HttpExecutor`, graph validation, engine-compatible JSON export)
