@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { NodeValidationError } from "./exceptions.js";
+import { NodeInputValidationError } from "./exceptions.js";
 import { NODE_CALL_PROTOCOL_2_OUTCOMES } from "./node-call-protocol.js";
 
 /**
@@ -28,7 +28,7 @@ export type WorkflowNodeCallOutcome = z.infer<typeof WorkflowNodeCallOutcomeSche
  *
  * @param value - Wire value (pass | fail | skipped | timeout)
  * @returns The matching status literal
- * @throws {NodeValidationError} On missing/unknown values (validation category)
+ * @throws {NodeInputValidationError} On missing/unknown values (validation category)
  */
 export function parseWorkflowNodeCallOutcome(value: unknown): WorkflowNodeCallOutcome {
   // Node protocol 2 (engine#1300): the exact words SUCCEEDED / FAILED read as
@@ -38,7 +38,7 @@ export function parseWorkflowNodeCallOutcome(value: unknown): WorkflowNodeCallOu
     legacy === "pass" || legacy === "fail" ? legacy : value,
   );
   if (!parsed.success) {
-    throw new NodeValidationError(
+    throw new NodeInputValidationError(
       `Unknown node execution status ${JSON.stringify(value)}; expected one of ["pass","fail","skipped","timeout"]`,
       { details: { received: JSON.stringify(value) } },
     );

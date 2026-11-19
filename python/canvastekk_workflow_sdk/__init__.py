@@ -59,8 +59,8 @@ from canvastekk_workflow_sdk.exceptions import (
     NodeOutputValidationError,
     NodeTimeoutError,
     NodeValidationError,
-    WorkflowExecutionError,
-    WorkflowValidationError,
+    WorkflowDefinitionValidationError,
+    WorkflowRunError,
     error_envelope,
 )
 from canvastekk_workflow_sdk.logging import StructuredJsonFormatter, configure_logging, get_node_logger
@@ -92,18 +92,18 @@ from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecu
 from canvastekk_workflow_sdk.testing import LocalFileServer, serve_files
 from canvastekk_workflow_sdk.workflow import (
     EdgeType,
-    HttpExecutor,
-    InProcessExecutor,
-    NodeExecutor,
-    NodeResult,
-    ValidationResult,
+    HttpNodeExecutor,
+    InProcessNodeExecutor,
     WorkflowBuilder,
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,
+    WorkflowDefinitionValidationResult,
     WorkflowEdgeDefinition,
     WorkflowRunner,
+    WorkflowRunNodeExecutor,
+    WorkflowRunNodeResult,
     WorkflowRunResult,
-    validate,
+    validate_workflow_definition,
 )
 from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 from canvastekk_workflow_sdk.workflow_node_manifest import (
@@ -140,8 +140,8 @@ __all__ = [
     "NodeExecutionContext",
     "NodeExecutionMetric",
     "WorkflowNodeHealthResponse",
-    "HttpExecutor",
-    "InProcessExecutor",
+    "HttpNodeExecutor",
+    "InProcessNodeExecutor",
     "Instance",
     "InstanceSet",
     "LocalFileServer",
@@ -155,12 +155,12 @@ __all__ = [
     "NodeExecutionError",
     "NodeExecutionRequest",
     "NodeExecutionResponse",
-    "NodeExecutor",
+    "WorkflowRunNodeExecutor",
     "NodeIOError",
     "NodeMiddleware",
     "WorkflowNodeCallOutcome",
     "NodeOutputValidationError",
-    "NodeResult",
+    "WorkflowRunNodeResult",
     "NodeTimeoutError",
     "NodeValidationError",
     "error_envelope",
@@ -185,18 +185,18 @@ __all__ = [
     "TekkAuthUnavailable",
     "TekkNodeAuth",
     "TimingMiddleware",
-    "ValidationResult",
+    "WorkflowDefinitionValidationResult",
     "WorkflowBuilder",
     "WorkflowDefinitionNode",
     "WorkflowDefinitionSpec",
     "WorkflowEdgeDefinition",
-    "WorkflowExecutionError",
+    "WorkflowRunError",
     "WorkflowNodeManifest",
     "WorkflowNodeRole",
     "WorkflowNodeStyles",
     "WorkflowRunResult",
     "WorkflowRunner",
-    "WorkflowValidationError",
+    "WorkflowDefinitionValidationError",
     "build_workflow_node_registry_payload",
     "configure_logging",
     "create_authed_workflow_node_app",
@@ -209,7 +209,7 @@ __all__ = [
     "get_node_logger",
     "register_workflow_node",
     "serve_files",
-    "validate",
+    "validate_workflow_definition",
 ]
 
 from canvastekk_workflow_sdk._version import RELEASE_DATE as RELEASE_DATE  # noqa: E402, F401
@@ -260,6 +260,15 @@ _DEPRECATED_NAME_ALIASES = {
     "mount_node": ("canvastekk_workflow_sdk.bootstrap", "mount_workflow_node"),
     "create_authed_app": ("canvastekk_workflow_sdk.bootstrap", "create_authed_workflow_node_app"),
     "create_lambda_handler": ("canvastekk_workflow_sdk.bootstrap", "create_workflow_node_lambda_handler"),
+    # Phase 4 (ADR 0001): workflow definition + run cluster
+    "validate": ("canvastekk_workflow_sdk.workflow.validation", "validate_workflow_definition"),
+    "ValidationResult": ("canvastekk_workflow_sdk.workflow.validation", "WorkflowDefinitionValidationResult"),
+    "NodeResult": ("canvastekk_workflow_sdk.workflow.runner", "WorkflowRunNodeResult"),
+    "NodeExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "WorkflowRunNodeExecutor"),
+    "InProcessExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "InProcessNodeExecutor"),
+    "HttpExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "HttpNodeExecutor"),
+    "WorkflowExecutionError": ("canvastekk_workflow_sdk.exceptions", "WorkflowRunError"),
+    "WorkflowValidationError": ("canvastekk_workflow_sdk.exceptions", "WorkflowDefinitionValidationError"),
 }
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from canvastekk_workflow_sdk.workflow.models import (
+from canvastekk_workflow_sdk.workflow.workflow_definition import (
     EdgeType,
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,
@@ -228,9 +228,9 @@ class WorkflowBuilder:
             WorkflowDefinitionSpec ready for execution.
 
         Raises:
-            WorkflowValidationError: If validation fails.
+            WorkflowDefinitionValidationError: If validation fails.
         """
-        from canvastekk_workflow_sdk.workflow.validation import validate as validate_graph
+        from canvastekk_workflow_sdk.workflow.validation import validate_workflow_definition as validate_graph
 
         spec = WorkflowDefinitionSpec(
             nodes=list(self._nodes),
@@ -240,8 +240,8 @@ class WorkflowBuilder:
         if validate:
             result = validate_graph(spec)
             if not result.is_valid:
-                from canvastekk_workflow_sdk.exceptions import WorkflowValidationError
+                from canvastekk_workflow_sdk.exceptions import WorkflowDefinitionValidationError
 
-                raise WorkflowValidationError(f"Workflow validation failed: {'; '.join(result.errors)}")
+                raise WorkflowDefinitionValidationError(f"Workflow validation failed: {'; '.join(result.errors)}")
 
         return spec

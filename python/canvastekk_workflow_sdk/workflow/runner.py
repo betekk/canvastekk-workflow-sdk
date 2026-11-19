@@ -2,7 +2,7 @@
 Workflow Runner
 
 Local workflow executor that ties together executor, resolver, and level computation.
-Accepts a NodeExecutor via constructor (Strategy pattern).
+Accepts a WorkflowRunNodeExecutor via constructor (Strategy pattern).
 """
 
 from __future__ import annotations
@@ -17,22 +17,22 @@ from typing import TYPE_CHECKING, Any
 
 from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
 from canvastekk_workflow_sdk.workflow._control_flow import CONTROL_FLOW_HANDLERS
-from canvastekk_workflow_sdk.workflow.executor import NodeExecutor
 from canvastekk_workflow_sdk.workflow.level import compute_levels
+from canvastekk_workflow_sdk.workflow.node_executor import WorkflowRunNodeExecutor
 from canvastekk_workflow_sdk.workflow.resolver import resolve_inputs
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.workflow.models import WorkflowDefinitionSpec
+    from canvastekk_workflow_sdk.workflow.workflow_definition import WorkflowDefinitionSpec
 
 
-class ErrorPolicy(StrEnum):
+class WorkflowRunErrorPolicy(StrEnum):
     """How the runner handles node execution failures."""
 
     FAIL_FAST = "fail_fast"
     CONTINUE = "continue"
 
 
-class NodeResult:
+class WorkflowRunNodeResult:
     """Result of executing a single node."""
 
     __slots__ = ("node_id", "slug", "status", "outputs", "duration_ms", "error", "skipped_reason")
@@ -76,7 +76,7 @@ class WorkflowRunResult:
         self,
         status: str,
         final_outputs: dict[str, Any],
-        node_results: list[NodeResult],
+        node_results: list[WorkflowRunNodeResult],
         duration_ms: int,
         output_dir: Path | None = None,
     ) -> None:
@@ -99,7 +99,7 @@ class WorkflowRunResult:
 class WorkflowRunner:
     """Local workflow runner.
 
-    Accepts a ``NodeExecutor`` strategy and runs a workflow spec level-by-level.
+    Accepts a ``WorkflowRunNodeExecutor`` strategy and runs a workflow spec level-by-level.
 
     Args:
         executor: Strategy for executing individual nodes.
@@ -107,14 +107,14 @@ class WorkflowRunner:
         output_dir: Shared output directory for all nodes in a run.
             When ``None`` (default), a temporary directory is created per run
             and cleaned up afterwards (unless ``cleanup=False``).
-            Only effective with :class:`InProcessExecutor` — remote nodes
-            via :class:`HttpExecutor` do not share the local filesystem.
+            Only effective with :class:`InProcessNodeExecutor` — remote nodes
+            via :class:`HttpNodeExecutor` do not share the local filesystem.
         cleanup: Whether to remove auto-created temp directories after the run.
             User-supplied ``output_dir`` is never cleaned up regardless of this setting.
 
     Example::
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("segmentation-v1.0.0", MySegmentNode())
         runner = WorkflowRunner(executor)
         result = runner.run(spec, inputs={"point_cloud": "/data/scan.las"})
@@ -122,9 +122,9 @@ class WorkflowRunner:
 
     def __init__(
         self,
-        executor: NodeExecutor,
+        executor: WorkflowRunNodeExecutor,
         *,
-        error_policy: ErrorPolicy = ErrorPolicy.FAIL_FAST,
+        error_policy: WorkflowRunErrorPolicy = WorkflowRunErrorPolicy.FAIL_FAST,
         output_dir: Path | None = None,
         cleanup: bool = True,
         max_concurrency: int = 8,
@@ -189,7 +189,7 @@ class WorkflowRunner:
         node_map = {n.id: n for n in spec.nodes}
         node_outputs: dict[str, dict[str, Any]] = {}
         seeded_outputs: dict[str, dict[str, Any]] = {}
-        node_results: list[NodeResult] = []
+        node_results: list[WorkflowRunNodeResult] = []
         failed_nodes: set[str] = set()
 
         if self._output_dir is not None:
@@ -231,7 +231,7 @@ class WorkflowRunner:
                     except Exception as exc:
                         failed_nodes.add(nid)
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="failed",
@@ -251,7 +251,7 @@ class WorkflowRunner:
                         outputs = handler(resolved, context)
                         node_outputs[nid] = outputs
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="completed",
@@ -262,7 +262,7 @@ class WorkflowRunner:
                     except Exception as exc:
                         failed_nodes.add(nid)
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="failed",
@@ -279,7 +279,7 @@ class WorkflowRunner:
                     if upstream_failed or nid in failed_nodes:
                         node = node_map[nid]
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="skipped",
@@ -292,7 +292,7 @@ class WorkflowRunner:
                     node = node_map[nid]
                     if not self._executor.has(node.slug):
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="failed",
@@ -300,7 +300,7 @@ class WorkflowRunner:
                             )
                         )
                         failed_nodes.add(nid)
-                        if self._error_policy == ErrorPolicy.FAIL_FAST:
+                        if self._error_policy == WorkflowRunErrorPolicy.FAIL_FAST:
                             break
                         continue
 
@@ -309,14 +309,14 @@ class WorkflowRunner:
                     except Exception as exc:
                         failed_nodes.add(nid)
                         node_results.append(
-                            NodeResult(
+                            WorkflowRunNodeResult(
                                 node_id=nid,
                                 slug=node.slug,
                                 status="failed",
                                 error=f"Input resolution failed: {exc}",
                             )
                         )
-                        if self._error_policy == ErrorPolicy.FAIL_FAST:
+                        if self._error_policy == WorkflowRunErrorPolicy.FAIL_FAST:
                             break
                         continue
                     context = NodeExecutionContext(
@@ -335,7 +335,7 @@ class WorkflowRunner:
                         if isinstance(result, Exception):
                             failed_nodes.add(nid)
                             node_results.append(
-                                NodeResult(
+                                WorkflowRunNodeResult(
                                     node_id=nid,
                                     slug=node.slug,
                                     status="failed",
@@ -345,7 +345,7 @@ class WorkflowRunner:
                         else:
                             node_outputs[nid] = result
                             node_results.append(
-                                NodeResult(
+                                WorkflowRunNodeResult(
                                     node_id=nid,
                                     slug=node.slug,
                                     status="completed",
@@ -353,7 +353,7 @@ class WorkflowRunner:
                                 )
                             )
 
-                if self._error_policy == ErrorPolicy.FAIL_FAST and failed_nodes:
+                if self._error_policy == WorkflowRunErrorPolicy.FAIL_FAST and failed_nodes:
                     break
 
             final_outputs: dict[str, Any] = {}
@@ -380,3 +380,24 @@ class WorkflowRunner:
             duration_ms=duration_ms,
             output_dir=result_output_dir,
         )
+
+
+# Deprecated public names (ADR 0001, #271): old names -> renamed symbols.
+_DEPRECATED_ALIASES = {
+    "NodeResult": "WorkflowRunNodeResult",
+    "ErrorPolicy": "WorkflowRunErrorPolicy",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        warnings.warn(
+            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
+            " (ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[_DEPRECATED_ALIASES[name]]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

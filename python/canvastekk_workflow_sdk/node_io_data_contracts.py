@@ -70,7 +70,7 @@ def parse_workflow_node_call_outcome(value: Any) -> WorkflowNodeCallOutcome:
         The matching :class:`WorkflowNodeCallOutcome`.
 
     Raises:
-        NodeValidationError: If the value is missing or unknown
+        NodeInputValidationError: If the value is missing or unknown
             (validation category, S.2 taxonomy).
     """
     if isinstance(value, WorkflowNodeCallOutcome):
@@ -85,9 +85,9 @@ def parse_workflow_node_call_outcome(value: Any) -> WorkflowNodeCallOutcome:
         legacy = NODE_CALL_PROTOCOL_2_OUTCOMES.get(value)
         if legacy in (WorkflowNodeCallOutcome.PASS.value, WorkflowNodeCallOutcome.FAIL.value):
             return WorkflowNodeCallOutcome(legacy)
-    from canvastekk_workflow_sdk.exceptions import NodeValidationError
+    from canvastekk_workflow_sdk.exceptions import NodeInputValidationError
 
-    raise NodeValidationError(
+    raise NodeInputValidationError(
         f"Unknown node execution status {value!r}; expected one of {[s.value for s in WorkflowNodeCallOutcome]}",
         details={"received": repr(value), "expected": [s.value for s in WorkflowNodeCallOutcome]},
     )

@@ -683,7 +683,7 @@ def main() -> None:
         print("Usage: ctk <command> [options]  (alias: python -m canvastekk_workflow_sdk)")
         print()
         print("Commands:")
-        print("  validate <module:attribute> [--json]  Validate a node manifest definition")
+        print("  validate <module:attribute> [--json]  Validate a workflow node manifest")
         print(
             "  probe <module:attribute | --manifest FILE> [--engine-url URL] [--json]  Registration probes (offline mirror + optional registry diff)"
         )
@@ -796,7 +796,7 @@ def main() -> None:
             sys.exit(load_fail_code)
 
     try:
-        if args[0] == "validate":
+        if args[0] == "validate_workflow_definition":
             report = _validate_definition(definition)
         else:
             engine_url = _flag_value(args, "--engine-url")

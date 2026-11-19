@@ -13,7 +13,7 @@ import {
 } from "../src/node-call-protocol.js";
 import { parseWorkflowNodeCallOutcome } from "../src/node-execution-response.js";
 import { NodeValidationError } from "../src/exceptions.js";
-import { HttpExecutor } from "../src/workflow/executor.js";
+import { HttpNodeExecutor } from "../src/workflow/node-executor.js";
 
 const manifest = (slug: string): WorkflowNodeManifest => ({
   slug,
@@ -94,7 +94,7 @@ describe("node protocol 2 (engine#1300)", () => {
     }
   });
 
-  describe("HttpExecutor", () => {
+  describe("HttpNodeExecutor", () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it.each([
@@ -109,7 +109,7 @@ describe("node protocol 2 (engine#1300)", () => {
         }),
       );
       vi.stubGlobal("fetch", fetchMock);
-      const executor = new HttpExecutor().registerUrl("echo", "http://node.example");
+      const executor = new HttpNodeExecutor().registerUrl("echo", "http://node.example");
       const ctx = { runId: "r", nodeId: "n" } as unknown as NodeExecutionContext;
 
       if (succeeds) {

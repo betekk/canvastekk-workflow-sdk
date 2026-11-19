@@ -146,6 +146,18 @@ export class NodeValidationError extends NodeExecutionError {
 }
 
 /**
+ * Raised when a workflow node manifest fails validation (ADR 0001, #271).
+ * Wire name stays NodeValidationError (see wireErrorType) until 1.0.0.
+ */
+export class WorkflowNodeManifestValidationError extends NodeValidationError {}
+
+/**
+ * Raised when node input payload validation fails (ADR 0001, #271).
+ * Wire name stays NodeValidationError (see wireErrorType) until 1.0.0.
+ */
+export class NodeInputValidationError extends NodeValidationError {}
+
+/**
  * Error thrown when node output validation fails.
  */
 export class NodeOutputValidationError extends NodeExecutionError {
@@ -236,11 +248,11 @@ export class NodeConfigurationError extends NodeExecutionError {
 /**
  * Error thrown when workflow execution fails.
  */
-export class WorkflowExecutionError extends NodeExecutionError {
+export class WorkflowRunError extends NodeExecutionError {
   readonly nodeId: string | null;
 
   /**
-   * Creates a new WorkflowExecutionError.
+   * Creates a new WorkflowRunError.
    * @param message - Error message
    * @param options - Node ID and additional details
    */
@@ -254,7 +266,7 @@ export class WorkflowExecutionError extends NodeExecutionError {
     const mergedDetails: Record<string, unknown> = { ...details };
     if (nodeId) mergedDetails.node_id = nodeId;
     super(message, { errorCode: "WORKFLOW_EXECUTION_ERROR", details: mergedDetails });
-    this.name = "WorkflowExecutionError";
+    this.name = "WorkflowRunError";
     this.nodeId = nodeId ?? null;
   }
 }
@@ -262,13 +274,13 @@ export class WorkflowExecutionError extends NodeExecutionError {
 /**
  * Error thrown when workflow validation fails.
  */
-export class WorkflowValidationError extends NodeExecutionError {
+export class WorkflowDefinitionValidationError extends NodeExecutionError {
   readonly category: ErrorCategory = "validation";
 
   readonly errors: string[];
 
   /**
-   * Creates a new WorkflowValidationError.
+   * Creates a new WorkflowDefinitionValidationError.
    * @param message - Error message
    * @param options - Validation errors and additional details
    */
@@ -280,7 +292,7 @@ export class WorkflowValidationError extends NodeExecutionError {
     } = {},
   ) {
     super(message, { errorCode: "WORKFLOW_VALIDATION_ERROR", details });
-    this.name = "WorkflowValidationError";
+    this.name = "WorkflowDefinitionValidationError";
     this.errors = errors ?? [];
   }
 

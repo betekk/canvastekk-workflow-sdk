@@ -1,12 +1,12 @@
 """Tests for workflow validation."""
 
-from canvastekk_workflow_sdk.workflow.models import (
+from canvastekk_workflow_sdk.workflow.validation import WorkflowDefinitionValidationResult, validate_workflow_definition
+from canvastekk_workflow_sdk.workflow.workflow_definition import (
     EdgeType,
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,
     WorkflowEdgeDefinition,
 )
-from canvastekk_workflow_sdk.workflow.validation import ValidationResult, validate
 
 
 def make_linear_spec() -> WorkflowDefinitionSpec:
@@ -26,7 +26,7 @@ def make_linear_spec() -> WorkflowDefinitionSpec:
 class TestValidationLinearGraph:
     def test_valid_linear_graph_passes(self) -> None:
         spec = make_linear_spec()
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is True
         assert len(result.errors) == 0
@@ -34,7 +34,7 @@ class TestValidationLinearGraph:
         assert len(result.dead_ends) == 0
 
     def test_validation_result_structure(self) -> None:
-        result = ValidationResult()
+        result = WorkflowDefinitionValidationResult()
         assert isinstance(result.is_valid, bool)
         assert isinstance(result.errors, list)
         assert isinstance(result.orphans, list)
@@ -56,7 +56,7 @@ class TestOrphanDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert "orphan" in result.orphans
@@ -75,7 +75,7 @@ class TestOrphanDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert "orphan1" in result.orphans
@@ -98,7 +98,7 @@ class TestDeadEndDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert "dead_end" in result.dead_ends
@@ -118,7 +118,7 @@ class TestDeadEndDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert "dead1" in result.dead_ends
@@ -143,7 +143,7 @@ class TestCycleDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("cycle" in error.lower() for error in result.errors)
@@ -162,7 +162,7 @@ class TestCycleDetection:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("cycle" in error.lower() for error in result.errors)
@@ -182,7 +182,7 @@ class TestStartEndConstraints:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("exactly 1 __start__" in error for error in result.errors)
@@ -198,7 +198,7 @@ class TestStartEndConstraints:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("must have a __start__" in error for error in result.errors)
@@ -214,7 +214,7 @@ class TestStartEndConstraints:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("must have at least 1 __end__" in error for error in result.errors)
@@ -232,7 +232,7 @@ class TestStartEndConstraints:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("no incoming edges" in error for error in result.errors)
@@ -250,7 +250,7 @@ class TestStartEndConstraints:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("no outgoing edges" in error for error in result.errors)
@@ -268,7 +268,7 @@ class TestEdgeReferenceValidation:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("non-existent from_node" in error for error in result.errors)
@@ -284,7 +284,7 @@ class TestEdgeReferenceValidation:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("non-existent to_node" in error for error in result.errors)
@@ -300,7 +300,7 @@ class TestNodeIdUniqueness:
             edges=[],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("Duplicate node ID" in error for error in result.errors)
@@ -317,7 +317,7 @@ class TestNodeIdUniqueness:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("Duplicate edge ID" in error for error in result.errors)
@@ -342,7 +342,7 @@ class TestComplexGraphs:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is True
 
@@ -361,7 +361,7 @@ class TestComplexGraphs:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is True
 
@@ -387,6 +387,6 @@ class TestComplexGraphs:
             ],
         )
 
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is True

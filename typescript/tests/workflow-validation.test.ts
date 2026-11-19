@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validate } from "../src/workflow/validation.js";
+import { validateWorkflowDefinition } from "../src/workflow/validation.js";
 
 describe("validate", () => {
   it("valid spec passes", () => {
@@ -15,7 +15,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(true);
     expect(result.errors).toHaveLength(0);
     expect(result.orphans).toHaveLength(0);
@@ -33,7 +33,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors).toContain("Workflow must have a __start__ node");
   });
@@ -51,7 +51,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors).toContain("Workflow must have exactly 1 __start__ node, found 2");
   });
@@ -67,7 +67,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors).toContain("Workflow must have at least 1 __end__ node");
   });
@@ -86,7 +86,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("Duplicate node ID"))).toBe(true);
   });
@@ -104,7 +104,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("non-existent from_node") || e.includes("non-existent to_node"))).toBe(true);
   });
@@ -125,7 +125,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("cycle"))).toBe(true);
   });
@@ -144,7 +144,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.orphans).toContain("orphan");
     expect(result.errors.some((e) => e.includes("Orphan node(s)"))).toBe(true);
@@ -164,7 +164,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.orphans).toContain("end2");
     expect(result.errors.some((e) => e.includes("Orphan node(s)"))).toBe(true);
@@ -183,7 +183,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("__start__ node must have no incoming edges"))).toBe(true);
   });
@@ -201,7 +201,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("__end__ node") && e.includes("must have no outgoing edges"))).toBe(true);
   });
@@ -219,7 +219,7 @@ describe("validate", () => {
       ],
       metadata: {},
     };
-    const result = validate(spec);
+    const result = validateWorkflowDefinition(spec);
     expect(result.isValid).toBe(false);
     expect(result.errors.some((e) => e.includes("Duplicate edge ID"))).toBe(true);
   });

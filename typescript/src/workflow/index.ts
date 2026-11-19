@@ -1,10 +1,10 @@
-export type { EdgeType, WorkflowEdgeDefinition, WorkflowDefinitionNode, WorkflowDefinitionSpec } from "./models.js";
+export type { EdgeType, WorkflowEdgeDefinition, WorkflowDefinitionNode, WorkflowDefinitionSpec } from "./workflow-definition.js";
 export { WorkflowBuilder } from "./builder.js";
-export { InProcessExecutor, HttpExecutor } from "./executor.js";
-export type { NodeExecutor } from "./executor.js";
+export { InProcessNodeExecutor, HttpNodeExecutor } from "./node-executor.js";
+export type { WorkflowRunNodeExecutor } from "./node-executor.js";
 export { WorkflowRunner } from "./runner.js";
-export type { ErrorPolicy, NodeResult, WorkflowRunResult } from "./runner.js";
+export type { WorkflowRunErrorPolicy, WorkflowRunNodeResult, WorkflowRunResult } from "./runner.js";
 export { computeLevels } from "./level.js";
 export { resolveInputs, ResolverError } from "./resolver.js";
-export { validate } from "./validation.js";
-export type { ValidationResult } from "./validation.js";
+export { validateWorkflowDefinition } from "./validation.js";
+export type { WorkflowDefinitionValidationResult } from "./validation.js";

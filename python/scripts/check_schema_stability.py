@@ -35,7 +35,7 @@ from canvastekk_workflow_sdk import (
     WorkflowNodeRole,
     WorkflowNodeStyles,
 )
-from canvastekk_workflow_sdk.workflow.models import (
+from canvastekk_workflow_sdk.workflow.workflow_definition import (
     EdgeType,
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,

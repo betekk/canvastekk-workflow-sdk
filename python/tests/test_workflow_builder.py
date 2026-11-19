@@ -3,7 +3,7 @@
 import pytest
 
 from canvastekk_workflow_sdk.workflow.builder import WorkflowBuilder
-from canvastekk_workflow_sdk.workflow.models import EdgeType
+from canvastekk_workflow_sdk.workflow.workflow_definition import EdgeType
 
 
 class TestWorkflowBuilder:
@@ -77,10 +77,10 @@ class TestWorkflowBuilder:
         builder.add_start("start")
         builder.add_end("end")
 
-        from canvastekk_workflow_sdk.workflow.validation import validate
+        from canvastekk_workflow_sdk.workflow.validation import validate_workflow_definition
 
         spec = builder.build(validate=False)
-        result = validate(spec)
+        result = validate_workflow_definition(spec)
 
         assert result.is_valid is False
         assert any("no path to __end__" in error.lower() for error in result.errors)

@@ -73,3 +73,50 @@ describe("deprecated index names (ADR 0001)", () => {
     );
   });
 });
+
+// --- Phase 4 (workflow definition + run cluster) ---
+import * as oldModels from "../src/workflow/models.js";
+import * as oldExecutor from "../src/workflow/executor.js";
+import * as newWorkflowDefinition from "../src/workflow/workflow-definition.js";
+import * as newNodeExecutor from "../src/workflow/node-executor.js";
+import {
+  validate,
+  ValidationResult,
+  NodeResult,
+  ErrorPolicy,
+  NodeExecutor,
+  InProcessExecutor,
+  HttpExecutor,
+  WorkflowExecutionError,
+  WorkflowValidationError,
+} from "../src/index.js";
+import * as newValidation from "../src/workflow/validation.js";
+import { WorkflowRunError, WorkflowDefinitionValidationError } from "../src/exceptions.js";
+
+describe("deprecated paths + names, phase 4 (ADR 0001)", () => {
+  it("workflow/models.js re-exports workflow-definition.js", () => {
+    expect(oldModels.WorkflowDefinitionSpec).toBe(newWorkflowDefinition.WorkflowDefinitionSpec);
+  });
+
+  it("workflow/executor.js re-exports node-executor.js with old class names", () => {
+    expect(oldExecutor.NodeExecutor).toBe(newNodeExecutor.WorkflowRunNodeExecutor);
+    expect(oldExecutor.InProcessExecutor).toBe(newNodeExecutor.InProcessNodeExecutor);
+    expect(oldExecutor.HttpExecutor).toBe(newNodeExecutor.HttpNodeExecutor);
+  });
+
+  it("index old names point at the new symbols", () => {
+    expect(validate).toBe(newValidation.validateWorkflowDefinition);
+    expect(WorkflowExecutionError).toBe(WorkflowRunError);
+    expect(WorkflowValidationError).toBe(WorkflowDefinitionValidationError);
+  });
+
+  it("type-only old names typecheck", () => {
+    const r: ValidationResult | undefined = undefined;
+    const n: NodeResult | undefined = undefined;
+    const p: ErrorPolicy | undefined = undefined;
+    const e: NodeExecutor | undefined = undefined;
+    const i: InProcessExecutor | undefined = undefined;
+    const h: HttpExecutor | undefined = undefined;
+    expect([r, n, p, e, i, h]).toEqual(Array(6).fill(undefined));
+  });
+});

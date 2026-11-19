@@ -307,8 +307,8 @@ The SDK provides structured exceptions. When raised inside `execute()`, they pro
 | `NodeTimeoutError` | `TIMEOUT` | 408 | Execution exceeded time limit |
 | `NodeIOError` | `IO_ERROR` | 500 | File read/write failure |
 | `NodeConfigurationError` | `CONFIGURATION_ERROR` | 500 | Invalid node configuration |
-| `WorkflowValidationError` | `WORKFLOW_VALIDATION_ERROR` | 422 | Workflow spec validation failure (cycle, orphan, missing START/END) |
-| `WorkflowExecutionError` | `WORKFLOW_EXECUTION_ERROR` | 500 | Local workflow execution failure |
+| `WorkflowDefinitionValidationError` | `WORKFLOW_VALIDATION_ERROR` | 422 | Workflow spec validation failure (cycle, orphan, missing START/END) |
+| `WorkflowRunError` | `WORKFLOW_EXECUTION_ERROR` | 500 | Local workflow execution failure |
 
 Note: When raised inside `execute()`, the SDK catches them and returns `status: "fail"` with HTTP 200. The structured error codes appear in the `error_code` field. When exceptions escape to the FastAPI exception handler, they produce the HTTP status codes above.
 
@@ -1342,7 +1342,7 @@ Build, validate, and test-run workflow DAGs locally — without the engine, Temp
 
 ```python
 from canvastekk_workflow_sdk import WorkflowBuilder, WorkflowRunner
-from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import InProcessNodeExecutor
 
 # Build a workflow
 spec = (
@@ -1358,7 +1358,7 @@ spec = (
 )
 
 # Test run locally with WorkflowNodeBase instances
-executor = InProcessExecutor()
+executor = InProcessNodeExecutor()
 executor.register("segmentation-v1.0.0", MySegmentNode())
 executor.register("measurement-v1.0.0", MyMeasurementNode())
 
@@ -1418,34 +1418,34 @@ builder.connect("start", "segment", from_output="point_cloud", to_input="input_f
 
 #### `build(*, validate=True)`
 
-Construct the `WorkflowDefinitionSpec`. If `validate=True` (default), validates the graph and raises `WorkflowValidationError` on failure.
+Construct the `WorkflowDefinitionSpec`. If `validate=True` (default), validates the graph and raises `WorkflowDefinitionValidationError` on failure.
 
-### NodeExecutor Strategy
+### WorkflowRunNodeExecutor Strategy
 
-The runner accepts a `NodeExecutor` via constructor — choose how nodes execute:
+The runner accepts a `WorkflowRunNodeExecutor` via constructor — choose how nodes execute:
 
-#### `InProcessExecutor` — Direct Execution
+#### `InProcessNodeExecutor` — Direct Execution
 
 Runs `WorkflowNodeBase.execute()` directly via `asyncio.to_thread()` (non-blocking):
 
 ```python
-from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import InProcessNodeExecutor
 
-executor = InProcessExecutor()
+executor = InProcessNodeExecutor()
 executor.register("segmentation-v1.0.0", MySegmentNode())
 executor.register("measurement-v1.0.0", MyMeasurementNode())
 
 runner = WorkflowRunner(executor)
 ```
 
-#### `HttpExecutor` — HTTP Calls
+#### `HttpNodeExecutor` — HTTP Calls
 
 Calls node `/execute` endpoints via `httpx`. Posts `NodeExecutionRequest`-compatible payloads:
 
 ```python
-from canvastekk_workflow_sdk.workflow.executor import HttpExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import HttpNodeExecutor
 
-executor = HttpExecutor()
+executor = HttpNodeExecutor()
 executor.register_url("segmentation-v1.0.0", "http://localhost:8001")
 executor.register_url("measurement-v1.0.0", "http://localhost:8002")
 
@@ -1457,14 +1457,14 @@ runner = WorkflowRunner(executor)
 ```python
 from canvastekk_workflow_sdk import WorkflowRunner
 
-runner = WorkflowRunner(executor, error_policy=ErrorPolicy.FAIL_FAST)
+runner = WorkflowRunner(executor, error_policy=WorkflowRunErrorPolicy.FAIL_FAST)
 result = runner.run(spec, inputs={"point_cloud": "/data/scan.las"})
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `executor` | `NodeExecutor` | required | Execution strategy (InProcess or HTTP) |
-| `error_policy` | `ErrorPolicy` | `FAIL_FAST` | `FAIL_FAST` stops on first error; `CONTINUE` skips downstream of failed nodes |
+| `executor` | `WorkflowRunNodeExecutor` | required | Execution strategy (InProcess or HTTP) |
+| `error_policy` | `WorkflowRunErrorPolicy` | `FAIL_FAST` | `FAIL_FAST` stops on first error; `CONTINUE` skips downstream of failed nodes |
 
 ### WorkflowRunResult
 
@@ -1472,10 +1472,10 @@ result = runner.run(spec, inputs={"point_cloud": "/data/scan.las"})
 |-------|------|-------------|
 | `status` | `"completed" \| "failed"` | Overall workflow status |
 | `final_outputs` | `dict` | Outputs collected from END nodes |
-| `node_results` | `list[NodeResult]` | Per-node execution results |
+| `node_results` | `list[WorkflowRunNodeResult]` | Per-node execution results |
 | `duration_ms` | `int` | Total execution time |
 
-### NodeResult
+### WorkflowRunNodeResult
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1855,4 +1855,4 @@ git commit -m "feat: new endpoint with BREAKING CHANGE"   # major bump
 - [x] Registry field mapping for new engine API (v0.9.0 — `title`→`label`, `default_retry`→`retry`, `WorkflowNodeRegistrationResult`, `InvokeType` validation, `tags`, `invoke_config`)
 - [x] SDK naming convention alignment with engine WorkflowNode/WorkflowDefinitionNode model (v0.10.0 — docstrings, versioning semantics, type mapping documentation)
 - [x] Template variable substitution documentation for node authors (DA-1038 — `{{variable}}` syntax, schema constraints, security notes)
-- [x] Workflow Builder & Local Runner (DA-1087 — `WorkflowBuilder`, `WorkflowRunner`, `InProcessExecutor`, `HttpExecutor`, graph validation, engine-compatible JSON export)
+- [x] Workflow Builder & Local Runner (DA-1087 — `WorkflowBuilder`, `WorkflowRunner`, `InProcessNodeExecutor`, `HttpNodeExecutor`, graph validation, engine-compatible JSON export)

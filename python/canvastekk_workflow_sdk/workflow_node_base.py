@@ -35,6 +35,7 @@ from canvastekk_workflow_sdk.exceptions import (
     IO_SUBCODE_URL_POLICY_BLOCKED,
     NodeConfigurationError,
     NodeExecutionError,
+    NodeInputValidationError,
     NodeIOError,
     NodeOutputValidationError,
     NodeTimeoutError,
@@ -48,6 +49,22 @@ from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecu
 from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 logger = logging.getLogger(__name__)
+
+# ADR 0001 (#271): the NodeValidationError split must not change the wire.
+# The node-execution response's error_type historically carried the base
+# class name; keep the historical wire names until the 1.0.0 alias removal.
+_WIRE_ERROR_NAMES = {
+    "WorkflowNodeManifestValidationError": "NodeValidationError",
+    "NodeInputValidationError": "NodeValidationError",
+    "WorkflowRunError": "WorkflowExecutionError",
+    "WorkflowDefinitionValidationError": "WorkflowValidationError",
+}
+
+
+def _wire_error_type(exc: BaseException) -> str:
+    name = type(exc).__name__
+    return _WIRE_ERROR_NAMES.get(name, name)
+
 
 _HTTPX_DOWNLOAD_TIMEOUT = 30.0
 
@@ -161,7 +178,7 @@ class WorkflowNodeBase(ABC):
             inputs: The inputs dict to validate.
 
         Raises:
-            NodeValidationError: If inputs do not match input_schema.
+            NodeInputValidationError: If inputs do not match input_schema.
         """
         schema = self.definition.input_schema
         if not schema or schema == {"type": "object"}:
@@ -178,7 +195,7 @@ class WorkflowNodeBase(ABC):
                 }
                 for e in errors
             ]
-            raise NodeValidationError(
+            raise NodeInputValidationError(
                 f"Input validation failed: {errors[0].message}",
                 errors=error_details,
             )
@@ -643,7 +660,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=e.message,
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
                 error_code=e.error_code,
             )
@@ -654,7 +671,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=e.message,
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
                 error_code=e.error_code,
             )
@@ -665,7 +682,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=e.message,
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
                 error_code=e.error_code,
             )
@@ -676,7 +693,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=e.message,
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
                 error_code=e.error_code,
             )
@@ -687,7 +704,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=e.message,
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
                 error_code=e.error_code,
             )
@@ -698,7 +715,7 @@ class WorkflowNodeBase(ABC):
             return NodeExecutionResponse.failure(
                 execution_id=execution_id,
                 error=str(e),
-                error_type=type(e).__name__,
+                error_type=_wire_error_type(e),
                 duration_ms=duration_ms,
             )
 

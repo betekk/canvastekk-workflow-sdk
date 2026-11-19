@@ -23,7 +23,7 @@ import type { NodeExecutionRequest } from "./node-execution-request.js";
 import { NodeExecutionResponseFactory, type NodeExecutionResponse } from "./node-execution-response.js";
 import {
   NodeExecutionError,
-  NodeValidationError,
+  NodeInputValidationError,
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
@@ -46,6 +46,21 @@ export interface CreateNodeAppOptions {
 const ajv = new Ajv({ strict: false });
 
 const logger = createLogger("base-node");
+
+// ADR 0001 (#271): the NodeValidationError split must not change the wire.
+// errorType historically carried the base class name; keep the historical
+// wire names until the 1.0.0 alias removal (#272).
+const WIRE_ERROR_NAMES: Record<string, string> = {
+  WorkflowNodeManifestValidationError: "NodeValidationError",
+  NodeInputValidationError: "NodeValidationError",
+  WorkflowRunError: "WorkflowRunError",
+  WorkflowDefinitionValidationError: "WorkflowDefinitionValidationError",
+};
+
+function wireErrorType(error: Error): string {
+  const name = error.constructor.name;
+  return WIRE_ERROR_NAMES[name] ?? name;
+}
 
 const DOWNLOAD_BUDGET_FRACTION = 0.8;
 
@@ -451,7 +466,7 @@ export abstract class WorkflowNodeBase {
 
     if (!validate(inputs)) {
       const errors = formatAjvErrors(validate.errors ?? []);
-      throw new NodeValidationError(
+      throw new NodeInputValidationError(
         `Input validation failed: ${errors[0]?.message ?? "unknown error"}`,
         { errors },
       );
@@ -739,7 +754,7 @@ export abstract class WorkflowNodeBase {
         nodeName: this.getDefinition().slug,
         status: "fail",
         durationMs,
-        errorType: error.constructor.name,
+        errorType: wireErrorType(error),
         errorCode,
         tokenUsage: 0,
       }),

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { VERSION } from "./version.js";
-import { NodeValidationError } from "./exceptions.js";
+import { WorkflowNodeManifestValidationError } from "./exceptions.js";
 
 const SLUG_PATTERN = /^[a-z]([a-z0-9-]*[a-z0-9])?$/;
 const AMBIGUOUS_NAME_SENTINEL = "__ambiguous_name__";
@@ -454,7 +454,7 @@ export function getFileOutputFields(def: WorkflowNodeManifest): string[] {
  * @param fieldName - Name of the file input field
  * @param filePath - Local path to the downloaded file
  * @param fileSize - Size of the downloaded file in bytes
- * @throws {NodeValidationError} If file extension or size violates constraints
+ * @throws {WorkflowNodeManifestValidationError} If file extension or size violates constraints
  */
 export function validateFileInput(
   def: WorkflowNodeManifest,
@@ -477,7 +477,7 @@ export function validateFileInput(
     const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
     const allowed = xAccept.map((e: string) => e.toLowerCase());
     if (!allowed.includes(ext)) {
-      throw new NodeValidationError(
+      throw new WorkflowNodeManifestValidationError(
         `File extension '${ext}' is not allowed for field '${fieldName}'. Allowed extensions: ${JSON.stringify(xAccept)}`,
       );
     }
@@ -486,7 +486,7 @@ export function validateFileInput(
   const xMaxSizeBytes = schema["x-maxSizeBytes"] as number | undefined;
   if (xMaxSizeBytes !== undefined && fileSize !== undefined) {
     if (fileSize > xMaxSizeBytes) {
-      throw new NodeValidationError(
+      throw new WorkflowNodeManifestValidationError(
         `File size ${fileSize} bytes exceeds maximum allowed size ${xMaxSizeBytes} bytes for field '${fieldName}'`,
       );
     }

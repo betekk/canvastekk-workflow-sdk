@@ -6,8 +6,8 @@ import {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
-  WorkflowExecutionError,
-  WorkflowValidationError,
+  WorkflowRunError,
+  WorkflowDefinitionValidationError,
   WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
@@ -98,9 +98,9 @@ describe("NodeConfigurationError", () => {
   });
 });
 
-describe("WorkflowExecutionError", () => {
+describe("WorkflowRunError", () => {
   it("includes nodeId in details", () => {
-    const err = new WorkflowExecutionError("workflow failed", {
+    const err = new WorkflowRunError("workflow failed", {
       nodeId: "node-1",
     });
     expect(err.errorCode).toBe("WORKFLOW_EXECUTION_ERROR");
@@ -109,9 +109,9 @@ describe("WorkflowExecutionError", () => {
   });
 });
 
-describe("WorkflowValidationError", () => {
+describe("WorkflowDefinitionValidationError", () => {
   it("includes errors in toDict", () => {
-    const err = new WorkflowValidationError("bad workflow", {
+    const err = new WorkflowDefinitionValidationError("bad workflow", {
       errors: ["cycle detected"],
     });
     expect(err.errorCode).toBe("WORKFLOW_VALIDATION_ERROR");
@@ -155,9 +155,9 @@ describe("getHttpStatusForError", () => {
     expect(getHttpStatusForError(new NodeValidationError("x"))).toBe(422);
     expect(getHttpStatusForError(new NodeIOError("x"))).toBe(500);
     expect(getHttpStatusForError(new NodeConfigurationError("x"))).toBe(500);
-    expect(getHttpStatusForError(new WorkflowValidationError("x"))).toBe(422);
+    expect(getHttpStatusForError(new WorkflowDefinitionValidationError("x"))).toBe(422);
     expect(getHttpStatusForError(new NodeOutputValidationError("x"))).toBe(422);
-    expect(getHttpStatusForError(new WorkflowExecutionError("x"))).toBe(500);
+    expect(getHttpStatusForError(new WorkflowRunError("x"))).toBe(500);
     expect(getHttpStatusForError(new NodeExecutionError("x"))).toBe(500);
   });
 
@@ -184,7 +184,7 @@ describe("error taxonomy (S.2, SDK#161)", () => {
     expect(new NodeIOError("x").category).toBe("transport");
     expect(new NodeConfigurationError("x").category).toBe("lifecycle");
     expect(new NodeOutputValidationError("x").category).toBe("validation");
-    expect(new WorkflowValidationError(["bad"]).category).toBe("validation");
+    expect(new WorkflowDefinitionValidationError(["bad"]).category).toBe("validation");
   });
 
   it("base defaults to domain", () => {

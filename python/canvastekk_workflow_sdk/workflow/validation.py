@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.workflow.models import (
+    from canvastekk_workflow_sdk.workflow.workflow_definition import (
         WorkflowDefinitionNode,
         WorkflowDefinitionSpec,
         WorkflowEdgeDefinition,
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ValidationResult:
+class WorkflowDefinitionValidationResult:
     """Result of workflow graph validation."""
 
     is_valid: bool = True
@@ -29,7 +29,7 @@ class ValidationResult:
     dead_ends: list[str] = field(default_factory=list)
 
 
-def validate(spec: WorkflowDefinitionSpec) -> ValidationResult:
+def validate_workflow_definition(spec: WorkflowDefinitionSpec) -> WorkflowDefinitionValidationResult:
     """Validate a workflow spec for structural correctness.
 
     Checks:
@@ -44,12 +44,12 @@ def validate(spec: WorkflowDefinitionSpec) -> ValidationResult:
         spec: The workflow spec to validate.
 
     Returns:
-        ValidationResult with is_valid=True if no errors found.
+        WorkflowDefinitionValidationResult with is_valid=True if no errors found.
 
     Raises:
-        WorkflowValidationError: If validation fails and caller doesn't check result.
+        WorkflowDefinitionValidationError: If validation fails and caller doesn't check result.
     """
-    result = ValidationResult()
+    result = WorkflowDefinitionValidationResult()
     nodes = spec.nodes
     edges = spec.edges
     node_ids = {n.id for n in nodes}
@@ -72,12 +72,12 @@ def validate(spec: WorkflowDefinitionSpec) -> ValidationResult:
     return result
 
 
-def _check_node_ids(nodes: list[WorkflowDefinitionNode], result: ValidationResult) -> None:
+def _check_node_ids(nodes: list[WorkflowDefinitionNode], result: WorkflowDefinitionValidationResult) -> None:
     """Validate that all nodes have unique, non-empty string IDs.
 
     Args:
         nodes: List of workflow nodes.
-        result: ValidationResult to accumulate errors.
+        result: WorkflowDefinitionValidationResult to accumulate errors.
     """
     seen: set[str] = set()
     for node in nodes:
@@ -95,14 +95,14 @@ def _check_node_ids(nodes: list[WorkflowDefinitionNode], result: ValidationResul
 def _check_edge_references(
     edges: list[WorkflowEdgeDefinition],
     node_ids: set[str],
-    result: ValidationResult,
+    result: WorkflowDefinitionValidationResult,
 ) -> None:
     """Validate that all edges reference existing nodes and have unique IDs.
 
     Args:
         edges: List of workflow edges.
         node_ids: Set of valid node IDs.
-        result: ValidationResult to accumulate errors.
+        result: WorkflowDefinitionValidationResult to accumulate errors.
     """
     edge_ids: set[str] = set()
     for edge in edges:
@@ -124,7 +124,7 @@ def _check_start_end(
     nodes: list[WorkflowDefinitionNode],
     edges: list[WorkflowEdgeDefinition],
     node_map: dict[str, WorkflowDefinitionNode],
-    result: ValidationResult,
+    result: WorkflowDefinitionValidationResult,
 ) -> None:
     """Validate START/END constraints.
 
@@ -135,7 +135,7 @@ def _check_start_end(
         nodes: List of workflow nodes.
         edges: List of workflow edges.
         node_map: Mapping of node ID to node.
-        result: ValidationResult to accumulate errors.
+        result: WorkflowDefinitionValidationResult to accumulate errors.
     """
     start_nodes = [n for n in nodes if n.slug == "__start__"]
     end_nodes = [n for n in nodes if n.slug == "__end__"]
@@ -180,7 +180,7 @@ def _check_start_end(
 def _check_cycles(
     nodes: list[WorkflowDefinitionNode],
     edges: list[WorkflowEdgeDefinition],
-    result: ValidationResult,
+    result: WorkflowDefinitionValidationResult,
 ) -> None:
     """Detect cycles using Kahn's algorithm (topological sort).
 
@@ -189,7 +189,7 @@ def _check_cycles(
     Args:
         nodes: List of workflow nodes.
         edges: List of workflow edges.
-        result: ValidationResult to accumulate errors.
+        result: WorkflowDefinitionValidationResult to accumulate errors.
     """
     node_ids = {n.id for n in nodes}
     adj: dict[str, list[str]] = defaultdict(list)
@@ -220,7 +220,7 @@ def _check_connectivity(
     nodes: list[WorkflowDefinitionNode],
     edges: list[WorkflowEdgeDefinition],
     node_map: dict[str, WorkflowDefinitionNode],
-    result: ValidationResult,
+    result: WorkflowDefinitionValidationResult,
 ) -> None:
     """Check graph connectivity using BFS.
 
@@ -231,7 +231,7 @@ def _check_connectivity(
         nodes: List of workflow nodes.
         edges: List of workflow edges.
         node_map: Mapping of node ID to node.
-        result: ValidationResult to accumulate errors.
+        result: WorkflowDefinitionValidationResult to accumulate errors.
     """
     start_nodes = [n for n in nodes if n.slug == "__start__"]
     if not start_nodes:
@@ -305,3 +305,24 @@ def _bfs_multi(starts: set[str], adj: dict[str, list[str]]) -> set[str]:
                 visited.add(neighbor)
                 queue.append(neighbor)
     return visited
+
+
+# Deprecated public names (ADR 0001, #271): old names -> renamed symbols.
+_DEPRECATED_ALIASES = {
+    "validate": "validate_workflow_definition",
+    "ValidationResult": "WorkflowDefinitionValidationResult",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        warnings.warn(
+            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
+            " (ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[_DEPRECATED_ALIASES[name]]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

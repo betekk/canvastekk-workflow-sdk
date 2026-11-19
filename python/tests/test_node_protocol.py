@@ -18,7 +18,7 @@ from canvastekk_workflow_sdk.node_call_protocol import (
     requested_node_call_protocol,
 )
 from canvastekk_workflow_sdk.node_io_data_contracts import WorkflowNodeCallOutcome, parse_workflow_node_call_outcome
-from canvastekk_workflow_sdk.workflow.executor import HttpExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import HttpNodeExecutor
 from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 from tests.test_app import EchoNode, FailingNode
 
@@ -86,7 +86,7 @@ async def test_http_executor_sends_the_header_and_reads_both(status: str, succee
         seen.append(request)
         return httpx.Response(200, json={"execution_id": "e", "status": status, "outputs": {"x": 1}, "error": "boom"})
 
-    executor = HttpExecutor(retries=0).register_url("echo", "http://node.example")
+    executor = HttpNodeExecutor(retries=0).register_url("echo", "http://node.example")
     executor._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     context = NodeExecutionContext(run_id="r", node_id="n")
 

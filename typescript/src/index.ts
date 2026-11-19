@@ -36,6 +36,22 @@ export { uploadViaCdsMultipartSession as uploadViaSession } from "./cds-multipar
 /** @deprecated use NODE_IO_DATA_CONTRACT_VERSION */
 export { NODE_IO_DATA_CONTRACT_VERSION as CONTRACT_VERSION, type NodeIoDataContractData as BaseContractData } from "./node-io-data-contracts/index.js";
 // --- end phase-3 deprecated aliases ---
+// --- Deprecated name aliases, phase 4 (ADR 0001, #271; removal in 1.0.0, #272) ---
+/** @deprecated use validateWorkflowDefinition */
+export { validateWorkflowDefinition as validate } from "./workflow/index.js";
+/** @deprecated use WorkflowDefinitionValidationResult */
+export { type WorkflowDefinitionValidationResult as ValidationResult } from "./workflow/index.js";
+/** @deprecated use WorkflowRunNodeResult */
+export { type WorkflowRunNodeResult as NodeResult } from "./workflow/index.js";
+/** @deprecated use WorkflowRunErrorPolicy */
+export { type WorkflowRunErrorPolicy as ErrorPolicy } from "./workflow/index.js";
+/** @deprecated use WorkflowRunNodeExecutor / InProcessNodeExecutor / HttpNodeExecutor */
+export { type WorkflowRunNodeExecutor as NodeExecutor, InProcessNodeExecutor as InProcessExecutor, HttpNodeExecutor as HttpExecutor } from "./workflow/index.js";
+/** @deprecated use WorkflowRunError */
+export { WorkflowRunError as WorkflowExecutionError } from "./exceptions.js";
+/** @deprecated use WorkflowDefinitionValidationError */
+export { WorkflowDefinitionValidationError as WorkflowValidationError } from "./exceptions.js";
+// --- end phase-4 deprecated aliases ---
 
 // --- Deprecated name aliases (ADR 0001, #271; removal in 1.0.0, #272) ---
 /** @deprecated use WorkflowNodeColorPreset */
@@ -89,8 +105,8 @@ export {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
-  WorkflowExecutionError,
-  WorkflowValidationError,
+  WorkflowRunError,
+  WorkflowDefinitionValidationError,
   WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
@@ -196,24 +212,24 @@ export { diffWorkflowNodeManifests } from "./workflow-node-manifest-diff.js";
 export type { WorkflowNodeManifestDiff } from "./workflow-node-manifest-diff.js";
 export {
   WorkflowBuilder,
-  InProcessExecutor,
-  HttpExecutor,
+  InProcessNodeExecutor,
+  HttpNodeExecutor,
   WorkflowRunner,
   computeLevels,
   resolveInputs,
   ResolverError,
-  validate,
+  validateWorkflowDefinition,
 } from "./workflow/index.js";
 export type {
   EdgeType,
   WorkflowEdgeDefinition,
   WorkflowDefinitionNode,
   WorkflowDefinitionSpec,
-  NodeExecutor,
-  ErrorPolicy,
-  NodeResult,
+  WorkflowRunNodeExecutor,
+  WorkflowRunErrorPolicy,
+  WorkflowRunNodeResult,
   WorkflowRunResult,
-  ValidationResult,
+  WorkflowDefinitionValidationResult,
 } from "./workflow/index.js";
 
 import { warnSupportHorizon } from "./support-horizon.js";

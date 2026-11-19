@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_validator, model_serializer, model_validator
 
 from canvastekk_workflow_sdk._version import __version__ as _sdk_version_stamp
-from canvastekk_workflow_sdk.exceptions import NodeValidationError
+from canvastekk_workflow_sdk.exceptions import WorkflowNodeManifestValidationError
 
 
 def _stamped_sdk_version() -> str:
@@ -540,7 +540,7 @@ class WorkflowNodeManifest(BaseModel):
             file_path: Path to the downloaded file.
 
         Raises:
-            NodeValidationError: If the file fails validation.
+            WorkflowNodeManifestValidationError: If the file fails validation.
         """
         properties = self.input_schema.get("properties", {})
         schema = properties.get(field_name, {})
@@ -550,7 +550,7 @@ class WorkflowNodeManifest(BaseModel):
         x_accept = schema.get("x-accept")
         if x_accept and file_path.suffix:
             if file_path.suffix.lower() not in [ext.lower() for ext in x_accept]:
-                raise NodeValidationError(
+                raise WorkflowNodeManifestValidationError(
                     f"File extension '{file_path.suffix}' is not allowed for field '{field_name}'. "
                     f"Allowed extensions: {x_accept}"
                 )
@@ -559,7 +559,7 @@ class WorkflowNodeManifest(BaseModel):
         if x_max_size is not None:
             file_size = file_path.stat().st_size
             if file_size > x_max_size:
-                raise NodeValidationError(
+                raise WorkflowNodeManifestValidationError(
                     f"File size ({file_size} bytes) exceeds maximum size ({x_max_size} bytes) for field '{field_name}'"
                 )
 
