@@ -103,4 +103,6 @@ GATE 8d8c3d1 tier=light lint=t typecheck=t build=- unit=t e2e=n.a
 LOG Phase 3 gate (docs-only): skill-mirror diff -r exit 0; rg "envelope" hits guide (3) and all three READMEs mention the guard; no contradicting claims found.
 GATE f1d1d28 tier=light lint=t typecheck=n.a build=- unit=n.a e2e=n.a
 LOG Exit gate (ticket, tier=full): TS lint full green, tsc source+tests green, tsup build green (pre-existing import.meta cjs warning in cli.ts unchanged), vitest 27 files/480 tests; python ruff full clean, pytest 1020 passed 1 skipped, wheel/sdist build OK; skill-mirror diff -r exit 0.
+GATE 7d73b6a tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Re-gate (resume rebase onto 0b0f33c — #258 protocol-2 entered the base, hence py 1020→1041 and ts 480→496 inherited-test deltas — then refactor 7d73b6a pure code motion): eslint, tsc source+tests, tsup build, vitest 28/496, ruff, pytest 1041 passed 1 skipped, skill-mirror diff 0, wheel/sdist build OK. Supersedes the pre-rebase GATE f1d1d28 tier=light line (SHA rewritten by rebase); this is the authoritative exit memo.
 
