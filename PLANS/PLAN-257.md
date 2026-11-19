@@ -38,15 +38,17 @@
 
 ### Phase 2: TypeScript definition-time guard (parity)
 
-- [ ] **2.1** Add `validateOutputSchemaRequiredFields(schema)` to `typescript/src/definition.ts`, called from the manifest schema's existing `superRefine` where `validateFileFieldFormats` runs on `output_schema`; identical semantics and near-identical message to python (parity suites compare behavior). Close the parse-site gap (architecture review finding 1): `registerNode` builds its payload from `WorkflowNodeManifestSchema.parse(node.definition)` — parse is otherwise lazy (`base-node.ts` `getDefinition`) and the CLI path (`cli.ts:324`) is the only eager parse today, so a direct `registerNode({ definition: <literal> })` caller would ship an unvalidated manifest.
+- [x] **2.1** Add `validateOutputSchemaRequiredFields(schema)` to `typescript/src/definition.ts`, called from the manifest schema's existing `superRefine` where `validateFileFieldFormats` runs on `output_schema`; identical semantics and near-identical message to python (parity suites compare behavior). Close the parse-site gap (architecture review finding 1): `registerNode` builds its payload from `WorkflowNodeManifestSchema.parse(node.definition)` — parse is otherwise lazy (`base-node.ts` `getDefinition`) and the CLI path (`cli.ts:324`) is the only eager parse today, so a direct `registerNode({ definition: <literal> })` caller would ship an unvalidated manifest.
     — **Why:** the ts package registers the same registry; a python-only guard leaves js-authored nodes able to reintroduce the outage, and structural typing lets object literals skip lazy validation on the direct-API path
     — **Done when:** `WorkflowNodeManifestSchema.parse` throws for required-`error` output schemas and passes for optional-`error` ones; `registerNode` parses before building the payload (test pins a literal definition reaching `buildRegistryPayload` validated)
     — **Consumers affected:** ts SDK surfaces + js node authors
+    — **Done:** exported `ENVELOPE_RESERVED_OUTPUT_FIELDS` + `validateOutputSchemaRequiredFields` hooked into the manifest transform's existing try/catch (throws surface as zod issues); `registerNode` payload build now parses (registry.ts, comment cites the lazy-parse gap); files: `typescript/src/definition.ts`, `typescript/src/registry.ts`; fixes: none
 
-- [ ] **2.2** Mirror tests in `typescript/tests/definition.test.ts` covering the same four cases as 1.2, plus one `registerNode` test pinning that a raw literal definition with required-`error` outputs is rejected before any network call.
+- [x] **2.2** Mirror tests in `typescript/tests/definition.test.ts` covering the same four cases as 1.2, plus one `registerNode` test pinning that a raw literal definition with required-`error` outputs is rejected before any network call.
     — **Why:** same boundary-pinning as 1.2, ts side; the registerNode parse hook needs its own pin (it is the fix for the architecture-review bypass finding)
     — **Done when:** `vitest run definition.test.ts registry.test.ts` green
     — **Consumers affected:** CI ts suite
+    — **Done:** it.each over the three envelope fields + optional-error + input-side-error + absent/non-list required tests in definition.test.ts; registerNode raw-literal test asserts /envelope field/ rejection with `fetched === false`; definition+registry 107 passed, full ts suite 480 passed; files: `typescript/tests/definition.test.ts`, `typescript/tests/registry.test.ts`; fixes: none
 
 ### Phase 3: Contract-authoring docs + skill mirror + README sweep
 
@@ -90,5 +92,7 @@ None blocking (parent epic tracker#4295 lists A7 as independent). No new externa
 
 ## Trace
 
+GATE 7ce10a9 tier=light lint=t typecheck=n.a build=- unit=t e2e=n.a
 LOG Phase 1 gate: ruff scoped errored once (I001 import order, auto-fixed), then green; test_definition.py 110 passed; full python suite 1020 passed 1 skipped (main-checkout poetry venv; worktree lacks fastapi extra). GATE memo follows the phase commit.
+LOG Phase 2 gate (green first try): eslint scoped on definition/registry + tests, tsc typecheck + typecheck:tests, definition+registry 107 passed, full ts suite 480 passed (npm ci run in worktree — node_modules is untracked and not inherited).
 

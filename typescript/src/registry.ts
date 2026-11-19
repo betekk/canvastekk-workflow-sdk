@@ -2,7 +2,7 @@ import { VERSION } from "./version.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { WorkflowNodeManifest } from "./definition.js";
-import { DeprecationInfoSchema } from "./definition.js";
+import { DeprecationInfoSchema, WorkflowNodeManifestSchema } from "./definition.js";
 import { RegistrationError } from "./exceptions.js";
 
 /** Node invocation type. */
@@ -222,7 +222,10 @@ export async function registerNode(
     );
   }
 
-  const manifest = buildRegistryPayload(node.definition, {
+  // #257: parse before payload — parse is otherwise lazy (base-node getDefinition)
+  // and the CLI is the only eager parse site, so a raw literal definition would
+  // otherwise ship to the registry unvalidated. Idempotent for parsed manifests.
+  const manifest = buildRegistryPayload(WorkflowNodeManifestSchema.parse(node.definition), {
     invokeType,
     invokeUrl,
     tags,
