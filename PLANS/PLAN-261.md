@@ -30,22 +30,26 @@ Cross-module consumers exist beyond the repo (nodes repo dispatch) → architect
 ## Implementation Phases
 
 ### Phase 1: reusable-release.yml — release-intent gate
-- [ ] **1.1** Add `is_release` output at both levels: workflow `on.workflow_call.outputs` (description + `value: ${{ jobs.release.outputs.is_release }}`) and the `release` job's `outputs:` (`${{ steps.release_intent.outputs.is_release }}`)
+- [x] **1.1** Add `is_release` output at both levels: workflow `on.workflow_call.outputs` (description + `value: ${{ jobs.release.outputs.is_release }}`) and the `release` job's `outputs:` (`${{ steps.release_intent.outputs.is_release }}`)
     — **Why:** `release.yml`'s publish gate must key on release intent, not branch name; workflow_call outputs are the only channel upward.
     — **Done when:** `actionlint` accepts both blocks and the output resolves through the caller expression.
     — **Consumers affected:** `release.yml` publish job gate (Phase 2).
-- [ ] **1.2** Replace the `bump_type` step with a combined `release_intent` step (github-script, no `if:`): one `listPullRequestsAssociatedWithCommit` call emitting `is_release` (label set contains `release`) and `type` (`major`/`minor` from labels, else `patch`). Lookup exception or empty PR list ⇒ `is_release=false` + `::warning` — **fail closed**. Keep the #172 provenance comment, restated for inverted semantics.
+    — **Done:** is_release threaded through workflow_call.outputs and job outputs; actionlint green on all four workflows; files: reusable-release.yml; fixes: none
+- [x] **1.2** Replace the `bump_type` step with a combined `release_intent` step (github-script, no `if:`): one `listPullRequestsAssociatedWithCommit` call emitting `is_release` (label set contains `release`) and `type` (`major`/`minor` from labels, else `patch`). Lookup exception or empty PR list ⇒ `is_release=false` + `::warning` — **fail closed**. Keep the #172 provenance comment, restated for inverted semantics.
     — **Why:** Single API call decides both *whether* to release and the bump size; today's #172 fallback (downgrade-to-patch) is safe for size but would be fail-open for release intent.
     — **Done when:** Step emits both outputs on all three paths (label present / absent / lookup-failed) — exercised by the AC-3 simulation script (4.2).
     — **Consumers affected:** `tag_version`, changelog/release gates (1.3, 1.4), publish gate via 1.1.
-- [ ] **1.3** Retire the `is_prod` output from the `prerelease` step (line 114) and retarget its three consumers (`bump_type`-position gate is gone with 1.2; changelog gate :157; GitHub-Release gate :167) to `steps.release_intent.outputs.is_release == 'true'`
+    — **Done:** bump_type (branch-gated, patch-fallback) replaced by unconditional fail-closed release_intent emitting is_release + type, #172 provenance restated with inverted semantics; simulation deferred to 4.2 per plan; files: reusable-release.yml; fixes: none
+- [x] **1.3** Retire the `is_prod` output from the `prerelease` step (line 114) and retarget its three consumers (`bump_type`-position gate is gone with 1.2; changelog gate :157; GitHub-Release gate :167) to `steps.release_intent.outputs.is_release == 'true'`
     — **Why:** Branch-name identity no longer implies release; the label lookup is the single source of intent. `branch`/`suffix` outputs stay (beta-channel gate :179 still reads `branch`).
     — **Done when:** `grep is_prod` in the file returns zero hits; beta gate still references `prerelease.outputs.branch`.
     — **Consumers affected:** changelog + GitHub Release creation steps.
-- [ ] **1.4** `tag_version` (mathieudutour action): add `if: steps.release_intent.outputs.is_release == 'true'`; `release_branches: prod` → `dev`; `default_bump: ${{ steps.release_intent.outputs.type || 'patch' }}`
+    — **Done:** is_prod echo removed (comment points to release_intent), changelog + GitHub Release gates retargeted to is_release, step names reworded "(release merges only)", beta gate untouched on prerelease.outputs.branch; grep is_prod → zero; files: reusable-release.yml; fixes: none
+- [x] **1.4** `tag_version` (mathieudutour action): add `if: steps.release_intent.outputs.is_release == 'true'`; `release_branches: prod` → `dev`; `default_bump: ${{ steps.release_intent.outputs.type || 'patch' }}`
     — **Why:** Only release-PR merges may mint tags; with the step gated, `dev` must be the action's release branch so it mints bare finals; bump size comes from the intent step.
     — **Done when:** actionlint passes; an ungated dev push structurally cannot reach the action (step-level `if`).
     — **Consumers affected:** tag minting → `new_tag`/`new_version` outputs → publish job.
+    — **Done:** step-level if added, release_branches: dev with rationale comment (bare finals; ordinary pushes never reach the step), default_bump sourced from release_intent.type; actionlint green; files: reusable-release.yml; fixes: none
 
 ### Phase 2: release.yml — trigger and publish gate
 - [ ] **2.1** `on.push.branches: [dev, prod]` → `[dev]` (keep `workflow_dispatch`)
@@ -105,3 +109,8 @@ Cross-module consumers exist beyond the repo (nodes repo dispatch) → architect
 - **Accidental release from a feature PR mislabeled `release`** → deliberate act by a labeler with push rights; #263 documents the label discipline.
 - **Tag action behavior change on `release_branches: dev`** → step-level `if` means the action only ever runs on gated pushes; #264's real release is the end-to-end proof.
 - **#252 collision (betekk-gha migration preserving two-lane)** → epic decision recorded on #252; #263 re-scopes its AC.
+
+## Trace
+
+LOG gate-escalation Phase 1: full tier — anchor: CI/workflow file touched + Dependency & Consumer Map node with cross-module consumers (reusable-release.yml → release.yml caller).
+LOG fix r1 (unit axis): pytest collection failed — ModuleNotFoundError fastapi; env created without extras. Root cause: canonical CI invocation is `poetry install -E fastapi` (ci-python.yml:118). Repaired env, re-ran full unit axis green. total_fixes=1.
