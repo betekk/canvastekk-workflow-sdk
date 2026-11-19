@@ -8,7 +8,7 @@ on:
         type: string
         default: v
       cliff_config:
-        description: Repo-relative path to the git-cliff config used for the prod changelog
+        description: Repo-relative path to the git-cliff config used for the release changelog
         type: string
         default: cliff.toml
       runner_pool:
@@ -110,7 +110,6 @@ jobs:
             dev)  SUFFIX="dev"  ;;
             uat)  SUFFIX="uat"  ;;
             beta) SUFFIX="beta" ;;
-            prod) SUFFIX=""     ;;
             *)    SUFFIX="$BRANCH" ;;
           esac
           echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
@@ -194,7 +193,7 @@ jobs:
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
           name: ${{ steps.tag_version.outputs.new_tag }}
-          body: "Prerelease from the `beta` channel (external preview). Full changelog ships with the next prod release."
+          body: "Prerelease from the `beta` channel (external preview). Full changelog ships with the next final release."
           makeLatest: false
           prerelease: true
         env:
