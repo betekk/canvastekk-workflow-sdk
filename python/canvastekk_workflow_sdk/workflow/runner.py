@@ -15,7 +15,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from canvastekk_workflow_sdk.context import ExecutionContext
+from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
 from canvastekk_workflow_sdk.workflow._control_flow import CONTROL_FLOW_HANDLERS
 from canvastekk_workflow_sdk.workflow.executor import NodeExecutor
 from canvastekk_workflow_sdk.workflow.level import compute_levels
@@ -149,7 +149,7 @@ class WorkflowRunner:
         self,
         slug: str,
         resolved: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """Run executor.execute under the per-level concurrency semaphore."""
         async with self._semaphore:
@@ -241,7 +241,7 @@ class WorkflowRunner:
                         continue
                     if node.slug == "__start__" and nid in seeded_outputs:
                         resolved = {**resolved, **seeded_outputs[nid]}
-                    context = ExecutionContext(
+                    context = NodeExecutionContext(
                         run_id="local",
                         node_id=nid,
                         output_dir=run_output_dir / nid,
@@ -319,7 +319,7 @@ class WorkflowRunner:
                         if self._error_policy == ErrorPolicy.FAIL_FAST:
                             break
                         continue
-                    context = ExecutionContext(
+                    context = NodeExecutionContext(
                         run_id="local",
                         node_id=nid,
                         output_dir=run_output_dir / nid,

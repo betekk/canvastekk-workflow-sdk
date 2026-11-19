@@ -17,7 +17,7 @@ vi.mock("../src/logging.js", () => ({
   })),
 }));
 
-import { BaseNode } from "../src/base-node.js";
+import { WorkflowNodeBase } from "../src/workflow-node-base.js";
 import { WorkflowNodeManifestSchema } from "../src/definition.js";
 import { buildWorkflowNodeRegistryPayload } from "../src/registry.js";
 import type { WorkflowNodeManifest, WorkflowNodeDeprecationInfo } from "../src/definition.js";
@@ -48,8 +48,8 @@ const baseManifest = (deprecation?: WorkflowNodeDeprecationInfo): WorkflowNodeMa
   ...(deprecation !== undefined ? { deprecation } : {}),
 });
 
-function makeNode(deprecation?: WorkflowNodeDeprecationInfo): BaseNode {
-  class TestNode extends BaseNode {
+function makeNode(deprecation?: WorkflowNodeDeprecationInfo): WorkflowNodeBase {
+  class TestNode extends WorkflowNodeBase {
     definition: WorkflowNodeManifest = baseManifest(deprecation);
 
     execute(inputs: Record<string, unknown>): Record<string, unknown> {

@@ -1,7 +1,7 @@
 """
 Node Executor Strategy
 
-Defines how a node is executed: in-process (BaseNode.execute) or HTTP (POST /execute).
+Defines how a node is executed: in-process (WorkflowNodeBase.execute) or HTTP (POST /execute).
 """
 
 from __future__ import annotations
@@ -12,11 +12,15 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from canvastekk_workflow_sdk.protocol import NODE_PROTOCOL_HEADER, NODE_PROTOCOL_VERSION, read_outcome
+from canvastekk_workflow_sdk.node_call_protocol import (
+    NODE_CALL_PROTOCOL_HEADER,
+    NODE_CALL_PROTOCOL_VERSION,
+    read_node_call_outcome,
+)
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.base import BaseNode
-    from canvastekk_workflow_sdk.context import ExecutionContext
+    from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
+    from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 
 
 class NodeExecutor(ABC):
@@ -27,7 +31,7 @@ class NodeExecutor(ABC):
         self,
         slug: str,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """Execute a node and return its outputs."""
 
@@ -37,7 +41,7 @@ class NodeExecutor(ABC):
 
 
 class InProcessExecutor(NodeExecutor):
-    """Execute nodes by calling BaseNode.execute() directly via asyncio.to_thread.
+    """Execute nodes by calling WorkflowNodeBase.execute() directly via asyncio.to_thread.
 
     Example::
 
@@ -48,14 +52,14 @@ class InProcessExecutor(NodeExecutor):
 
     def __init__(self) -> None:
         """Initialize in-process executor with empty node registry."""
-        self._registry: dict[str, BaseNode] = {}
+        self._registry: dict[str, WorkflowNodeBase] = {}
 
-    def register(self, slug: str, node: BaseNode) -> InProcessExecutor:
-        """Register a BaseNode instance for a slug.
+    def register(self, slug: str, node: WorkflowNodeBase) -> InProcessExecutor:
+        """Register a WorkflowNodeBase instance for a slug.
 
         Args:
             slug: Node type slug (e.g. ``"segmentation-v1.0.0"``).
-            node: BaseNode instance.
+            node: WorkflowNodeBase instance.
 
         Returns:
             self for chaining.
@@ -67,9 +71,9 @@ class InProcessExecutor(NodeExecutor):
         self,
         slug: str,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
-        """Execute a node by calling BaseNode.execute() in a thread.
+        """Execute a node by calling WorkflowNodeBase.execute() in a thread.
 
         Args:
             slug: Node type slug.
@@ -137,7 +141,7 @@ class HttpExecutor(NodeExecutor):
         self,
         slug: str,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """Execute a node by POSTing to its HTTP endpoint.
 
@@ -168,7 +172,7 @@ class HttpExecutor(NodeExecutor):
                 response = await client.post(
                     f"{url}/execute",
                     json=payload,
-                    headers={NODE_PROTOCOL_HEADER: str(NODE_PROTOCOL_VERSION)},
+                    headers={NODE_CALL_PROTOCOL_HEADER: str(NODE_CALL_PROTOCOL_VERSION)},
                 )
                 response.raise_for_status()
                 break
@@ -182,7 +186,7 @@ class HttpExecutor(NodeExecutor):
         data = response.json()
         if not isinstance(data, dict):
             raise RuntimeError(f"Node '{slug}' returned malformed response (not an object)")
-        if read_outcome(data.get("status")) == "pass":
+        if read_node_call_outcome(data.get("status")) == "pass":
             outputs = data.get("outputs", {})
             if not isinstance(outputs, dict):
                 raise RuntimeError(f"Node '{slug}' returned malformed outputs (not an object)")

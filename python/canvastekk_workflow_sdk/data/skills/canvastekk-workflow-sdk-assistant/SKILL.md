@@ -47,9 +47,9 @@ gating a creation; each row is a hard failure, not a style note.
 
 **Structure rules**
 
-- `definition` is a module-level variable AND a class attribute on the `BaseNode` subclass (module level enables CLI validation; class attribute satisfies `BaseNode.__init_subclass__`).
+- `definition` is a module-level variable AND a class attribute on the `WorkflowNodeBase` subclass (module level enables CLI validation; class attribute satisfies `WorkflowNodeBase.__init_subclass__`).
 - `app = MyNode().create_app()` at module level (uvicorn target `handler:app`).
-- `execute(self, inputs: dict, context: ExecutionContext) -> dict` implemented; returns a dict matching `output_schema`.
+- `execute(self, inputs: dict, context: NodeExecutionContext) -> dict` implemented; returns a dict matching `output_schema`.
 
 **Offline gate (must exit 0 before "done")**
 
@@ -66,7 +66,7 @@ never install an extra "just in case".
 | You are doing | Install | Why |
 |---|---|---|
 | Defining / validating / testing a node, building workflows locally, registering via `register_workflow_node` | `canvastekk-workflow-sdk` | Base install is complete for everything except serving HTTP |
-| Serving the HTTP contract through the SDK (`create_node_app` / `create_app()`) | `canvastekk-workflow-sdk[fastapi,serve]` | Since SDK 0.43 the base install ships without fastapi; `[serve]` adds uvicorn |
+| Serving the HTTP contract through the SDK (`create_workflow_node_app` / `create_app()`) | `canvastekk-workflow-sdk[fastapi,serve]` | Since SDK 0.43 the base install ships without fastapi; `[serve]` adds uvicorn |
 | Hosting the routes yourself (any web framework you already use) | base + your framework | The SDK validates/verifies/registers; it never serves |
 | `NodeAuth.jwt()` | `[jwt]` | Adds PyJWT |
 | `NodeAuth.keycloak()` | `[keycloak]` | Adds PyJWT + cryptography |
@@ -88,7 +88,7 @@ Run each check; report a PASS/FAIL table with the fix for every FAIL.
    plan an upgrade; the SDK warns at import when past its support horizon.
 2. **Dependency audit** — read `pyproject.toml`/requirements; cross-check
    extras against what the handler actually imports (uses `create_app`/
-   `create_node_app` → `[fastapi]` needed; runs uvicorn → `[serve]`;
+   `create_workflow_node_app` → `[fastapi]` needed; runs uvicorn → `[serve]`;
    `NodeAuth.jwt` → `[jwt]`; `NodeAuth.keycloak` → `[keycloak]`). Flag
    missing extras (import crashes) and unused extras (cost).
 3. **Change review** — classify what changed between versions:
@@ -120,7 +120,7 @@ GitHub Packages needs a PAT with `read:packages`):**
 | `GET /metrics` | execution statistics |
 | `GET /live` · `GET /ready` | Kubernetes liveness/readiness |
 
-**`ExecutionContext` in `execute()`**: `run_id`, `node_id`,
+**`NodeExecutionContext` in `execute()`**: `run_id`, `node_id`,
 `output_path(name)` for files, `logger`, `report_progress(0..1, msg)`,
 `record_token_usage(…)`, `metadata` (download facts per file field).
 

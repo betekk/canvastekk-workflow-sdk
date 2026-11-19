@@ -9,8 +9,8 @@ import httpx
 import pytest
 
 from canvastekk_workflow_sdk import WorkflowNodeDeprecationInfo, WorkflowNodeManifest, WorkflowNodeManifestContract
-from canvastekk_workflow_sdk.base import BaseNode
-from canvastekk_workflow_sdk.context import ExecutionContext
+from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
+from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 from canvastekk_workflow_sdk.workflow_node_registry import (
     WorkflowNodeRegistrationError,
     WorkflowNodeRegistrationResult,
@@ -22,7 +22,7 @@ from canvastekk_workflow_sdk.workflow_node_registry import (
 #: Well-formed registry credential for happy-path tests (DA-1948 shape).
 CTK = "ctk_" + "k" * 43
 
-class DummyNode(BaseNode):
+class DummyNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         name="test",
         version="1.0.0",
@@ -32,7 +32,7 @@ class DummyNode(BaseNode):
         output_schema={"type": "object", "properties": {"output": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"output": inputs.get("input", "")}
 
 

@@ -179,7 +179,7 @@ def configure_logging(
     Reads ``CANVASTEKK_LOG_LEVEL`` and ``CANVASTEKK_LOG_FORMAT`` from the
     environment unless overridden by the explicit parameters.
 
-    This is called automatically by :func:`create_node_app` at startup.
+    This is called automatically by :func:`create_workflow_node_app` at startup.
     Call it manually in tests or scripts if you need SDK logging outside
     the HTTP server.
 

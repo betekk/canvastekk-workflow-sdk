@@ -6,7 +6,7 @@ import type { NodeExecutor } from "./executor.js";
 import { computeLevels } from "./level.js";
 import { resolveInputs } from "./resolver.js";
 import { CONTROL_FLOW_HANDLERS } from "./control-flow.js";
-import { ExecutionContext } from "../context.js";
+import { NodeExecutionContext } from "../node-execution-context.js";
 
 export type ErrorPolicy = "fail_fast" | "continue";
 
@@ -149,7 +149,7 @@ export class WorkflowRunner {
           if (slug === "__start__" && seededOutputs.has(nid)) {
             resolved = { ...resolved, ...seededOutputs.get(nid) };
           }
-          const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
+          const context = new NodeExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           const t0 = performance.now();
           try {
             const outputs = handler(resolved, context);
@@ -223,7 +223,7 @@ export class WorkflowRunner {
             if (this._errorPolicy === "fail_fast") break;
             continue;
           }
-          const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
+          const context = new NodeExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           tasks.push(this._executor.execute(slug, resolved, context));
           taskNodeIds.push(nid);
         }

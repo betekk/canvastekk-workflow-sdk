@@ -7,10 +7,10 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
+from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, WorkflowNodeBase, WorkflowNodeManifest
 
 
-class FileInputNode(BaseNode):
+class FileInputNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="file-input-v1.0.0",
         name="file-input",
@@ -36,12 +36,12 @@ class FileInputNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         path = Path(inputs["point_cloud"])
         return {"size": path.stat().st_size}
 
 
-class MultiFileInputNode(BaseNode):
+class MultiFileInputNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="multi-file-v1.0.0",
         name="multi-file",
@@ -68,11 +68,11 @@ class MultiFileInputNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"file_a": inputs["file_a"], "file_b": inputs["file_b"]}
 
 
-class OptionalFileInputNode(BaseNode):
+class OptionalFileInputNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="opt-file-v1.0.0",
         name="opt-file",
@@ -93,14 +93,14 @@ class OptionalFileInputNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         data_val = inputs.get("data")
         if data_val is None:
             return {"data": None}
         return {"data": Path(data_val).stat().st_size}
 
 
-class NoFileInputNode(BaseNode):
+class NoFileInputNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="no-file-v1.0.0",
         name="no-file",
@@ -117,11 +117,11 @@ class NoFileInputNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class StrictValidationNode(BaseNode):
+class StrictValidationNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="strict-v1.0.0",
         name="strict",
@@ -143,7 +143,7 @@ class StrictValidationNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {}
 
 
@@ -183,7 +183,7 @@ def _make_mock_stream_error(status_code: int):
 class TestAutoDownload:
     """Tests for auto-download file input pipeline."""
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_url_downloaded_and_replaced_with_local_path(self, mock_stream, tmp_path):
         content = b"fake ply data"
         stream_response = _make_mock_stream(
@@ -213,7 +213,7 @@ class TestAutoDownload:
         assert mock_stream.call_args.args == ("GET", url)
         assert mock_stream.call_args.kwargs["follow_redirects"] is False
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_original_url_stored_in_metadata(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -266,7 +266,7 @@ class TestAutoDownload:
         with pytest.raises(Exception):
             node._validate_inputs(request.inputs)
 
-        class LenientOptionalNode(BaseNode):
+        class LenientOptionalNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 id="lenient-opt-v1.0.0",
                 name="lenient-opt",
@@ -313,7 +313,7 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["message"] == "https://example.com/not-a-file"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_download_http_error_raises_io_error(self, mock_stream):
         stream_response = _make_mock_stream_error(404)
         mock_stream.return_value = stream_response
@@ -332,7 +332,7 @@ class TestAutoDownload:
         assert not stream_response.iterated
         assert stream_response.exited
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_download_timeout_raises_io_error(self, mock_stream):
         mock_stream.side_effect = httpx.TimeoutException("timed out")
 
@@ -348,7 +348,7 @@ class TestAutoDownload:
         assert response.error_type == "NodeIOError"
         assert "Timeout" in response.error
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_content_disposition_path_traversal_sanitized(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -375,7 +375,7 @@ class TestAutoDownload:
         assert "../" not in local
         assert Path(local).name == "point_cloud_scan.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_two_file_inputs_no_collision(self, mock_stream):
         call_count = [0]
 
@@ -409,7 +409,7 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["file_a"] != response.outputs["file_b"]
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_url_with_query_params_filename_extracted(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"data",
@@ -434,11 +434,11 @@ class TestAutoDownload:
         local = metadata_captured["point_cloud"]["local_path"]
         assert Path(local).name == "point_cloud_scan.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_url_with_no_extension_fallback(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"data", {})
 
-        class NoExtNode(BaseNode):
+        class NoExtNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 id="noext-v1.0.0",
                 name="noext",
@@ -505,7 +505,7 @@ class TestAutoDownload:
         assert response.status == "pass"
         assert response.outputs["message"] == "hello"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_multiple_file_inputs_all_processed(self, mock_stream):
         call_count = [0]
 
@@ -551,7 +551,7 @@ class TestAutoDownload:
 
         assert response.status == "fail"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_wrong_extension_validation_fails(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(
             b"not a ply file",
@@ -570,7 +570,7 @@ class TestAutoDownload:
         assert response.error_type == "NodeValidationError"
         assert ".txt" in response.error
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_file_too_large_validation_fails(self, mock_stream):
         big_content = b"x" * 200
 
@@ -591,7 +591,7 @@ class TestAutoDownload:
         assert response.error_type == "NodeIOError"
         assert "exceeds" in response.error.lower() or "size" in response.error.lower()
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_partial_download_failure_cleans_up(self, mock_stream, tmp_path):
         call_count = [0]
 
@@ -631,32 +631,32 @@ class TestFilenameExtraction:
     """Tests for filename extraction from URLs and headers."""
 
     def test_content_disposition_filename(self):
-        result = BaseNode._extract_filename(
+        result = WorkflowNodeBase._extract_filename(
             "https://example.com/file",
             'attachment; filename="scan.ply"',
         )
         assert result == "scan.ply"
 
     def test_content_disposition_single_quotes(self):
-        result = BaseNode._extract_filename(
+        result = WorkflowNodeBase._extract_filename(
             "https://example.com/file",
             "attachment; filename='scan.ply'",
         )
         assert result == "scan.ply"
 
     def test_url_path_fallback(self):
-        result = BaseNode._extract_filename(
+        result = WorkflowNodeBase._extract_filename(
             "https://example.com/bucket/scan.ply?sig=abc",
             None,
         )
         assert result == "scan.ply"
 
     def test_url_with_no_path(self):
-        result = BaseNode._extract_filename("https://example.com", None)
+        result = WorkflowNodeBase._extract_filename("https://example.com", None)
         assert result == "download"
 
     def test_path_traversal_stripped(self):
-        result = BaseNode._extract_filename(
+        result = WorkflowNodeBase._extract_filename(
             "https://example.com/file",
             'attachment; filename="../../../etc/passwd"',
         )
@@ -665,25 +665,25 @@ class TestFilenameExtraction:
 
 
 class TestExecutionContextExtensions:
-    """Tests for new ExecutionContext properties."""
+    """Tests for new NodeExecutionContext properties."""
 
     def test_metadata_dict_exists(self):
         request = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
-        ctx = ExecutionContext(request)
+        ctx = NodeExecutionContext(request)
 
         assert isinstance(ctx.metadata, dict)
         assert len(ctx.metadata) == 0
 
     def test_metadata_is_mutable(self):
         request = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
-        ctx = ExecutionContext(request)
+        ctx = NodeExecutionContext(request)
 
         ctx.metadata["test"] = {"key": "value"}
         assert ctx.metadata["test"] == {"key": "value"}
 
     def test_downloads_dir_created_lazily(self):
         request = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
-        ctx = ExecutionContext(request)
+        ctx = NodeExecutionContext(request)
 
         assert ctx._downloads_dir is None
         d = ctx.downloads_dir
@@ -693,13 +693,13 @@ class TestExecutionContextExtensions:
 
     def test_downloads_dir_is_subdir_of_output_dir(self):
         request = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
-        ctx = ExecutionContext(request)
+        ctx = NodeExecutionContext(request)
 
         assert ctx.downloads_dir == ctx.output_dir / "downloads"
 
     def test_downloads_dir_only_created_once(self):
         request = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
-        ctx = ExecutionContext(request)
+        ctx = NodeExecutionContext(request)
 
         d1 = ctx.downloads_dir
         d2 = ctx.downloads_dir
@@ -722,7 +722,7 @@ class TestDownloadPolicy:
 
     def test_redirect_to_private_ip_blocked(self) -> None:
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.stream",
+            "canvastekk_workflow_sdk.workflow_node_base.httpx.stream",
             return_value=_make_redirect_response(f"https://{self.PRIVATE_HOST}/x.ply"),
         ):
             node = FileInputNode()
@@ -744,7 +744,7 @@ class TestDownloadPolicy:
             _make_redirect_response("https://example.com/redirected.ply"),
             _make_mock_stream(b"redirected content"),
         ]
-        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=responses):
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream", side_effect=responses):
             metadata_captured: dict[str, Any] = {}
 
             class CaptureNode(FileInputNode):
@@ -770,7 +770,7 @@ class TestDownloadPolicy:
             _make_redirect_response("/next/scan.ply"),
             _make_mock_stream(b"data"),
         ]
-        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=responses):
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream", side_effect=responses):
             response = FileInputNode().run(
                 NodeExecutionRequest(
                     run_id="r-rel",
@@ -784,7 +784,7 @@ class TestDownloadPolicy:
     def test_too_many_redirect_hops_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CANVASTEKK_URL_ALLOWLIST", "example.com")
         redirects = [_make_redirect_response(f"https://example.com/hop{i}.ply") for i in range(7)]
-        with patch("canvastekk_workflow_sdk.base.httpx.stream", side_effect=redirects):
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream", side_effect=redirects):
             response = FileInputNode().run(
                 NodeExecutionRequest(
                     run_id="r-loops",
@@ -802,7 +802,7 @@ class TestDownloadPolicy:
     ) -> None:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
         stream_response = _make_mock_stream(b"x" * 200, {"content-length": "200"})
-        with patch("canvastekk_workflow_sdk.base.httpx.stream", return_value=stream_response):
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream", return_value=stream_response):
             response = StrictValidationNode().run(
                 NodeExecutionRequest(
                     run_id="r-header-cap",
@@ -831,7 +831,7 @@ class TestDownloadPolicy:
                 yield b"x" * 100
 
         stream_response = ChunkedResponse()
-        with patch("canvastekk_workflow_sdk.base.httpx.stream", return_value=stream_response):
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream", return_value=stream_response):
             response = StrictValidationNode().run(
                 NodeExecutionRequest(
                     run_id="r-stream-cap",
@@ -852,7 +852,7 @@ class TestDownloadPolicy:
         monkeypatch.setenv("CANVASTEKK_OUTPUT_DIR", str(tmp_path))
         monkeypatch.setenv("CANVASTEKK_MAX_DOWNLOAD_BYTES", "10")
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.stream",
+            "canvastekk_workflow_sdk.workflow_node_base.httpx.stream",
             return_value=_make_mock_stream(b"x" * 12),
         ):
             response = MultiFileInputNode().run(
@@ -875,11 +875,11 @@ class TestDownloadPolicy:
         import time as _time
 
         monkeypatch.setattr(
-            "canvastekk_workflow_sdk.base._download_deadline",
+            "canvastekk_workflow_sdk.workflow_node_base._download_deadline",
             lambda timeout_seconds, started=None: _time.monotonic() - 1,
         )
         with patch(
-            "canvastekk_workflow_sdk.base.httpx.stream",
+            "canvastekk_workflow_sdk.workflow_node_base.httpx.stream",
             return_value=_make_mock_stream(b"payload"),
         ):
             response = FileInputNode().run(
@@ -901,7 +901,7 @@ class TestDownloadPolicy:
         cancel.set()
         node = FileInputNode()
         node._set_cancel_event(cancel)
-        with patch("canvastekk_workflow_sdk.base.httpx.stream") as mock_get:
+        with patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream") as mock_get:
             response = node.run(
                 NodeExecutionRequest(
                     run_id="r-cancel",
@@ -944,7 +944,7 @@ class TestIoSubcodesSdk161:
         assert IO_SUBCODE_SIZE_EXCEEDED == "IO_SIZE_EXCEEDED"
 
 
-class ArrayFileInputNode(BaseNode):
+class ArrayFileInputNode(WorkflowNodeBase):
     """S.1 (SDK#161): an array-of-file input field."""
 
     definition = WorkflowNodeManifest(
@@ -971,14 +971,14 @@ class ArrayFileInputNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"parts": [Path(p).stat().st_size for p in inputs["parts"] if isinstance(p, str) and p.startswith("/")]}
 
 
 class TestArrayFileInputsSdk161:
     """S.1: array file inputs download element-wise."""
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_array_urls_downloaded_element_wise(self, mock_stream):
         payloads = {
             "https://s3.example.com/a.ply": b"AAAA",
@@ -1007,7 +1007,7 @@ class TestArrayFileInputsSdk161:
         assert response.status == "pass"
         assert sorted(response.outputs["parts"]) == [4, 6]
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_array_metadata_is_per_element_list(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"XX", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
@@ -1029,7 +1029,7 @@ class TestArrayFileInputsSdk161:
         assert all(e["original_url"] == "https://s3.example.com/a.ply" for e in entries)
         assert all("local_path" in e and e["size_bytes"] == 2 for e in entries)
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_mixed_elements_pass_non_urls_through(self, mock_stream):
         mock_stream.return_value = _make_mock_stream(b"ZZZ", {"content-disposition": 'attachment; filename="a.ply"'})
         captured = {}
@@ -1050,7 +1050,7 @@ class TestArrayFileInputsSdk161:
         assert parts[0].startswith("/")
         assert parts[1] == "already-local.ply"
 
-    @patch("canvastekk_workflow_sdk.base.httpx.stream")
+    @patch("canvastekk_workflow_sdk.workflow_node_base.httpx.stream")
     def test_mid_list_failure_cleans_downloads(self, mock_stream):
         payloads = {
             "https://s3.example.com/a.ply": b"AAAA",

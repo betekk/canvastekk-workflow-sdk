@@ -2,7 +2,7 @@
  * Canonical node-service bootstrap (sdk#220) — TypeScript parity.
  *
  * Mirrors `python/canvastekk_workflow_sdk/bootstrap.py`:
- * - `createAuthedApp` — `createNodeApp` + `NodeAuth.central()` (central-only
+ * - `createAuthedApp` — `createWorkflowNodeApp` + `TekkNodeAuth.central()` (central-only
  *   by default; `legacyKeyEnvVar` keeps a dual-accept window alive).
  * - `mountNode` — dual-purpose services: your routes stay on the root
  *   express app; the authed node sub-app mounts under a prefix.
@@ -12,9 +12,9 @@
  */
 
 import type { Application } from "express";
-import { createNodeApp, type CreateNodeAppOptions } from "./app.js";
-import { NodeAuth } from "./auth.js";
-import type { BaseNode } from "./base-node.js";
+import { createWorkflowNodeApp, type CreateNodeAppOptions } from "./workflow-node-app.js";
+import { TekkNodeAuth } from "./auth.js";
+import type { WorkflowNodeBase } from "./workflow-node-base.js";
 
 export interface AuthedAppOptions extends CreateNodeAppOptions {
   /** Env var holding the legacy static key during a dual-accept window. `null` (default) = central-only. */
@@ -27,7 +27,7 @@ export interface AuthedAppOptions extends CreateNodeAppOptions {
  * @throws If `extraRoutes` is passed — the SDK mounts them without the auth
  *   middleware, so auth would not cover them.
  */
-export function createAuthedApp(node: BaseNode, opts: AuthedAppOptions = {}): Application {
+export function createAuthedApp(node: WorkflowNodeBase, opts: AuthedAppOptions = {}): Application {
   const { legacyKeyEnvVar = null, ...rest } = opts;
   if (rest.extraRoutes && rest.extraRoutes.length > 0) {
     throw new Error(
@@ -36,9 +36,9 @@ export function createAuthedApp(node: BaseNode, opts: AuthedAppOptions = {}): Ap
   }
   // Auth is APPENDED to caller-supplied dependencies (python create_node_app semantics) —
   // never a spread-overwrite, which would silently drop caller middleware.
-  return createNodeApp(node, {
+  return createWorkflowNodeApp(node, {
     ...rest,
-    dependencies: [NodeAuth.central({ legacyKeyEnvVar }), ...(rest.dependencies ?? [])],
+    dependencies: [TekkNodeAuth.central({ legacyKeyEnvVar }), ...(rest.dependencies ?? [])],
   });
 }
 
@@ -55,7 +55,7 @@ export interface MountNodeOptions extends AuthedAppOptions {
  *
  * @returns `rootApp` for chaining.
  */
-export function mountNode(rootApp: Application, node: BaseNode, opts: MountNodeOptions = {}): Application {
+export function mountNode(rootApp: Application, node: WorkflowNodeBase, opts: MountNodeOptions = {}): Application {
   const { prefix = "/node", ...rest } = opts;
   rootApp.use(prefix, createAuthedApp(node, rest));
   return rootApp;

@@ -1,6 +1,6 @@
 """Tests for the canonical node-service bootstrap (sdk#220).
 
-create_authed_app / mount_node / create_lambda_handler — see
+create_authed_workflow_node_app / mount_workflow_node / create_workflow_node_lambda_handler — see
 docs/NODE-SERVICE-LAYOUT.md for the standard these pin.
 """
 
@@ -11,16 +11,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from canvastekk_workflow_sdk import (
-    BaseNode,
-    ExecutionContext,
+    NodeExecutionContext,
+    WorkflowNodeBase,
     WorkflowNodeManifest,
-    create_authed_app,
-    create_lambda_handler,
-    mount_node,
+    create_authed_workflow_node_app,
+    create_workflow_node_lambda_handler,
+    mount_workflow_node,
 )
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
     definition = WorkflowNodeManifest(
@@ -33,7 +33,7 @@ class EchoNode(BaseNode):
         token_cost=0.0,
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
@@ -65,7 +65,7 @@ class TestCreateAuthedApp:
         """No verify base URL + no legacy window: every request fails closed."""
         monkeypatch.delenv("CWE_API_BASE_URL", raising=False)
         monkeypatch.setenv("CANVASTEKK_API_KEY", "legacy-value")
-        app = create_authed_app(EchoNode())
+        app = create_authed_workflow_node_app(EchoNode())
         client = TestClient(app)
         # Even a matching legacy key is INERT: legacy_key_env_var=None by default.
         resp = client.post("/execute", json=_execute_body(), headers={"X-API-Key": "legacy-value"})
@@ -75,18 +75,18 @@ class TestCreateAuthedApp:
         """legacy_key_env_var keeps the static-key leg live during dual-accept."""
         monkeypatch.delenv("CWE_API_BASE_URL", raising=False)
         monkeypatch.setenv("BOOTSTRAP_TEST_KEY", "static-key-1")
-        app = create_authed_app(EchoNode(), legacy_key_env_var="BOOTSTRAP_TEST_KEY")
+        app = create_authed_workflow_node_app(EchoNode(), legacy_key_env_var="BOOTSTRAP_TEST_KEY")
         client = TestClient(app)
         ok = client.post("/execute", json=_execute_body(), headers={"X-API-Key": "static-key-1"})
         assert ok.status_code == 200
         assert ok.json()["outputs"]["message"] == "hi"
 
     def test_extra_routes_rejected(self) -> None:
-        """extra_routes bypass the auth dependency in create_node_app — refused."""
+        """extra_routes bypass the auth dependency in create_workflow_node_app — refused."""
         from fastapi import APIRouter
 
         with pytest.raises(ValueError, match="extra_routes"):
-            create_authed_app(EchoNode(), extra_routes=[APIRouter()])
+            create_authed_workflow_node_app(EchoNode(), extra_routes=[APIRouter()])
 
 
 class TestMountNode:
@@ -100,7 +100,7 @@ class TestMountNode:
         async def ping() -> dict[str, str]:
             return {"ping": "pong"}
 
-        mount_node(root, EchoNode(), legacy_key_env_var="BOOTSTRAP_TEST_KEY")
+        mount_workflow_node(root, EchoNode(), legacy_key_env_var="BOOTSTRAP_TEST_KEY")
         client = TestClient(root)
 
         assert client.get("/ping").status_code == 200  # root face: no node auth
@@ -116,17 +116,17 @@ class TestMountNode:
         monkeypatch.delenv("CWE_API_BASE_URL", raising=False)
         monkeypatch.setenv("CANVASTEKK_API_KEY", "legacy-inert-by-default")
         root = FastAPI()
-        mount_node(root, EchoNode())
+        mount_workflow_node(root, EchoNode())
         client = TestClient(root)
 
         denied = client.post("/node/execute", json=_execute_body(), headers={"X-API-Key": "legacy-inert-by-default"})
         assert denied.status_code == 401
 
     def test_mounted_node_lifespan_runs(self) -> None:
-        """Starlette skips mounted sub-app lifespans — mount_node chains them."""
+        """Starlette skips mounted sub-app lifespans — mount_workflow_node chains them."""
         StartupFlagNode.startup_ran = False
         root = FastAPI()
-        mount_node(root, StartupFlagNode())
+        mount_workflow_node(root, StartupFlagNode())
         with TestClient(root):
             pass  # entering the client runs the root lifespan
         assert StartupFlagNode.startup_ran is True
@@ -135,7 +135,7 @@ class TestMountNode:
         monkeypatch.setenv("BOOTSTRAP_TEST_KEY", "static-key-1")
         monkeypatch.delenv("CWE_API_BASE_URL", raising=False)
         root = FastAPI()
-        mount_node(root, EchoNode(), prefix="/cw", legacy_key_env_var="BOOTSTRAP_TEST_KEY")
+        mount_workflow_node(root, EchoNode(), prefix="/cw", legacy_key_env_var="BOOTSTRAP_TEST_KEY")
         client = TestClient(root)
         ok = client.post("/cw/execute", json=_execute_body(), headers={"X-API-Key": "static-key-1"})
         assert ok.status_code == 200
@@ -150,7 +150,7 @@ class TestCreateLambdaHandler:
         def plain(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return {"ok": True, "echo": event["prompt"]}
 
-        handler = create_lambda_handler(FastAPI(), plain_event=plain)
+        handler = create_workflow_node_lambda_handler(FastAPI(), plain_event=plain)
         assert handler({"prompt": "run-it"}, None) == {"ok": True, "echo": "run-it"}
 
     def test_http_event_dispatch(self) -> None:
@@ -162,7 +162,7 @@ class TestCreateLambdaHandler:
         async def ping() -> dict[str, str]:
             return {"ping": "pong"}
 
-        handler = create_lambda_handler(root, plain_event=lambda e, c: {"ok": False})
+        handler = create_workflow_node_lambda_handler(root, plain_event=lambda e, c: {"ok": False})
         event = {
             "version": "2.0",
             "routeKey": "$default",

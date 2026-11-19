@@ -22,7 +22,7 @@ When creating CanvasTEKK workflow nodes, always follow these rules:
 3. **Include `x-accept` and `x-maxSizeBytes`** on every file input field — the SDK auto-validates downloaded files against these constraints
 4. **File inputs are auto-downloaded by the SDK**: The SDK downloads presigned URL file inputs to `context.downloads_dir` before calling `execute()`. Node authors receive local file paths, not URLs. Manual download with `httpx.stream()` is only needed for non-file URLs or opt-out scenarios.
 5. **Write outputs to `context.output_path(filename)`**: Never hardcode paths; return them as `str(output_path)`
-6. **`definition` must be both module-level AND class attribute**: Module-level enables CLI validation; class attribute satisfies `BaseNode.__init_subclass__`
+6. **`definition` must be both module-level AND class attribute**: Module-level enables CLI validation; class attribute satisfies `WorkflowNodeBase.__init_subclass__`
 7. **Node IDs follow `{name}-v{version}` format**: e.g., `segment-v1.0.0`
 8. **Report progress with `context.report_progress()`**: At key stages (process, save)
 9. **Always generate Dockerfile + pyproject.toml + tests**: A complete node project includes all four files

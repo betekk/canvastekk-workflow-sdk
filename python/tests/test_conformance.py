@@ -12,7 +12,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from canvastekk_workflow_sdk import BaseNode
+from canvastekk_workflow_sdk import WorkflowNodeBase
 from canvastekk_workflow_sdk.workflow_node_conformance import verify_node
 from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 from canvastekk_workflow_sdk.workflow_node_registry import WorkflowNodeRegistrationError, register_workflow_node
@@ -356,7 +356,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
     assert captured.get("dry_run") is True
 
 
-class _CentralEchoNode(BaseNode):
+class _CentralEchoNode(WorkflowNodeBase):
     """Echo node used to probe central-mode authentication end to end."""
 
     definition = WorkflowNodeManifest(
@@ -414,15 +414,15 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
     End to end over real code paths: verify_node → ASGI app →
     _CentralAuth → local CWE stub → verify_node_token (#3825).
     """
-    from canvastekk_workflow_sdk.app import create_node_app
     from canvastekk_workflow_sdk.auth import NodeAuth
     from canvastekk_workflow_sdk.node_token import mint_node_token
+    from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
     key = "conformance-signing-key-0123456789abcdef"
     server = _start_cwe_stub(key)
     try:
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
-        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+        app = create_workflow_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
 
         def fake_client(**kw: Any) -> TestClient:
             return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))
@@ -440,14 +440,14 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
 
 def test_verify_node_central_mode_without_token_fails_at_manifest(monkeypatch) -> None:
     """Without a token the manifest fetch cannot succeed — report not ok."""
-    from canvastekk_workflow_sdk.app import create_node_app
     from canvastekk_workflow_sdk.auth import NodeAuth
+    from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
     key = "conformance-signing-key-0123456789abcdef"
     server = _start_cwe_stub(key)
     try:
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
-        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+        app = create_workflow_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
 
         def fake_client(**kw: Any) -> TestClient:
             return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))

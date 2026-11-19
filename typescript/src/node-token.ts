@@ -4,7 +4,7 @@
  *
  * Shape checking only, no cryptography: nodes never hold the signing
  * key. Verification is delegated to the engine's verify endpoint via
- * `NodeAuth.central()`. The normative implementation is the SDK Python
+ * `TekkNodeAuth.central()`. The normative implementation is the SDK Python
  * module `node_token.py`; see `docs/NODE-TOKEN-CONTRACT.md`.
  */
 

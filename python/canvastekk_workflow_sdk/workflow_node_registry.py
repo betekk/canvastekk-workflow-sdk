@@ -15,7 +15,7 @@ import httpx
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.base import BaseNode
+    from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
     from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 logger = logging.getLogger(__name__)
@@ -521,7 +521,7 @@ def diff_against_published_workflow_node_manifest(
 
 
 def register_workflow_node(
-    node: BaseNode,
+    node: WorkflowNodeBase,
     registry_url: str,
     *,
     invoke_url: str | None = None,
@@ -550,7 +550,7 @@ def register_workflow_node(
         version for any schema or metadata changes.
 
     Args:
-        node: The BaseNode instance to register.
+        node: The WorkflowNodeBase instance to register.
         registry_url: Full URL of the registry endpoint
             (e.g., ``"https://engine.example.com/api/workflows/nodes/"``).
         invoke_url: URL where the node is reachable.

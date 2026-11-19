@@ -5,12 +5,12 @@
  * (`@betekk/canvastekk-workflow-sdk`) stays express-free:
  *
  * ```ts
- * import { createNodeApp } from "@betekk/canvastekk-workflow-sdk/express";
+ * import { createWorkflowNodeApp } from "@betekk/canvastekk-workflow-sdk/express";
  * ```
  *
  * Install express yourself (`npm install express`) — it is an optional peer.
  */
-export { createNodeApp, createMultiNodeApp } from "./app.js";
-export type { CreateNodeAppOptions } from "./app.js";
+export { createWorkflowNodeApp, createMultiWorkflowNodeApp } from "./workflow-node-app.js";
+export type { CreateNodeAppOptions } from "./workflow-node-app.js";
 export { createAuthedApp, mountNode } from "./bootstrap.js";
 export type { AuthedAppOptions, MountNodeOptions } from "./bootstrap.js";

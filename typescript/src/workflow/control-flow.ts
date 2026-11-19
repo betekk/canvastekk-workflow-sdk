@@ -1,4 +1,4 @@
-import type { ExecutionContext } from "../context.js";
+import type { NodeExecutionContext } from "../node-execution-context.js";
 
 /**
  * Handler function for control flow nodes (START, END).
@@ -10,7 +10,7 @@ import type { ExecutionContext } from "../context.js";
  * @param context - Execution context
  * @returns Node outputs
  */
-type ControlFlowHandler = (inputs: Record<string, unknown>, context: ExecutionContext) => Record<string, unknown>;
+type ControlFlowHandler = (inputs: Record<string, unknown>, context: NodeExecutionContext) => Record<string, unknown>;
 
 /**
  * Built-in control flow handlers for special node slugs.

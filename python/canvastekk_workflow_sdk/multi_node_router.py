@@ -1,0 +1,111 @@
+"""
+Multi-Node Router
+
+Creates a single FastAPI application that hosts multiple nodes,
+each under its own URL prefix. Useful for consolidating several
+nodes behind one server.
+
+Example::
+
+    from canvastekk_workflow_sdk.multi_node_router import create_multi_workflow_node_app
+
+    app = create_multi_workflow_node_app({
+        "segment": SegmentNode(),
+        "measure": MeasureNode(),
+    })
+
+Each node gets its own set of 6 endpoints:
+    POST /segment/execute
+    GET  /segment/health
+    GET  /segment/manifest
+    ...
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from canvastekk_workflow_sdk.node_execution_response import MultiWorkflowNodeHealthResponse
+from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
+
+if TYPE_CHECKING:  # pragma: no cover - import-time only
+    from fastapi import FastAPI
+
+
+if TYPE_CHECKING:
+    from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
+
+
+def create_multi_workflow_node_app(
+    nodes: dict[str, WorkflowNodeBase],
+    *,
+    global_dependencies: list[Any] | None = None,
+    **fastapi_kwargs: Any,
+) -> FastAPI:
+    """Create a FastAPI app hosting multiple nodes under URL prefixes.
+
+    Each key in ``nodes`` becomes a URL prefix. For example,
+    ``{"segment": SegmentNode()}`` creates endpoints like
+    ``POST /segment/execute``.
+
+    Args:
+        nodes: Mapping of URL prefix to WorkflowNodeBase instance.
+            Prefixes should be URL-safe (no slashes).
+        global_dependencies: FastAPI dependencies applied to all
+            node endpoints across all mounted nodes.
+        **fastapi_kwargs: Additional arguments passed to the root
+            FastAPI constructor.
+
+    Returns:
+        A FastAPI application with all node endpoints mounted.
+
+    Example::
+
+        app = create_multi_workflow_node_app({
+            "segment": SegmentNode(),
+            "measure": MeasureNode(),
+        })
+
+        # Endpoints:
+        # POST /segment/execute, GET /segment/health, ...
+        # POST /measure/execute, GET /measure/health, ...
+    """
+    from fastapi import FastAPI
+
+    app = FastAPI(**fastapi_kwargs)
+
+    node_apps: list[tuple[str, Any]] = []
+    try:
+        for prefix, node in nodes.items():
+            node_app = create_workflow_node_app(
+                node,
+                dependencies=global_dependencies,
+            )
+            node_apps.append((prefix, node_app))
+    except Exception:
+        for prefix, node_app in node_apps:
+            try:
+                app.unmount(f"/{prefix}")
+            except Exception:
+                pass
+        raise
+
+    for prefix, node_app in node_apps:
+        app.mount(f"/{prefix}", node_app)
+
+    @app.get(
+        "/health",
+        response_model=MultiWorkflowNodeHealthResponse,
+        summary="Multi-node application health",
+        description="Returns the aggregate health status and the URL prefixes of every mounted node application.",
+        tags=["Health"],
+    )
+    async def root_health() -> MultiWorkflowNodeHealthResponse:
+        """Root health endpoint for the multi-node application.
+
+        Returns:
+            Dict with ``status`` and list of mounted node prefixes.
+        """
+        return MultiWorkflowNodeHealthResponse(status="healthy", nodes=list(nodes.keys()))
+
+    return app

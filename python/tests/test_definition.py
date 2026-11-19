@@ -16,7 +16,7 @@ from canvastekk_workflow_sdk import (
     WorkflowNodeRole,
     WorkflowNodeStyles,
 )
-from canvastekk_workflow_sdk.contracts import build_check_output_schema
+from canvastekk_workflow_sdk.node_io_data_contracts import build_check_output_schema
 from canvastekk_workflow_sdk.workflow_node_manifest import export_workflow_node_manifest
 
 

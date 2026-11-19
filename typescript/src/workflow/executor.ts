@@ -1,6 +1,6 @@
-import type { ExecutionContext } from "../context.js";
-import { NodeExecutionResponseSchema } from "../response.js";
-import { NODE_PROTOCOL_HEADER, NODE_PROTOCOL_VERSION, readOutcome } from "../protocol.js";
+import type { NodeExecutionContext } from "../node-execution-context.js";
+import { NodeExecutionResponseSchema } from "../node-execution-response.js";
+import { NODE_CALL_PROTOCOL_HEADER, NODE_CALL_PROTOCOL_VERSION, readNodeCallOutcome } from "../node-call-protocol.js";
 
 /**
  * Abstract base for node execution strategies.
@@ -16,7 +16,7 @@ export abstract class NodeExecutor {
   abstract execute(
     slug: string,
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Promise<Record<string, unknown>>;
   /** Checks if a node is registered for the given slug. */
   abstract has(slug: string): boolean;
@@ -26,7 +26,7 @@ export abstract class NodeExecutor {
  * Executes nodes in-process without HTTP calls.
  */
 export class InProcessExecutor extends NodeExecutor {
-  private _registry: Map<string, { execute: (inputs: Record<string, unknown>, ctx: ExecutionContext) => Record<string, unknown> | Promise<Record<string, unknown>> }> = new Map();
+  private _registry: Map<string, { execute: (inputs: Record<string, unknown>, ctx: NodeExecutionContext) => Record<string, unknown> | Promise<Record<string, unknown>> }> = new Map();
 
   /**
    * Registers a node executor function.
@@ -34,7 +34,7 @@ export class InProcessExecutor extends NodeExecutor {
    * @param node - Node with execute method
    * @returns This executor for chaining
    */
-  register(slug: string, node: { execute: (inputs: Record<string, unknown>, ctx: ExecutionContext) => Record<string, unknown> | Promise<Record<string, unknown>> }): this {
+  register(slug: string, node: { execute: (inputs: Record<string, unknown>, ctx: NodeExecutionContext) => Record<string, unknown> | Promise<Record<string, unknown>> }): this {
     this._registry.set(slug, node);
     return this;
   }
@@ -47,7 +47,7 @@ export class InProcessExecutor extends NodeExecutor {
    * @returns Node outputs
    * @throws {Error} If no node is registered for the slug
    */
-  override async execute(slug: string, inputs: Record<string, unknown>, context: ExecutionContext): Promise<Record<string, unknown>> {
+  override async execute(slug: string, inputs: Record<string, unknown>, context: NodeExecutionContext): Promise<Record<string, unknown>> {
     const node = this._registry.get(slug);
     if (!node) throw new Error(`No node registered for slug '${slug}'`);
     return node.execute(inputs, context);
@@ -94,7 +94,7 @@ export class HttpExecutor extends NodeExecutor {
    * @returns Node outputs
    * @throws {Error} If no URL is registered or the node returns an error
    */
-  override async execute(slug: string, inputs: Record<string, unknown>, context: ExecutionContext): Promise<Record<string, unknown>> {
+  override async execute(slug: string, inputs: Record<string, unknown>, context: NodeExecutionContext): Promise<Record<string, unknown>> {
     const url = this._urls.get(slug);
     if (!url) throw new Error(`No URL registered for slug '${slug}'`);
 
@@ -106,7 +106,7 @@ export class HttpExecutor extends NodeExecutor {
 
     const resp = await fetch(`${url}/execute`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", [NODE_PROTOCOL_HEADER]: String(NODE_PROTOCOL_VERSION) },
+      headers: { "Content-Type": "application/json", [NODE_CALL_PROTOCOL_HEADER]: String(NODE_CALL_PROTOCOL_VERSION) },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(this._timeout),
     });
@@ -119,7 +119,7 @@ export class HttpExecutor extends NodeExecutor {
     if (!parsed.success) {
       throw new Error(`Node '${slug}' returned malformed response: ${parsed.error.issues[0]?.message ?? "schema mismatch"}`);
     }
-    if (readOutcome(parsed.data.status) === "pass") {
+    if (readNodeCallOutcome(parsed.data.status) === "pass") {
       return parsed.data.outputs ?? {};
     }
     throw new Error(`Node '${slug}' returned failure: ${parsed.data.error ?? "unknown"}`);

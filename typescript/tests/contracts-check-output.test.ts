@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCheckOutputSchema,
   validateVerdictFields,
-} from "../src/contracts/check-output.js";
+} from "../src/node-io-data-contracts/check-output.js";
 
 describe("buildCheckOutputSchema (DA-3359)", () => {
   it("defaults to the three-value vocab and an open schema", () => {

@@ -4,11 +4,11 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
-from canvastekk_workflow_sdk.router import create_multi_node_app
+from canvastekk_workflow_sdk import NodeExecutionContext, WorkflowNodeBase, WorkflowNodeManifest
+from canvastekk_workflow_sdk.multi_node_router import create_multi_workflow_node_app
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
@@ -18,11 +18,11 @@ class EchoNode(BaseNode):
         output_schema={"type": "object", "properties": {"message": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class ReverseNode(BaseNode):
+class ReverseNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="reverse",
         version="1.0.0",
@@ -32,11 +32,11 @@ class ReverseNode(BaseNode):
         output_schema={"type": "object", "properties": {"result": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"result": inputs.get("text", "")[::-1]}
 
 
-class UpperNode(BaseNode):
+class UpperNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="upper",
         version="1.0.0",
@@ -46,16 +46,16 @@ class UpperNode(BaseNode):
         output_schema={"type": "object", "properties": {"result": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"result": inputs.get("text", "").upper()}
 
 
 class TestMultiNodeRouter:
-    """Tests for create_multi_node_app function."""
+    """Tests for create_multi_workflow_node_app function."""
 
     def test_two_nodes_on_same_app_both_respond_independently(self) -> None:
         """Test that two nodes on same app both respond independently."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -79,7 +79,7 @@ class TestMultiNodeRouter:
 
     def test_root_health_endpoint_returns_healthy_with_node_list(self) -> None:
         """Test that root health endpoint returns healthy with node list."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -96,7 +96,7 @@ class TestMultiNodeRouter:
 
     def test_each_nodes_health_endpoint_works_under_prefix(self) -> None:
         """Test that each node's /health endpoint works under prefix."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -118,7 +118,7 @@ class TestMultiNodeRouter:
 
     def test_each_nodes_manifest_endpoint_works_under_prefix(self) -> None:
         """Test that each node's /manifest endpoint works under prefix."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -140,7 +140,7 @@ class TestMultiNodeRouter:
 
     def test_each_nodes_execute_endpoint_works_under_prefix(self) -> None:
         """Test that each node's /execute endpoint works under prefix."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -168,7 +168,7 @@ class TestMultiNodeRouter:
 
     def test_works_with_single_node(self) -> None:
         """Test that router works with a single node."""
-        app = create_multi_node_app({"echo": EchoNode()})
+        app = create_multi_workflow_node_app({"echo": EchoNode()})
         client = TestClient(app)
 
         response = client.get("/health")
@@ -186,7 +186,7 @@ class TestMultiNodeRouter:
 
     def test_three_nodes_on_same_app_all_respond_independently(self) -> None:
         """Test that three nodes on same app all respond independently."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -218,7 +218,7 @@ class TestMultiNodeRouter:
 
     def test_nodes_metrics_endpoint_works_under_prefix(self) -> None:
         """Test that each node's /metrics endpoint works under prefix."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -241,7 +241,7 @@ class TestMultiNodeRouter:
 
     def test_nodes_manifest_endpoint_works_under_prefix(self) -> None:
         """Test that each node's /manifest endpoint works under prefix."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),
@@ -270,7 +270,7 @@ class TestMultiNodeRouter:
         def custom_dependency(request: Request) -> None:
             dependency_invocations.append(request.url.path)
 
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {"echo": EchoNode(), "reverse": ReverseNode()},
             global_dependencies=[Depends(custom_dependency)],
         )
@@ -284,7 +284,7 @@ class TestMultiNodeRouter:
 
     def test_fastapi_kwargs_passed_to_root_app(self) -> None:
         """Test that FastAPI kwargs are passed to root app."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {"echo": EchoNode()},
             title="Multi Node App",
             version="1.0.0",
@@ -294,7 +294,7 @@ class TestMultiNodeRouter:
 
     def test_empty_nodes_dict_creates_app_with_root_health_only(self) -> None:
         """Test that empty nodes dict creates app with only root health endpoint."""
-        app = create_multi_node_app({})
+        app = create_multi_workflow_node_app({})
         client = TestClient(app)
 
         response = client.get("/health")
@@ -305,7 +305,7 @@ class TestMultiNodeRouter:
 
     def test_prefixes_without_leading_slash(self) -> None:
         """Test that prefixes work without leading slash."""
-        app = create_multi_node_app(
+        app = create_multi_workflow_node_app(
             {
                 "echo": EchoNode(),
                 "reverse": ReverseNode(),

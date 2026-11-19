@@ -4,11 +4,11 @@ import concurrent.futures
 import threading
 from typing import Any
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
-from canvastekk_workflow_sdk.observability import ExecutionMetric, MetricsCollector
+from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, WorkflowNodeBase, WorkflowNodeManifest
+from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecutionMetricsCollector
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="echo-v1.0.0",
         slug="echo",
@@ -19,11 +19,11 @@ class EchoNode(BaseNode):
         output_schema={"type": "object", "properties": {"message": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
+class FailingNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         id="fail-v1.0.0",
         slug="fail",
@@ -34,13 +34,13 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise RuntimeError("boom")
 
 
 class TestExecutionMetric:
     def test_to_dict(self) -> None:
-        m = ExecutionMetric(
+        m = NodeExecutionMetric(
             run_id="r1",
             node_id="n1",
             node_name="echo",
@@ -54,7 +54,7 @@ class TestExecutionMetric:
         assert "timestamp" in d
 
     def test_defaults(self) -> None:
-        m = ExecutionMetric(
+        m = NodeExecutionMetric(
             run_id="r1",
             node_id="n1",
             node_name="echo",
@@ -68,13 +68,13 @@ class TestExecutionMetric:
 
 class TestMetricsCollector:
     def test_empty_summary(self) -> None:
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
         assert c.get_summary() == {"total_executions": 0}
 
     def test_record_and_summary(self) -> None:
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
         c.record(
-            ExecutionMetric(
+            NodeExecutionMetric(
                 run_id="r1",
                 node_id="n1",
                 node_name="echo",
@@ -84,7 +84,7 @@ class TestMetricsCollector:
             )
         )
         c.record(
-            ExecutionMetric(
+            NodeExecutionMetric(
                 run_id="r2",
                 node_id="n2",
                 node_name="echo",
@@ -105,10 +105,10 @@ class TestMetricsCollector:
         assert summary["total_token_usage"] == 1.0
 
     def test_summary_last_n(self) -> None:
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
         for i in range(10):
             c.record(
-                ExecutionMetric(
+                NodeExecutionMetric(
                     run_id=f"r{i}",
                     node_id="n1",
                     node_name="echo",
@@ -121,10 +121,10 @@ class TestMetricsCollector:
         assert summary["total_executions"] == 3
 
     def test_max_records_eviction(self) -> None:
-        c = MetricsCollector(max_records=5)
+        c = NodeExecutionMetricsCollector(max_records=5)
         for i in range(10):
             c.record(
-                ExecutionMetric(
+                NodeExecutionMetric(
                     run_id=f"r{i}",
                     node_id="n1",
                     node_name="echo",
@@ -135,9 +135,9 @@ class TestMetricsCollector:
         assert len(c._metrics) == 5
 
     def test_clear(self) -> None:
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
         c.record(
-            ExecutionMetric(
+            NodeExecutionMetric(
                 run_id="r1",
                 node_id="n1",
                 node_name="echo",
@@ -151,7 +151,7 @@ class TestMetricsCollector:
 
 class TestNodeMetricsIntegration:
     def test_successful_execution_records_metric(self) -> None:
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = EchoNode()
         node.set_metrics_collector(collector)
 
@@ -169,7 +169,7 @@ class TestNodeMetricsIntegration:
         assert summary["fail_count"] == 0
 
     def test_failed_execution_records_metric(self) -> None:
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = FailingNode()
         node.set_metrics_collector(collector)
 
@@ -189,13 +189,13 @@ class TestNodeMetricsIntegration:
     def test_metrics_endpoint(self) -> None:
         from fastapi.testclient import TestClient
 
-        from canvastekk_workflow_sdk import create_node_app
+        from canvastekk_workflow_sdk import create_workflow_node_app
 
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = EchoNode()
         node.set_metrics_collector(collector)
 
-        client = TestClient(create_node_app(node))
+        client = TestClient(create_workflow_node_app(node))
 
         client.post(
             "/execute",
@@ -212,12 +212,12 @@ class TestNodeMetricsIntegration:
         assert data["total_executions"] == 1
 
     def test_each_base_node_has_own_collector(self) -> None:
-        a = MetricsCollector()
-        b = MetricsCollector()
+        a = NodeExecutionMetricsCollector()
+        b = NodeExecutionMetricsCollector()
         assert a is not b
 
     def test_each_base_node_instance_has_independent_metrics(self) -> None:
-        """Test that each BaseNode instance has independent metrics (Phase 3 singleton removal)."""
+        """Test that each WorkflowNodeBase instance has independent metrics (Phase 3 singleton removal)."""
         node1 = EchoNode()
         node2 = EchoNode()
 
@@ -243,11 +243,11 @@ class TestNodeMetricsIntegration:
         assert node1._metrics_collector is not node2._metrics_collector
 
     def test_base_node_metrics_collector_initialized_on_creation(self) -> None:
-        """Test that BaseNode creates its own MetricsCollector on initialization (Phase 3)."""
+        """Test that WorkflowNodeBase creates its own NodeExecutionMetricsCollector on initialization (Phase 3)."""
         node = EchoNode()
 
         assert hasattr(node, "_metrics_collector")
-        assert isinstance(node._metrics_collector, MetricsCollector)
+        assert isinstance(node._metrics_collector, NodeExecutionMetricsCollector)
         assert node._metrics_collector.get_summary()["total_executions"] == 0
 
     def test_two_nodes_dont_share_metrics_after_failures(self) -> None:
@@ -282,7 +282,7 @@ class TestNodeMetricsIntegration:
 
     def test_set_metrics_collector_replaces_default_collector(self) -> None:
         """Test that set_metrics_collector replaces the default collector."""
-        custom_collector = MetricsCollector()
+        custom_collector = NodeExecutionMetricsCollector()
         node = EchoNode()
 
         original_collector = node._metrics_collector
@@ -293,7 +293,7 @@ class TestNodeMetricsIntegration:
 
     def test_metrics_recorded_correctly_on_custom_collector(self) -> None:
         """Test that metrics are recorded correctly on custom collector."""
-        custom_collector = MetricsCollector()
+        custom_collector = NodeExecutionMetricsCollector()
         node = EchoNode()
         node.set_metrics_collector(custom_collector)
 
@@ -315,14 +315,14 @@ class TestMetricsCollectorThreadSafety:
 
     def test_concurrent_record_calls(self) -> None:
         """Test that concurrent record() calls don't corrupt metrics."""
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
         num_threads = 50
         records_per_thread = 100
 
         def record_metrics(thread_id: int) -> None:
             for i in range(records_per_thread):
                 c.record(
-                    ExecutionMetric(
+                    NodeExecutionMetric(
                         run_id=f"r{thread_id}-{i}",
                         node_id=f"n{thread_id}",
                         node_name="test",
@@ -350,12 +350,12 @@ class TestMetricsCollectorThreadSafety:
 
     def test_concurrent_record_and_get_summary(self) -> None:
         """Test that concurrent record() and get_summary() calls work correctly."""
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
 
         def record_continuously() -> None:
             for i in range(100):
                 c.record(
-                    ExecutionMetric(
+                    NodeExecutionMetric(
                         run_id=f"r{i}",
                         node_id="n1",
                         node_name="test",
@@ -386,12 +386,12 @@ class TestMetricsCollectorThreadSafety:
 
     def test_concurrent_clear_operations(self) -> None:
         """Test that concurrent clear() operations don't cause issues."""
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
 
         def record_and_clear(thread_id: int) -> None:
             for i in range(50):
                 c.record(
-                    ExecutionMetric(
+                    NodeExecutionMetric(
                         run_id=f"r{thread_id}-{i}",
                         node_id=f"n{thread_id}",
                         node_name="test",
@@ -416,12 +416,12 @@ class TestMetricsCollectorThreadSafety:
 
     def test_get_summary_consistent_during_concurrent_writes(self) -> None:
         """Test that get_summary() returns consistent results during concurrent writes."""
-        c = MetricsCollector()
+        c = NodeExecutionMetricsCollector()
 
         def record_metrics() -> None:
             for i in range(100):
                 c.record(
-                    ExecutionMetric(
+                    NodeExecutionMetric(
                         run_id=f"r{i}",
                         node_id="n1",
                         node_name="test",

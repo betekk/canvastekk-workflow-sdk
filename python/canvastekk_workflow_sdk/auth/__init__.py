@@ -24,7 +24,7 @@ Example (FastAPI — unchanged since v0.60.0)::
     from canvastekk_workflow_sdk.auth import NodeAuth
 
     auth = NodeAuth.api_key()
-    app = create_node_app(node, dependencies=[Depends(auth)])
+    app = create_workflow_node_app(node, dependencies=[Depends(auth)])
 
 Example (framework-free)::
 

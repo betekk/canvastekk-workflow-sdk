@@ -1,7 +1,7 @@
 """Tests for request and response models."""
 
-from canvastekk_workflow_sdk.request import NodeExecutionRequest
-from canvastekk_workflow_sdk.response import HealthResponse, NodeExecutionResponse
+from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
+from canvastekk_workflow_sdk.node_execution_response import NodeExecutionResponse, WorkflowNodeHealthResponse
 
 
 class TestNodeExecutionRequest:
@@ -136,7 +136,7 @@ class TestNodeExecutionResponse:
 
 class TestHealthResponse:
     def test_healthy(self) -> None:
-        resp = HealthResponse(
+        resp = WorkflowNodeHealthResponse(
             status="healthy",
             node_id="test-v1",
             version="1.0.0",
@@ -147,7 +147,7 @@ class TestHealthResponse:
         assert resp.checks == {"api": True, "db": True}
 
     def test_degraded(self) -> None:
-        resp = HealthResponse(
+        resp = WorkflowNodeHealthResponse(
             status="degraded",
             node_id="test-v1",
             version="1.0.0",
@@ -156,7 +156,7 @@ class TestHealthResponse:
         assert resp.status == "degraded"
 
     def test_default_checks(self) -> None:
-        resp = HealthResponse(
+        resp = WorkflowNodeHealthResponse(
             status="healthy",
             node_id="test-v1",
             version="1.0.0",

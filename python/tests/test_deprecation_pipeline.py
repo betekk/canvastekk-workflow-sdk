@@ -2,7 +2,7 @@
 
 Covers the three SDK-side halves of the deprecation pipeline:
 registry payload emission (wire shape), ``WorkflowNodeDeprecationInfo`` model
-validation, and ``BaseNode`` runtime sunset/refusal semantics.
+validation, and ``WorkflowNodeBase`` runtime sunset/refusal semantics.
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ import pytest
 from pydantic import ValidationError
 
 from canvastekk_workflow_sdk import (
-    BaseNode,
-    ExecutionContext,
     NodeConfigurationError,
+    NodeExecutionContext,
     NodeExecutionRequest,
+    WorkflowNodeBase,
     WorkflowNodeManifest,
 )
 from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeDeprecationInfo
@@ -37,13 +37,13 @@ def _manifest(deprecation: WorkflowNodeDeprecationInfo | None) -> WorkflowNodeMa
     )
 
 
-def _make_node(deprecation: WorkflowNodeDeprecationInfo | None) -> BaseNode:
+def _make_node(deprecation: WorkflowNodeDeprecationInfo | None) -> WorkflowNodeBase:
     """Build an instantiated echo node whose definition carries the given deprecation."""
 
-    class _DeprecationEchoNode(BaseNode):
+    class _DeprecationEchoNode(WorkflowNodeBase):
         definition = _manifest(deprecation)
 
-        def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+        def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
             return {"echo": inputs.get("message", "")}
 
     return _DeprecationEchoNode()
@@ -107,7 +107,7 @@ class TestDeprecationInfoValidation:
 
 
 class TestRuntimeSunsetLifecycle:
-    """BaseNode.run enforces deprecation lifecycle (DA-2305)."""
+    """WorkflowNodeBase.run enforces deprecation lifecycle (DA-2305)."""
 
     def _request(self) -> NodeExecutionRequest:
         return NodeExecutionRequest(run_id="r1", node_id="n1", inputs={})
@@ -169,14 +169,14 @@ class TestRuntimeSunsetLifecycle:
                 notice="Deprecation window open.",
             )
         )
-        with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.base"):
+        with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.workflow_node_base"):
             response = node.run(self._request())
         assert response.status == "pass"
         assert any("deprecated" in record.message and "cds-file" in record.message for record in caplog.records)
 
     def test_clean_node_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         node = _make_node(None)
-        with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.base"):
+        with caplog.at_level(logging.WARNING, logger="canvastekk_workflow_sdk.workflow_node_base"):
             response = node.run(self._request())
         assert response.status == "pass"
         assert not any("deprecated" in record.message for record in caplog.records)

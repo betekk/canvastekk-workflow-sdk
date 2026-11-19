@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import express from "express";
 import { createAuthedApp, mountNode } from "../src/bootstrap.js";
-import { BaseNode } from "../src/base-node.js";
+import { WorkflowNodeBase } from "../src/workflow-node-base.js";
 import type { WorkflowNodeManifest } from "../src/definition.js";
-import type { ExecutionContext } from "../src/context.js";
+import type { NodeExecutionContext } from "../src/node-execution-context.js";
 
-class TestNode extends BaseNode {
+class TestNode extends WorkflowNodeBase {
   definition: WorkflowNodeManifest = {
     slug: "bootstrap-test-node",
     version: "1.0.0",
@@ -22,7 +22,7 @@ class TestNode extends BaseNode {
     },
   };
 
-  execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+  execute(inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
     return { result: `echo: ${inputs.message ?? ""}` };
   }
 }

@@ -4,20 +4,20 @@ import {
   point3DFromList,
   boundingBoxCenter,
   boundingBoxSize,
-} from "../src/contracts/point3d.js";
-import type { BoundingBox3D } from "../src/contracts/point3d.js";
+} from "../src/node-io-data-contracts/point3d.js";
+import type { BoundingBox3D } from "../src/node-io-data-contracts/point3d.js";
 import {
   instanceNumPoints,
   getInstancesByClass,
   getInstancesByClassId,
-} from "../src/contracts/instance.js";
-import type { Instance, InstanceSetData } from "../src/contracts/instance.js";
-import { getMeasurement, getValue } from "../src/contracts/measurement.js";
-import type { MeasurementSetData } from "../src/contracts/measurement.js";
-import { getPlaneByLabel } from "../src/contracts/plane.js";
-import type { PlaneSetData } from "../src/contracts/plane.js";
-import { saveJson, loadJson } from "../src/contracts/base.js";
-import { STANDARD_CLASSES, STANDARD_CLASS_NAMES } from "../src/contracts/index.js";
+} from "../src/node-io-data-contracts/instance.js";
+import type { Instance, InstanceSetData } from "../src/node-io-data-contracts/instance.js";
+import { getMeasurement, getValue } from "../src/node-io-data-contracts/measurement.js";
+import type { MeasurementSetData } from "../src/node-io-data-contracts/measurement.js";
+import { getPlaneByLabel } from "../src/node-io-data-contracts/plane.js";
+import type { PlaneSetData } from "../src/node-io-data-contracts/plane.js";
+import { saveJson, loadJson } from "../src/node-io-data-contracts/base.js";
+import { STANDARD_CLASSES, STANDARD_CLASS_NAMES } from "../src/node-io-data-contracts/index.js";
 
 describe("Point3D", () => {
   it("toList returns [x, y, z]", () => {

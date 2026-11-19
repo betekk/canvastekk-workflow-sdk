@@ -1,23 +1,23 @@
-"""Tests for BaseNode class."""
+"""Tests for WorkflowNodeBase class."""
 
 import threading
 from typing import Any
 
 import pytest
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
-from canvastekk_workflow_sdk import context as context_module
-from canvastekk_workflow_sdk.context import execution_context_var
+from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, WorkflowNodeBase, WorkflowNodeManifest
+from canvastekk_workflow_sdk import node_execution_context as context_module
 from canvastekk_workflow_sdk.exceptions import (
     NodeIOError,
     NodeOutputValidationError,
     NodeTimeoutError,
 )
 from canvastekk_workflow_sdk.middleware import TimingMiddleware
-from canvastekk_workflow_sdk.observability import MetricsCollector
+from canvastekk_workflow_sdk.node_execution_context import execution_context_var
+from canvastekk_workflow_sdk.observability import NodeExecutionMetricsCollector
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
     definition = WorkflowNodeManifest(
@@ -35,11 +35,11 @@ class EchoNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
+class FailingNode(WorkflowNodeBase):
     """Node that always fails for testing."""
 
     definition = WorkflowNodeManifest(
@@ -51,11 +51,11 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise ValueError("Intentional failure for testing")
 
 
-class HealthyNode(BaseNode):
+class HealthyNode(WorkflowNodeBase):
     """Node with custom health checks."""
 
     definition = WorkflowNodeManifest(
@@ -67,7 +67,7 @@ class HealthyNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {}
 
     def health_check(self) -> dict[str, Any]:
@@ -77,7 +77,7 @@ class HealthyNode(BaseNode):
         }
 
 
-class NodeIOErrorNode(BaseNode):
+class NodeIOErrorNode(WorkflowNodeBase):
     """Node that raises NodeIOError."""
 
     definition = WorkflowNodeManifest(
@@ -89,11 +89,11 @@ class NodeIOErrorNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise NodeIOError("File not found", path="/tmp/missing.ply")
 
 
-class NodeTimeoutErrorNode(BaseNode):
+class NodeTimeoutErrorNode(WorkflowNodeBase):
     """Node that raises NodeTimeoutError."""
 
     definition = WorkflowNodeManifest(
@@ -105,11 +105,11 @@ class NodeTimeoutErrorNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise NodeTimeoutError(30)
 
 
-class TokenReportingNode(BaseNode):
+class TokenReportingNode(WorkflowNodeBase):
     """Node that reports token usage via context."""
 
     definition = WorkflowNodeManifest(
@@ -122,12 +122,12 @@ class TokenReportingNode(BaseNode):
         token_cost=1.0,
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         context.record_token_usage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
         return {"done": True}
 
 
-class ValidatedNode(BaseNode):
+class ValidatedNode(WorkflowNodeBase):
     """Node with required input fields for validation testing."""
 
     definition = WorkflowNodeManifest(
@@ -146,19 +146,19 @@ class ValidatedNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"name": inputs["name"], "count": inputs["count"]}
 
 
 class TestBaseNode:
-    """Tests for BaseNode class."""
+    """Tests for WorkflowNodeBase class."""
 
     def test_definition_required(self) -> None:
         """Test that subclasses must define a definition."""
         with pytest.raises(TypeError, match="must define a 'definition'"):
 
-            class InvalidNode(BaseNode):
-                def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+            class InvalidNode(WorkflowNodeBase):
+                def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
                     return {}
 
     def test_execute_success(self) -> None:
@@ -273,7 +273,7 @@ class TestBaseNodeDynamicTokenUsage:
 
 class TestBaseNodeMetricsIntegration:
     def test_successful_execution_records_metric(self) -> None:
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = EchoNode()
         node.set_metrics_collector(collector)
 
@@ -285,7 +285,7 @@ class TestBaseNodeMetricsIntegration:
         assert summary["fail_count"] == 0
 
     def test_failed_execution_records_metric(self) -> None:
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = FailingNode()
         node.set_metrics_collector(collector)
 
@@ -296,7 +296,7 @@ class TestBaseNodeMetricsIntegration:
         assert summary["fail_count"] == 1
 
     def test_dynamic_token_usage_in_metrics(self) -> None:
-        collector = MetricsCollector()
+        collector = NodeExecutionMetricsCollector()
         node = TokenReportingNode()
         node.set_metrics_collector(collector)
 
@@ -343,13 +343,13 @@ class TestBaseNodeInitSubclass:
     def test_abstract_subclass_skips_validation(self) -> None:
         from abc import ABC
 
-        class MiddleNode(BaseNode, ABC):
+        class MiddleNode(WorkflowNodeBase, ABC):
             pass
 
         assert not hasattr(MiddleNode, "definition") or MiddleNode.definition is None
 
 
-class OutputValidationNode(BaseNode):
+class OutputValidationNode(WorkflowNodeBase):
     """Node with strict output schema for validation testing."""
 
     definition = WorkflowNodeManifest(
@@ -371,12 +371,12 @@ class OutputValidationNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         val = inputs.get("value", 0)
         return {"result": val * 2, "message": f"Doubled: {val * 2}"}
 
 
-class OutputValidationErrorNode(BaseNode):
+class OutputValidationErrorNode(WorkflowNodeBase):
     """Node that returns invalid output type."""
 
     definition = WorkflowNodeManifest(
@@ -391,11 +391,11 @@ class OutputValidationErrorNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"count": "not an integer"}
 
 
-class OutputMissingRequiredNode(BaseNode):
+class OutputMissingRequiredNode(WorkflowNodeBase):
     """Node that returns missing required field."""
 
     definition = WorkflowNodeManifest(
@@ -411,11 +411,11 @@ class OutputMissingRequiredNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"name": "John"}
 
 
-class TrivialOutputSchemaNode(BaseNode):
+class TrivialOutputSchemaNode(WorkflowNodeBase):
     """Node with trivial output schema."""
 
     definition = WorkflowNodeManifest(
@@ -427,7 +427,7 @@ class TrivialOutputSchemaNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"anything": "goes"}
 
 
@@ -489,7 +489,7 @@ class TestLifecycleHooks:
     def test_on_startup_hook_fires_on_app_start(self) -> None:
         """Test that on_startup is called when the app starts."""
 
-        class LifecycleNode(BaseNode):
+        class LifecycleNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="lifecycle",
                 version="1.0.0",
@@ -502,7 +502,7 @@ class TestLifecycleHooks:
             startup_called = False
             shutdown_called = False
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {"startup": self.startup_called, "shutdown": self.shutdown_called}
 
             async def on_startup(self) -> None:
@@ -531,7 +531,7 @@ class TestLifecycleHooks:
     def test_on_shutdown_hook_fires_on_app_stop(self) -> None:
         """Test that on_shutdown is called when the app stops."""
 
-        class ShutdownNode(BaseNode):
+        class ShutdownNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="shutdown",
                 version="1.0.0",
@@ -543,7 +543,7 @@ class TestLifecycleHooks:
 
             shutdown_called = False
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_shutdown(self) -> None:
@@ -577,7 +577,7 @@ class TestLifecycleHooks:
         """Test that _lifespan context manager calls on_startup and on_shutdown."""
         hook_order: list[str] = []
 
-        class OrderedLifecycleNode(BaseNode):
+        class OrderedLifecycleNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="ordered",
                 version="1.0.0",
@@ -587,7 +587,7 @@ class TestLifecycleHooks:
                 output_schema={"type": "object"},
             )
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_startup(self) -> None:
@@ -611,7 +611,7 @@ class TestLifecycleHooks:
     def test_on_startup_exception_propagates(self) -> None:
         """Test that exceptions in on_startup propagate correctly."""
 
-        class FailingStartupNode(BaseNode):
+        class FailingStartupNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="failing-startup",
                 version="1.0.0",
@@ -621,7 +621,7 @@ class TestLifecycleHooks:
                 output_schema={"type": "object"},
             )
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_startup(self) -> None:
@@ -641,7 +641,7 @@ class TestLifecycleHooks:
     def test_on_shutdown_exception_propagates(self) -> None:
         """Test that exceptions in on_shutdown propagate correctly."""
 
-        class FailingShutdownNode(BaseNode):
+        class FailingShutdownNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="failing-shutdown",
                 version="1.0.0",
@@ -651,7 +651,7 @@ class TestLifecycleHooks:
                 output_schema={"type": "object"},
             )
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_shutdown(self) -> None:
@@ -669,14 +669,14 @@ class TestLifecycleHooks:
         asyncio.run(test_shutdown_failure())
 
     def test_lifespan_works_with_create_node_app(self) -> None:
-        """Test that lifespan hooks work with create_node_app function."""
+        """Test that lifespan hooks work with create_workflow_node_app function."""
 
-        class LifecycleTestNode(BaseNode):
+        class LifecycleTestNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="lifespan-test",
                 version="1.0.0",
                 name="Lifespan Test",
-                description="Tests lifespan with create_node_app",
+                description="Tests lifespan with create_workflow_node_app",
                 input_schema={"type": "object"},
                 output_schema={"type": "object"},
             )
@@ -684,7 +684,7 @@ class TestLifecycleHooks:
             startup_called = False
             shutdown_called = False
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_startup(self) -> None:
@@ -695,10 +695,10 @@ class TestLifecycleHooks:
 
         from fastapi.testclient import TestClient
 
-        from canvastekk_workflow_sdk.app import create_node_app
+        from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
         node = LifecycleTestNode()
-        app = create_node_app(node)
+        app = create_workflow_node_app(node)
 
         assert node.startup_called is False
         assert node.shutdown_called is False
@@ -712,7 +712,7 @@ class TestLifecycleHooks:
     def test_multiple_contexts_invoke_hooks_multiple_times(self) -> None:
         """Test that multiple TestClient contexts invoke hooks multiple times."""
 
-        class MultiLifecycleNode(BaseNode):
+        class MultiLifecycleNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="multi-lifecycle",
                 version="1.0.0",
@@ -725,7 +725,7 @@ class TestLifecycleHooks:
             startup_count = 0
             shutdown_count = 0
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
             async def on_startup(self) -> None:
@@ -755,7 +755,7 @@ class TestLifecycleHooks:
         assert node.shutdown_count == 2
 
 
-class ProgressNode(BaseNode):
+class ProgressNode(WorkflowNodeBase):
     """Node that reports progress mid-run (DA-3230)."""
 
     definition = WorkflowNodeManifest(
@@ -770,7 +770,7 @@ class ProgressNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         self.report_progress(50, "still calculating")
         return {"done": True}
 
@@ -790,7 +790,7 @@ class SlowProgressNode(ProgressNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         import time
 
         time.sleep(0.02)
@@ -799,7 +799,7 @@ class SlowProgressNode(ProgressNode):
 
 
 class TestBaseNodeReportProgress:
-    """DA-3230: BaseNode.report_progress ambient-context behavior."""
+    """DA-3230: WorkflowNodeBase.report_progress ambient-context behavior."""
 
     def test_noop_outside_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[tuple[str, dict]] = []

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { LoggingMiddleware, TimingMiddleware, SDKVersionMiddleware } from "../src/middleware.js";
-import { ExecutionContext } from "../src/context.js";
+import { NodeExecutionContext } from "../src/node-execution-context.js";
 
-function makeContext(): ExecutionContext {
-  return new ExecutionContext({ outputDir: "/tmp/mw-test", run_id: "run-1", node_id: "node-1" });
+function makeContext(): NodeExecutionContext {
+  return new NodeExecutionContext({ outputDir: "/tmp/mw-test", run_id: "run-1", node_id: "node-1" });
 }
 
 describe("LoggingMiddleware", () => {

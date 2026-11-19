@@ -1,4 +1,4 @@
-import type { ExecutionContext } from "./context.js";
+import type { NodeExecutionContext } from "./node-execution-context.js";
 
 /**
  * Interface for node execution middleware hooks.
@@ -12,7 +12,7 @@ export interface NodeMiddleware {
    */
   onBeforeExecute(
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Record<string, unknown>;
 
   /**
@@ -25,7 +25,7 @@ export interface NodeMiddleware {
   onAfterExecute(
     inputs: Record<string, unknown>,
     outputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void;
 
@@ -39,7 +39,7 @@ export interface NodeMiddleware {
   onError(
     inputs: Record<string, unknown>,
     error: Error,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void;
 }
@@ -50,7 +50,7 @@ export interface NodeMiddleware {
 export class LoggingMiddleware implements NodeMiddleware {
   onBeforeExecute(
     inputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
   ): Record<string, unknown> {
     context.logger.info(
       `[${context.runId}] Executing node with ${Object.keys(inputs).length} input(s)`,
@@ -62,7 +62,7 @@ export class LoggingMiddleware implements NodeMiddleware {
   onAfterExecute(
     inputs: Record<string, unknown>,
     outputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void {
     context.logger.info(
@@ -74,7 +74,7 @@ export class LoggingMiddleware implements NodeMiddleware {
   onError(
     inputs: Record<string, unknown>,
     error: Error,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void {
     context.logger.error(
@@ -102,7 +102,7 @@ export class TimingMiddleware implements NodeMiddleware {
 
   onBeforeExecute(
     inputs: Record<string, unknown>,
-    _context: ExecutionContext,
+    _context: NodeExecutionContext,
   ): Record<string, unknown> {
     return inputs;
   }
@@ -110,7 +110,7 @@ export class TimingMiddleware implements NodeMiddleware {
   onAfterExecute(
     _inputs: Record<string, unknown>,
     _outputs: Record<string, unknown>,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void {
     this._timings.push({
@@ -124,7 +124,7 @@ export class TimingMiddleware implements NodeMiddleware {
   onError(
     _inputs: Record<string, unknown>,
     error: Error,
-    context: ExecutionContext,
+    context: NodeExecutionContext,
     durationMs: number,
   ): void {
     this._timings.push({

@@ -88,14 +88,14 @@ Or for local development, see the [For Development](#for-development) section ab
 
 ### Step 2: Define Your Node
 
-Create a file (e.g. `handler.py`) and subclass `BaseNode`:
+Create a file (e.g. `handler.py`) and subclass `WorkflowNodeBase`:
 
 ```python
 # handler.py
-from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest, ExecutionContext
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest, NodeExecutionContext
 
 
-class UppercaseNode(BaseNode):
+class UppercaseNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="uppercase",
         version="1.0.0",
@@ -112,7 +112,7 @@ class UppercaseNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         context.report_progress(0.5, "Processing text")
         return {"result": inputs["text"].upper()}
 
@@ -122,7 +122,7 @@ app = UppercaseNode().create_app()
 
 The four requirements:
 
-1. **Subclass `BaseNode`** — inherit from `canvastekk_workflow_sdk.BaseNode`
+1. **Subclass `WorkflowNodeBase`** — inherit from `canvastekk_workflow_sdk.WorkflowNodeBase`
 2. **Define `definition`** — a `WorkflowNodeManifest` with all required fields (`slug`, `version`, `name`, `description`, `input_schema`, `output_schema`). Note: `id` is auto-derived from `slug` + `version` and must NOT be provided manually.
 3. **Implement `execute(inputs, context)`** — return a dict matching your `output_schema`
 4. **Call `.create_app()`** — get a ready-to-run FastAPI application
@@ -187,7 +187,7 @@ NodeExecutionRequest
         |
      (pass)
         v
-  ExecutionContext created
+  NodeExecutionContext created
         |
         v
   Middleware: on_before_execute(inputs, context)
@@ -236,7 +236,7 @@ account as the `X-Account-Id` header (`canvastekk-workflow-engine`
 `context.account_id`:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     account_id = context.account_id  # int | None
 ```
 
@@ -248,7 +248,7 @@ Semantics:
 - **Header-only source.** A body-supplied `account_id` is stripped before
   validation — nodes always see the engine-asserted value, never a
   caller-forged one.
-- **`None` when absent.** Local runs (`WorkflowRunner`, direct `BaseNode.run()`
+- **`None` when absent.** Local runs (`WorkflowRunner`, direct `WorkflowNodeBase.run()`
   in tests) and engines that don't send the header get `None`. Nodes should
   treat `None` as "no account context" and keep working (or fail with a clear
   error if the account is required).
@@ -260,7 +260,7 @@ Unit-test pattern — construct the request directly, no header plumbing needed:
 
 ```python
 req = NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, account_id=7)
-ctx = ExecutionContext(req)
+ctx = NodeExecutionContext(req)
 assert ctx.account_id == 7
 ```
 
@@ -315,11 +315,11 @@ Note: When raised inside `execute()`, the SDK catches them and returns `status: 
 Usage example:
 
 ```python
-from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest, ExecutionContext
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest, NodeExecutionContext
 from canvastekk_workflow_sdk.exceptions import NodeIOError, NodeExecutionError
 
 
-class FileProcessorNode(BaseNode):
+class FileProcessorNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="file-proc",
         version="1.0.0",
@@ -329,7 +329,7 @@ class FileProcessorNode(BaseNode):
         output_schema={"type": "object", "properties": {"line_count": {"type": "integer"}}},
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         from pathlib import Path
 
         file_path = Path(inputs.get("path", ""))
@@ -391,7 +391,7 @@ When the workflow engine executes your node, file input values are presigned GET
 - Download metadata is available via `context.metadata[field_name]`
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     # inputs["point_cloud"] is now a LOCAL FILE PATH (auto-downloaded by SDK)
     cloud_path = Path(inputs["point_cloud"])
     cloud_data = cloud_path.read_bytes()
@@ -414,7 +414,7 @@ The SDK **automatically validates** downloaded file inputs against the constrain
 If you need to validate additional files (e.g., files you generate or download manually), use:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     # Auto-validated inputs are guaranteed to pass constraints
     cloud_path = Path(inputs["point_cloud"])
 
@@ -430,7 +430,7 @@ def execute(self, inputs: dict, context: ExecutionContext) -> dict:
 Use `context.output_path(filename)` for output files:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     # Write output to the context's output directory
     output_file = context.output_path("result.json")
     output_file.write_text('{"status": "done"}')
@@ -528,11 +528,11 @@ After successful execution, the SDK uploads the file at `outputs["converted"]` t
 ### Complete Example
 
 ```python
-from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest, ExecutionContext
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest, NodeExecutionContext
 from pathlib import Path
 
 
-class PointCloudSegmenter(BaseNode):
+class PointCloudSegmenter(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="segment",
         version="1.0.0",
@@ -560,7 +560,7 @@ class PointCloudSegmenter(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # File inputs are auto-downloaded to local paths by the SDK
         cloud_path = Path(inputs["point_cloud"])
         cloud_data = cloud_path.read_bytes()
@@ -927,12 +927,12 @@ definition = WorkflowNodeManifest(
 | `migration_url` | `None` | URL to migration docs (RFC 9745 §3 / RFC 8594 §6) |
 | `notice` | *(required)* | Human-readable notice shown to workflow-def authors |
 
-### ExecutionContext
+### NodeExecutionContext
 
 Provided to `execute()` method:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     # Identifiers
     context.run_id    # "workflow-run-abc123"
     context.node_id   # "node-instance-456"
@@ -967,7 +967,7 @@ Field constraints enforced at construction time:
 - `BoundingBox3D`: `min_point <= max_point` on each axis (x, y, z)
 
 ```python
-from canvastekk_workflow_sdk.contracts import InstanceSet, Instance, BoundingBox3D, Point3D
+from canvastekk_workflow_sdk.node_io_data_contracts import InstanceSet, Instance, BoundingBox3D, Point3D
 
 # Producing instances
 instance_set = InstanceSet(
@@ -1004,7 +1004,7 @@ for vent in vents:
 #### MeasurementSet — Measurements
 
 ```python
-from canvastekk_workflow_sdk.contracts import MeasurementSet, Measurement, Point3D
+from canvastekk_workflow_sdk.node_io_data_contracts import MeasurementSet, Measurement, Point3D
 
 measurements = MeasurementSet(
     measurements=[
@@ -1033,7 +1033,7 @@ height = measurements.get_value("ceiling_height")  # 2800.0
 #### PlaneSet — Detected Planes
 
 ```python
-from canvastekk_workflow_sdk.contracts import PlaneSet, Plane, Point3D
+from canvastekk_workflow_sdk.node_io_data_contracts import PlaneSet, Plane, Point3D
 
 planes = PlaneSet(
     planes=[
@@ -1056,7 +1056,7 @@ floor = planes.get_plane_by_label("floor")
 
 #### Serialization
 
-All contracts extend `BaseContract` which provides:
+All contracts extend `NodeIoDataContract` which provides:
 
 ```python
 # Save to JSON
@@ -1229,7 +1229,7 @@ print(result["name"])        # dict-like access for backward compat
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `node` | `BaseNode` | Yes | The node instance to register |
+| `node` | `WorkflowNodeBase` | Yes | The node instance to register |
 | `registry_url` | `str` | Yes | Engine registry endpoint |
 | `invoke_url` | `str \| None` | No | URL where the node is reachable |
 | `invoke_type` | `InvokeType` | No | `"http"`, `"lambda"`, `"sagemaker"`, or `"in-process"` (default: `"http"`) |
@@ -1357,7 +1357,7 @@ spec = (
     .build()  # validates the DAG
 )
 
-# Test run locally with BaseNode instances
+# Test run locally with WorkflowNodeBase instances
 executor = InProcessExecutor()
 executor.register("segmentation-v1.0.0", MySegmentNode())
 executor.register("measurement-v1.0.0", MyMeasurementNode())
@@ -1426,7 +1426,7 @@ The runner accepts a `NodeExecutor` via constructor — choose how nodes execute
 
 #### `InProcessExecutor` — Direct Execution
 
-Runs `BaseNode.execute()` directly via `asyncio.to_thread()` (non-blocking):
+Runs `WorkflowNodeBase.execute()` directly via `asyncio.to_thread()` (non-blocking):
 
 ```python
 from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
@@ -1528,7 +1528,7 @@ The SDK provides production-ready structured logging out of the box. It is confi
 
 ### How It Works
 
-`create_node_app()` calls `configure_logging()` during startup. This reads two environment variables:
+`create_workflow_node_app()` calls `configure_logging()` during startup. This reads two environment variables:
 
 | Variable | Default | Values | Description |
 |----------|---------|--------|-------------|
@@ -1544,7 +1544,7 @@ The SDK provides production-ready structured logging out of the box. It is confi
 Every log line includes:
 - `timestamp` — ISO 8601 UTC
 - `level` — `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
-- `logger` — logger name (e.g. `node.ff-1`, `canvastekk_workflow_sdk.app`)
+- `logger` — logger name (e.g. `node.ff-1`, `canvastekk_workflow_sdk.workflow_node_app`)
 - `message` — the log message
 - `run_id` / `node_id` — correlation IDs (when set by middleware)
 - Any extra fields passed via `extra={}`
@@ -1560,10 +1560,10 @@ Set `CANVASTEKK_LOG_FORMAT=text` for human-readable output during development.
 
 ### Using the Logger in `execute()`
 
-The `ExecutionContext` provides a pre-configured logger:
+The `NodeExecutionContext` provides a pre-configured logger:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     context.logger.info("Processing started")
 
     # With extra structured fields
@@ -1645,13 +1645,13 @@ Middleware provides hooks around `execute()` for cross-cutting concerns:
 
 ```python
 from typing import Any
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
+from canvastekk_workflow_sdk import WorkflowNodeBase, NodeExecutionContext, WorkflowNodeManifest
 from canvastekk_workflow_sdk.middleware import NodeMiddleware
 
 
 class AuditMiddleware:
     def on_before_execute(
-        self, inputs: dict[str, Any], context: ExecutionContext
+        self, inputs: dict[str, Any], context: NodeExecutionContext
     ) -> dict[str, Any]:
         context.logger.info(f"Audit: execution started for {context.node_id}")
         return inputs
@@ -1660,7 +1660,7 @@ class AuditMiddleware:
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         context.logger.info(f"Audit: execution completed in {duration_ms}ms")
@@ -1669,7 +1669,7 @@ class AuditMiddleware:
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         context.logger.error(f"Audit: execution failed: {error}")
@@ -1693,7 +1693,7 @@ Built-in middleware:
 Override `health_check()` to report on external dependencies:
 
 ```python
-class ModelInferenceNode(BaseNode):
+class ModelInferenceNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(...)
 
     def __init__(self):
@@ -1713,7 +1713,7 @@ class ModelInferenceNode(BaseNode):
         except ImportError:
             return False
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         if self.model is None:
             self.model = self._load_model()
         # ...
@@ -1730,10 +1730,10 @@ Health status logic:
 Override `hook()` to handle async callbacks:
 
 ```python
-class AsyncTaskNode(BaseNode):
+class AsyncTaskNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(...)
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # Start a long-running task, return immediately
         task_id = self._start_task(inputs)
         return {"task_id": task_id, "status": "processing"}
@@ -1754,17 +1754,17 @@ By default, `hook()` returns `None` which produces a `501 Not Implemented` respo
 ### Custom Metrics Collector
 
 ```python
-from canvastekk_workflow_sdk import BaseNode
-from canvastekk_workflow_sdk.observability import MetricsCollector, ExecutionMetric
+from canvastekk_workflow_sdk import WorkflowNodeBase
+from canvastekk_workflow_sdk.observability import NodeExecutionMetricsCollector, NodeExecutionMetric
 
 
-class RemoteMetricsCollector(MetricsCollector):
-    def record(self, metric: ExecutionMetric) -> None:
+class RemoteMetricsCollector(NodeExecutionMetricsCollector):
+    def record(self, metric: NodeExecutionMetric) -> None:
         super().record(metric)
         # Forward to external system (e.g. Prometheus, Datadog)
         self._push_to_monitoring(metric)
 
-    def _push_to_monitoring(self, metric: ExecutionMetric) -> None:
+    def _push_to_monitoring(self, metric: NodeExecutionMetric) -> None:
         # Send metric.to_dict() to your monitoring backend
         pass
 

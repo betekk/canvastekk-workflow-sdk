@@ -3,7 +3,7 @@
 The sunset is ``RELEASE_DATE + SUPPORT_HORIZON_DAYS``. The package-import
 path LOGS ONLY — the engine lazy-imports this package during seeding and
 discovery, and an import-time raise would silently disable both. The hard
-raise lives at the node entrypoints (``create_node_app``, ``BaseNode.run``).
+raise lives at the node entrypoints (``create_workflow_node_app``, ``WorkflowNodeBase.run``).
 
 ``CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1`` is the break-glass: past-sunset
 executions downgrade the raise to a CRITICAL log.

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
+from canvastekk_workflow_sdk import NodeExecutionContext, WorkflowNodeBase, WorkflowNodeManifest
 from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
 from canvastekk_workflow_sdk.workflow.level import compute_levels
 from canvastekk_workflow_sdk.workflow.models import (
@@ -416,7 +416,7 @@ class TestWorkflowRunner:
         assert dependent_result.skipped_reason == "upstream_failed"
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
@@ -426,11 +426,11 @@ class EchoNode(BaseNode):
         output_schema={"type": "object", "properties": {"message": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
+class FailingNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
@@ -440,11 +440,11 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         raise ValueError("Intentional failure")
 
 
-class FileWriterNode(BaseNode):
+class FileWriterNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="file-writer",
         version="1.0.0",
@@ -457,13 +457,13 @@ class FileWriterNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         path = context.output_path("data.txt")
         path.write_text("hello from A")
         return {"file_path": str(path)}
 
 
-class FileReaderNode(BaseNode):
+class FileReaderNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="file-reader",
         version="1.0.0",
@@ -479,12 +479,12 @@ class FileReaderNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         content = Path(inputs["file_path"]).read_text()
         return {"content": content}
 
 
-class OutputDirCaptureNode(BaseNode):
+class OutputDirCaptureNode(WorkflowNodeBase):
     definition = WorkflowNodeManifest(
         slug="dir-capture",
         version="1.0.0",
@@ -501,7 +501,7 @@ class OutputDirCaptureNode(BaseNode):
         super().__init__()
         self._capture_list = capture_list
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         dir_str = str(context.output_dir)
         if self._capture_list is not None:
             self._capture_list.append(dir_str)
@@ -803,7 +803,7 @@ class TestPerNodeOutputSubdirs:
     def test_parallel_nodes_same_filename_no_collision(self) -> None:
         captured: list[str] = []
 
-        class CollisionNode(BaseNode):
+        class CollisionNode(WorkflowNodeBase):
             definition = WorkflowNodeManifest(
                 slug="collision",
                 version="1.0.0",

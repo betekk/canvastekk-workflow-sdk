@@ -7,18 +7,18 @@ from unittest.mock import patch
 import pytest
 
 from canvastekk_workflow_sdk.exceptions import NodeIOError
-from canvastekk_workflow_sdk.response import NodeExecutionResponse
-from canvastekk_workflow_sdk.uploads import (
-    OutputUploader,
-    S3PresignedUploader,
-    UploadSession,
-    get_default_uploader,
+from canvastekk_workflow_sdk.node_execution_response import NodeExecutionResponse
+from canvastekk_workflow_sdk.node_output_uploads import (
+    NodeOutputS3PresignedUploader,
+    NodeOutputUploader,
+    NodeOutputUploadSession,
+    get_default_node_output_uploader,
 )
 
 LEGACY_TARGET_MESSAGE = "engine sent deprecated presigned target — upgrade the engine"
 
 
-def _session(**overrides: Any) -> UploadSession:
+def _session(**overrides: Any) -> NodeOutputUploadSession:
     fields = {
         "session_token": "tok-1",
         "initiate_url": "https://engine/sessions/tok-1/initiate",
@@ -27,36 +27,36 @@ def _session(**overrides: Any) -> UploadSession:
         "status_url": "https://engine/sessions/tok-1/status",
     }
     fields.update(overrides)
-    return UploadSession(**fields)
+    return NodeOutputUploadSession(**fields)
 
 
-class MockUploader(OutputUploader):
+class MockUploader(NodeOutputUploader):
     """Mock uploader for testing protocol compliance."""
 
     def __init__(self) -> None:
-        self.uploaded: list[tuple[NodeExecutionResponse, dict[str, UploadSession], list[str]]] = []
+        self.uploaded: list[tuple[NodeExecutionResponse, dict[str, NodeOutputUploadSession], list[str]]] = []
 
     def upload_outputs(
         self,
         response: NodeExecutionResponse,
-        upload_urls: dict[str, UploadSession],
+        upload_urls: dict[str, NodeOutputUploadSession],
         file_output_fields: list[str],
     ) -> None:
         self.uploaded.append((response, upload_urls, file_output_fields))
 
 
 class TestOutputUploaderProtocol:
-    """Tests for OutputUploader protocol."""
+    """Tests for NodeOutputUploader protocol."""
 
     def test_protocol_is_runtime_checkable(self) -> None:
-        """Test that OutputUploader protocol is runtime checkable."""
+        """Test that NodeOutputUploader protocol is runtime checkable."""
         uploader = MockUploader()
-        assert isinstance(uploader, OutputUploader)
+        assert isinstance(uploader, NodeOutputUploader)
 
     def test_s3_uploader_implements_protocol(self) -> None:
-        """Test that S3PresignedUploader implements OutputUploader protocol."""
-        uploader = S3PresignedUploader()
-        assert isinstance(uploader, OutputUploader)
+        """Test that NodeOutputS3PresignedUploader implements NodeOutputUploader protocol."""
+        uploader = NodeOutputS3PresignedUploader()
+        assert isinstance(uploader, NodeOutputUploader)
 
 
 class TestLegacyTargetRejection:
@@ -68,7 +68,7 @@ class TestLegacyTargetRejection:
         test_file.write_bytes(b"data")
 
         with pytest.raises(NodeIOError) as excinfo:
-            S3PresignedUploader().upload_file(str(test_file), "https://example.com/presigned")
+            NodeOutputS3PresignedUploader().upload_file(str(test_file), "https://example.com/presigned")
 
         assert str(excinfo.value) == LEGACY_TARGET_MESSAGE
 
@@ -82,9 +82,9 @@ class TestLegacyTargetRejection:
             duration_ms=100,
         )
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             with pytest.raises(NodeIOError) as excinfo:
-                S3PresignedUploader().upload_outputs(
+                NodeOutputS3PresignedUploader().upload_outputs(
                     response, {"result_path": "https://example.com/presigned"}, ["result_path"]
                 )
 
@@ -93,22 +93,22 @@ class TestLegacyTargetRejection:
 
 
 class TestS3PresignedUploader:
-    """Tests for S3PresignedUploader session-path behavior."""
+    """Tests for NodeOutputS3PresignedUploader session-path behavior."""
 
     def test_upload_file_routes_session_target_to_multipart(self, tmp_path: Path) -> None:
-        """A session target takes the multipart client (upload_via_session)."""
+        """A session target takes the multipart client (upload_via_cds_multipart_session)."""
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
         sess = _session()
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
-            S3PresignedUploader().upload_file(str(test_file), sess)
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
+            NodeOutputS3PresignedUploader().upload_file(str(test_file), sess)
 
         mock_session_upload.assert_called_once_with(sess, str(test_file))
 
     def test_upload_outputs_with_valid_file_and_session(self, tmp_path: Path) -> None:
         """Test upload_outputs with a valid file and session target."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
 
@@ -120,7 +120,7 @@ class TestS3PresignedUploader:
         upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         mock_session_upload.assert_called_once()
@@ -128,7 +128,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_array_uploads_each_element_indexed(self, tmp_path: Path) -> None:
         """tracker#3969: list value + array session → one indexed upload per element."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         files = []
         for name in ("a.las", "b.las", "c.zip"):
             f = tmp_path / name
@@ -143,7 +143,7 @@ class TestS3PresignedUploader:
         upload_urls = {"buffers": _session(array=True)}
         file_output_fields = ["buffers"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         assert mock_session_upload.call_count == 3
@@ -154,7 +154,7 @@ class TestS3PresignedUploader:
         assert [c.args[1] for c in mock_session_upload.call_args_list] == [str(f) for f in files]
 
     def test_upload_outputs_array_element_not_a_file_raises_with_index(self, tmp_path: Path) -> None:
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"buffers": [str(tmp_path / "missing.las")]},
@@ -164,7 +164,7 @@ class TestS3PresignedUploader:
             uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
 
     def test_upload_outputs_array_element_not_a_string_raises_with_index(self) -> None:
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"buffers": [42]},
@@ -174,18 +174,18 @@ class TestS3PresignedUploader:
             uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
 
     def test_upload_outputs_empty_array_is_noop(self) -> None:
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"buffers": []},
             duration_ms=100,
         )
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, {"buffers": _session(array=True)}, ["buffers"])
         mock_session_upload.assert_not_called()
 
     def test_upload_outputs_list_on_non_array_target_raises(self, tmp_path: Path) -> None:
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         f = tmp_path / "a.las"
         f.write_bytes(b"x")
         response = NodeExecutionResponse.success(
@@ -197,11 +197,11 @@ class TestS3PresignedUploader:
             uploader.upload_outputs(response, {"buffers": _session()}, ["buffers"])
 
     def test_upload_file_element_index_gated_on_array_flag(self, tmp_path: Path) -> None:
-        """element_index rides upload_via_session only for array targets."""
-        uploader = S3PresignedUploader()
+        """element_index rides upload_via_cds_multipart_session only for array targets."""
+        uploader = NodeOutputS3PresignedUploader()
         f = tmp_path / "a.las"
         f.write_bytes(b"x")
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_file(str(f), _session(array=True), element_index=4)
             mock_session_upload.assert_called_once()
             assert mock_session_upload.call_args.kwargs["element"] == {"index": 4, "suffix": ".las"}
@@ -212,7 +212,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_raises_on_non_string_value(self) -> None:
         """A present non-string file-output value fails the node (DA-2337)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"result": 123, "summary": "done"},
@@ -230,7 +230,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_raises_on_nonexistent_file(self) -> None:
         """A present path that does not exist fails the node with path detail (DA-2337)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"result_path": "/nonexistent/file.ply", "summary": "done"},
@@ -247,7 +247,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_raises_on_directory_value(self, tmp_path: Path) -> None:
         """A directory path is not a file — fails like a missing path (DA-2337)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"result_path": str(tmp_path), "summary": "done"},
@@ -264,7 +264,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_skips_absent_output_field(self) -> None:
         """An omitted file-output field is skipped, not failed (DA-2337)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.success(
             execution_id="exec-1",
             outputs={"summary": "done"},
@@ -273,14 +273,14 @@ class TestS3PresignedUploader:
         upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         mock_session_upload.assert_not_called()
 
     def test_upload_outputs_partial_failure_orphans_earlier_uploads(self, tmp_path: Path) -> None:
         """A bad later field raises AFTER earlier valid fields uploaded (DA-2337)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         test_file = tmp_path / "good.ply"
         test_file.write_bytes(b"ply data")
 
@@ -295,7 +295,7 @@ class TestS3PresignedUploader:
         }
         file_output_fields = ["good_path", "bad_path"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             with pytest.raises(NodeIOError) as excinfo:
                 uploader.upload_outputs(response, upload_urls, file_output_fields)
 
@@ -305,7 +305,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_skips_missing_urls(self, tmp_path: Path) -> None:
         """Test that upload_outputs skips fields without upload URLs."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
 
@@ -314,17 +314,17 @@ class TestS3PresignedUploader:
             outputs={"result_path": str(test_file), "summary": "done"},
             duration_ms=100,
         )
-        upload_urls: dict[str, UploadSession] = {}
+        upload_urls: dict[str, NodeOutputUploadSession] = {}
         file_output_fields = ["result_path"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         mock_session_upload.assert_not_called()
 
     def test_upload_outputs_raises_on_upload_failure(self, tmp_path: Path) -> None:
         """Session-path failures raise so the execution fails (DA-1711 4.1)."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         test_file = tmp_path / "result.ply"
         test_file.write_bytes(b"ply data")
 
@@ -337,7 +337,7 @@ class TestS3PresignedUploader:
         file_output_fields = ["result_path"]
 
         with patch(
-            "canvastekk_workflow_sdk.multipart.upload_via_session",
+            "canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session",
             side_effect=NodeIOError("part PUT failed"),
         ):
             with pytest.raises(NodeIOError):
@@ -345,7 +345,7 @@ class TestS3PresignedUploader:
 
     def test_upload_outputs_with_no_outputs(self) -> None:
         """Test that upload_outputs returns early when outputs is None."""
-        uploader = S3PresignedUploader()
+        uploader = NodeOutputS3PresignedUploader()
         response = NodeExecutionResponse.failure(
             execution_id="exec-1",
             error="test error",
@@ -355,27 +355,27 @@ class TestS3PresignedUploader:
         upload_urls = {"result_path": _session()}
         file_output_fields = ["result_path"]
 
-        with patch("canvastekk_workflow_sdk.multipart.upload_via_session") as mock_session_upload:
+        with patch("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session") as mock_session_upload:
             uploader.upload_outputs(response, upload_urls, file_output_fields)
 
         mock_session_upload.assert_not_called()
 
 
 class TestDefaultUploaderSingleton:
-    """Tests for get_default_uploader singleton."""
+    """Tests for get_default_node_output_uploader singleton."""
 
     def test_get_default_uploader_returns_singleton(self) -> None:
-        """Test that get_default_uploader returns the same instance."""
-        uploader1 = get_default_uploader()
-        uploader2 = get_default_uploader()
+        """Test that get_default_node_output_uploader returns the same instance."""
+        uploader1 = get_default_node_output_uploader()
+        uploader2 = get_default_node_output_uploader()
         assert uploader1 is uploader2
 
     def test_default_uploader_is_s3_presigned_uploader(self) -> None:
-        """Test that default uploader is S3PresignedUploader instance."""
-        uploader = get_default_uploader()
-        assert isinstance(uploader, S3PresignedUploader)
+        """Test that default uploader is NodeOutputS3PresignedUploader instance."""
+        uploader = get_default_node_output_uploader()
+        assert isinstance(uploader, NodeOutputS3PresignedUploader)
 
     def test_default_uploader_implements_protocol(self) -> None:
-        """Test that default uploader implements OutputUploader protocol."""
-        uploader = get_default_uploader()
-        assert isinstance(uploader, OutputUploader)
+        """Test that default uploader implements NodeOutputUploader protocol."""
+        uploader = get_default_node_output_uploader()
+        assert isinstance(uploader, NodeOutputUploader)

@@ -2,8 +2,8 @@
  * CanvasTEKK contract types and utilities for point cloud data.
  * Exports standard contract schemas for Point3D, BoundingBox, Instance, Measurement, and Plane.
  */
-export { CONTRACT_VERSION, saveJson, loadJson } from "./base.js";
-export type { BaseContractData } from "./base.js";
+export { NODE_IO_DATA_CONTRACT_VERSION, saveJson, loadJson } from "./base.js";
+export type { NodeIoDataContractData } from "./base.js";
 export {
   point3DToList,
   point3DFromList,
