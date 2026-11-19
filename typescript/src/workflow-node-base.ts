@@ -159,10 +159,11 @@ function formatAjvErrors(errors: import("ajv").ErrorObject[]): Record<string, un
  * Abstract base class for all CanvasTEKK workflow nodes.
  *
  * Subclasses must:
- * 1. Define a `definition` class attribute with a valid WorkflowNodeManifest
+ * 1. Define a `manifest` class attribute with a valid WorkflowNodeManifest
+ *    (legacy `definition` fields still resolve, deprecated — ADR 0001, #271)
  * 2. Implement the `execute()` method
  *
- * The SDK validates the definition at construction time and auto-downloads
+ * The SDK validates the manifest at construction time and auto-downloads
  * file inputs before calling `execute()`. Output validation runs after
  * `execute()` returns.
  *
@@ -197,7 +198,7 @@ export abstract class WorkflowNodeBase {
 
   /**
    * Creates a new WorkflowNodeBase instance.
-   * Validates the node definition at construction time.
+   * Validates the node manifest at construction time.
    */
   constructor() {
     // Constructor-time validation replaces Python's __init_subclass__

@@ -106,7 +106,9 @@ class WorkflowNodeBase(ABC):
     Abstract base class for all nodes.
 
     Subclasses must:
-    1. Define a `definition` class attribute with WorkflowNodeManifest
+    1. Define a `manifest` class attribute with WorkflowNodeManifest
+       (legacy `definition` attribute names still resolve, with a deprecation
+       warning — ADR 0001, #271)
     2. Implement the `execute()` method
 
     Example:
@@ -422,7 +424,7 @@ class WorkflowNodeBase(ABC):
         """Download presigned URL file inputs and replace with local paths.
 
         Built-in pipeline step in ``run()`` — not a middleware. Iterates
-        ``definition.file_input_fields``, downloads any URL values to
+        ``manifest.file_input_fields``, downloads any URL values to
         ``context.downloads_dir``, validates them, and stores metadata
         in ``context.metadata``.
 
