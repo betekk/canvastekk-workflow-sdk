@@ -29,13 +29,13 @@ from typing import Any
 
 MODEL_IMPORTS = """
 from canvastekk_workflow_sdk import (
-    DeprecationInfo,
-    RetryConfig,
+    WorkflowNodeDeprecationInfo,
+    WorkflowNodeRetryConfig,
     WorkflowNodeManifest,
     WorkflowNodeRole,
     WorkflowNodeStyles,
 )
-from canvastekk_workflow_sdk.workflow.models import (
+from canvastekk_workflow_sdk.workflow.workflow_definition import (
     EdgeType,
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,
@@ -43,12 +43,22 @@ from canvastekk_workflow_sdk.workflow.models import (
 )
 """
 
+# ADR 0001 (#271): models renamed for explicit naming. Applied to the BASE
+# dump before diffing so a pure rename compares structurally — any field,
+# enum, or shape delta on the renamed models STILL classifies as before.
+RENAMED_MODELS: dict[str, str] = {
+    "NodeContract": "WorkflowNodeManifestContract",
+    "ContractCapabilities": "WorkflowNodeContractCapabilities",
+    "RetryConfig": "WorkflowNodeRetryConfig",
+    "DeprecationInfo": "WorkflowNodeDeprecationInfo",
+}
+
 MODELS_TO_CHECK: list[tuple[str, str]] = [
     ("WorkflowNodeManifest", "WorkflowNodeManifest"),
-    ("DeprecationInfo", "DeprecationInfo"),
+    ("WorkflowNodeDeprecationInfo", "WorkflowNodeDeprecationInfo"),
     ("WorkflowNodeStyles", "WorkflowNodeStyles"),
     ("WorkflowNodeRole", "WorkflowNodeRole"),
-    ("RetryConfig", "RetryConfig"),
+    ("WorkflowNodeRetryConfig", "WorkflowNodeRetryConfig"),
     ("EdgeType", "EdgeType"),
     ("WorkflowDefinitionNode", "WorkflowDefinitionNode"),
     ("WorkflowEdgeDefinition", "WorkflowEdgeDefinition"),
@@ -153,7 +163,15 @@ def diff_schemas(base_path: str, pr_path: str) -> int:
         0 always (CI decides pass/fail based on ``breaking`` output + label).
     """
     with open(base_path) as f:
-        base = json.load(f)
+        base_text = f.read()
+    # Normalize pre-rename class names (ADR 0001) in the base dump: top-level
+    # model keys AND nested ``$defs``/``$ref`` labels. Structural deltas on the
+    # renamed models still diff — only the names are canonicalized.
+    for old, new in RENAMED_MODELS.items():
+        base_text = base_text.replace(f'"{old}"', f'"{new}"').replace(
+            f"#/$defs/{old}", f"#/$defs/{new}"
+        )
+    base = json.loads(base_text)
     with open(pr_path) as f:
         pr = json.load(f)
 

@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.workflow.models import WorkflowDefinitionSpec
+    from canvastekk_workflow_sdk.workflow.workflow_definition import WorkflowDefinitionSpec
 
 
 def compute_levels(spec: WorkflowDefinitionSpec) -> list[list[str]]:

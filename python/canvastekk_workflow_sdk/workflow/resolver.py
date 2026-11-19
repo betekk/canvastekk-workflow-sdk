@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.workflow.models import WorkflowDefinitionSpec
+    from canvastekk_workflow_sdk.workflow.workflow_definition import WorkflowDefinitionSpec
 
 
 def resolve_inputs(

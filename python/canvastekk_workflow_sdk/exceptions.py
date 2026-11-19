@@ -110,7 +110,12 @@ class NodeTimeoutError(NodeExecutionError):
 
 
 class NodeValidationError(NodeExecutionError):
-    """Raised when input validation against JSON Schema fails."""
+    """Base for validation failures (ADR 0001, #271): manifest vs input.
+
+    Still the catchable base for consumer ``except`` clauses; the SDK now
+    raises the specific subclasses below. Kept importable until 1.0.0 (#272);
+    prefer raising the specific subclass in new code.
+    """
 
     category = "validation"
 
@@ -144,6 +149,14 @@ class NodeValidationError(NodeExecutionError):
         result = super().to_dict()
         result["errors"] = self.errors
         return result
+
+
+class WorkflowNodeManifestValidationError(NodeValidationError):
+    """Raised when a workflow node manifest fails validation (ADR 0001, #271)."""
+
+
+class NodeInputValidationError(NodeValidationError):
+    """Raised when node input payload validation fails (ADR 0001, #271)."""
 
 
 class NodeIOError(NodeExecutionError):
@@ -203,7 +216,7 @@ class NodeConfigurationError(NodeExecutionError):
         )
 
 
-class WorkflowExecutionError(NodeExecutionError):
+class WorkflowRunError(NodeExecutionError):
     """Raised when local workflow execution fails."""
 
     category = "domain"
@@ -233,7 +246,7 @@ class WorkflowExecutionError(NodeExecutionError):
         self.node_id = node_id
 
 
-class WorkflowValidationError(NodeExecutionError):
+class WorkflowDefinitionValidationError(NodeExecutionError):
     """Raised when workflow spec validation fails."""
 
     category = "validation"
@@ -329,3 +342,24 @@ def get_http_status_for_error(exc: NodeExecutionError) -> int:
         Integer HTTP status code (defaults to 500 for unknown error codes).
     """
     return ERROR_CODE_TO_HTTP_STATUS.get(exc.error_code, 500)
+
+
+# Deprecated public names (ADR 0001, #271): old exception names -> renamed.
+_DEPRECATED_ALIASES = {
+    "WorkflowExecutionError": "WorkflowRunError",
+    "WorkflowValidationError": "WorkflowDefinitionValidationError",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        warnings.warn(
+            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
+            " (ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[_DEPRECATED_ALIASES[name]]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

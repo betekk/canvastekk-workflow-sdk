@@ -15,7 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.context import ExecutionContext
+    from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class NodeMiddleware(Protocol):
     def on_before_execute(
         self,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """Called before execute(). Can modify inputs.
 
@@ -47,7 +47,7 @@ class NodeMiddleware(Protocol):
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Called after successful execute().
@@ -64,7 +64,7 @@ class NodeMiddleware(Protocol):
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Called when execute() raises an exception.
@@ -84,7 +84,7 @@ class LoggingMiddleware:
     def on_before_execute(
         self,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """Log before node execution starts.
 
@@ -105,7 +105,7 @@ class LoggingMiddleware:
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Log after successful node execution.
@@ -129,7 +129,7 @@ class LoggingMiddleware:
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Log when execute() raises an exception.
@@ -166,7 +166,7 @@ class TimingMiddleware:
     def on_before_execute(
         self,
         inputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
     ) -> dict[str, Any]:
         """No-op before execution.
 
@@ -183,7 +183,7 @@ class TimingMiddleware:
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Record timing for successful execution.
@@ -207,7 +207,7 @@ class TimingMiddleware:
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         """Record timing for failed execution.

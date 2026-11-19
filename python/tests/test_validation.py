@@ -2,11 +2,11 @@
 
 from typing import Any
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, NodeExecutionRequest, WorkflowNodeManifest
+from canvastekk_workflow_sdk import NodeExecutionContext, NodeExecutionRequest, WorkflowNodeBase, WorkflowNodeManifest
 
 
-class StrictNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class StrictNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         name="strict",
         version="1.0.0",
         title="Strict",
@@ -23,12 +23,12 @@ class StrictNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"echo": inputs.get("name")}
 
 
-class LooseNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class LooseNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         name="loose",
         version="1.0.0",
         title="Loose",
@@ -37,7 +37,7 @@ class LooseNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return inputs
 
 

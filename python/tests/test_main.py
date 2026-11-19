@@ -37,7 +37,7 @@ def test_validate_valid_definition():
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     name="test-node",
     version="1.0.0",
     title="Test Node",
@@ -48,7 +48,7 @@ definition = WorkflowNodeManifest(
 """)
 
         result = subprocess.run(
-            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition"],
+            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:manifest"],
             cwd=tmpdir,
             capture_output=True,
             text=True,
@@ -67,7 +67,7 @@ def test_validate_with_json_flag():
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     name="test-node",
     version="1.0.0",
     title="Test Node",
@@ -78,7 +78,7 @@ definition = WorkflowNodeManifest(
 """)
 
         result = subprocess.run(
-            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition", "--json"],
+            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:manifest", "--json"],
             cwd=tmpdir,
             capture_output=True,
             text=True,
@@ -99,7 +99,7 @@ def test_validate_invalid_path_format():
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     name="test-node",
     version="1.0.0",
     title="Test Node",
@@ -331,7 +331,7 @@ def test_validate_invalid_draft7_schema_exit_1():
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     name="test-node",
     version="1.0.0",
     title="Test Node",
@@ -342,7 +342,7 @@ definition = WorkflowNodeManifest(
 """)
 
         result = subprocess.run(
-            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition"],
+            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:manifest"],
             cwd=tmpdir,
             capture_output=True,
             text=True,
@@ -363,7 +363,7 @@ def test_validate_valid_draft7_schema_exit_0():
         test_file.write_text("""
 from canvastekk_workflow_sdk import WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     name="test-node",
     version="1.0.0",
     title="Test Node",
@@ -374,7 +374,7 @@ definition = WorkflowNodeManifest(
 """)
 
         result = subprocess.run(
-            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:definition"],
+            [str(PYTHON_BIN), "-m", "canvastekk_workflow_sdk", "validate", "test_node:manifest"],
             cwd=tmpdir,
             capture_output=True,
             text=True,
@@ -491,7 +491,7 @@ class TestProbeRegistryDiff:
                 return self._payload or {}
 
         return patch(
-            "canvastekk_workflow_sdk.registry.httpx.get",
+            "canvastekk_workflow_sdk.workflow_node_registry.httpx.get",
             return_value=_Resp(published),
         )
 
@@ -553,7 +553,7 @@ class TestProbeRegistryDiff:
         import httpx as _httpx
 
         with patch(
-            "canvastekk_workflow_sdk.registry.httpx.get",
+            "canvastekk_workflow_sdk.workflow_node_registry.httpx.get",
             side_effect=_httpx.ConnectError("engine unreachable"),
         ):
             report = self._probe(self._manifest(), engine_url="https://cwe.example.com", token=CTK)

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { WorkflowBuilder } from "../src/workflow/builder.js";
 import { WorkflowRunner } from "../src/workflow/runner.js";
-import { InProcessExecutor } from "../src/workflow/executor.js";
+import { InProcessNodeExecutor } from "../src/workflow/node-executor.js";
 
 describe("WorkflowRunner", () => {
   it("sequential execution (start → node → end)", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("echo-v1.0.0", {
       execute: async (inputs, _ctx) => ({ result: inputs.message }),
     });
@@ -28,7 +28,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("parallel execution within a level", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("node-a-v1", {
       execute: async (_inputs, _ctx) => ({ value: "A" }),
     });
@@ -55,7 +55,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("fail_fast stops on first failure", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("fail-v1", {
       execute: async () => { throw new Error(" intentional fail"); },
     });
@@ -83,7 +83,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("continue runs all levels even on failure", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("fail-v1", {
       execute: async () => { throw new Error("fail"); },
     });
@@ -110,7 +110,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("upstream failure marks downstream as skipped", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("fail-v1", {
       execute: async () => { throw new Error("fail"); },
     });
@@ -138,7 +138,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("Executor registration check (missing slug → failed)", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
 
     const spec = await new WorkflowBuilder()
       .addStart("start")
@@ -158,7 +158,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("Auto-created temp dirs are cleaned up (cleanup: true)", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("pass-v1", {
       execute: async (inputs, ctx) => ({ output: ctx.outputDir }),
     });
@@ -182,7 +182,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("Auto-created temp dirs are kept when cleanup: false", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("pass-v1", {
       execute: async (inputs, ctx) => ({ output: ctx.outputDir }),
     });
@@ -204,7 +204,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("User-supplied outputDir is NOT cleaned up", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("pass-v1", {
       execute: async (inputs, ctx) => ({ output: ctx.outputDir }),
     });
@@ -227,7 +227,7 @@ describe("WorkflowRunner", () => {
 
   it("Shared outputDir enables file-passing between nodes", async () => {
     const { writeFileSync, readFileSync, mkdirSync } = await import("node:fs");
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("producer-v1", {
       execute: async (inputs, ctx) => {
         mkdirSync(ctx.outputDir, { recursive: true });
@@ -261,8 +261,8 @@ describe("WorkflowRunner", () => {
     expect(result.final_outputs).toEqual({ consumed: "shared content" });
   });
 
-  it("NodeResult includes correct metadata (nodeId, slug, status, outputs, durationMs, error, skippedReason)", async () => {
-    const executor = new InProcessExecutor();
+  it("WorkflowRunNodeResult includes correct metadata (nodeId, slug, status, outputs, durationMs, error, skippedReason)", async () => {
+    const executor = new InProcessNodeExecutor();
     executor.register("success-v1", {
       execute: async () => ({ ok: true }),
     });
@@ -288,7 +288,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("Multiple end nodes aggregate outputs from all end nodes", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("produce-a", { execute: async () => ({ a: 1 }) });
     executor.register("produce-b", { execute: async () => ({ b: 2 }) });
 
@@ -312,7 +312,7 @@ describe("WorkflowRunner", () => {
   });
 
   it("Handles nodeOutputs injection from initial inputs", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("read-v1", {
       execute: async (inputs, _ctx) => ({ value: inputs.inputKey }),
     });
@@ -333,7 +333,7 @@ describe("WorkflowRunner", () => {
 });
 describe("WorkflowRunner start-input seeding (DA-1711)", () => {
   it("seeded run inputs reach downstream nodes via wired edges", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("echo-v1", {
       execute: async (inputs) => ({ message: inputs.pointCloud }),
     });
@@ -354,7 +354,7 @@ describe("WorkflowRunner start-input seeding (DA-1711)", () => {
   });
 
   it("mis-wired edge fails one node instead of crashing run()", async () => {
-    const executor = new InProcessExecutor();
+    const executor = new InProcessNodeExecutor();
     executor.register("echo-v1", {
       execute: async (inputs) => ({ message: inputs.message ?? "none" }),
     });

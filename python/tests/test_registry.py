@@ -8,22 +8,22 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from canvastekk_workflow_sdk import DeprecationInfo, NodeContract, WorkflowNodeManifest
-from canvastekk_workflow_sdk.base import BaseNode
-from canvastekk_workflow_sdk.context import ExecutionContext
-from canvastekk_workflow_sdk.registry import (
-    RegisterNodeResult,
-    RegistrationError,
+from canvastekk_workflow_sdk import WorkflowNodeDeprecationInfo, WorkflowNodeManifest, WorkflowNodeManifestContract
+from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext
+from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
+from canvastekk_workflow_sdk.workflow_node_registry import (
+    WorkflowNodeRegistrationError,
+    WorkflowNodeRegistrationResult,
     _extract_node_data,
-    build_registry_payload,
-    register_node,
+    build_workflow_node_registry_payload,
+    register_workflow_node,
 )
 
 #: Well-formed registry credential for happy-path tests (DA-1948 shape).
 CTK = "ctk_" + "k" * 43
 
-class DummyNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class DummyNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         name="test",
         version="1.0.0",
         title="Test Node",
@@ -32,15 +32,15 @@ class DummyNode(BaseNode):
         output_schema={"type": "object", "properties": {"output": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"output": inputs.get("input", "")}
 
 
 class TestRegisterNode:
-    """Tests for register_node function."""
+    """Tests for register_workflow_node function."""
 
     def test_successful_registration_returns_parsed_response(self) -> None:
-        """Test that successful registration returns RegisterNodeResult."""
+        """Test that successful registration returns WorkflowNodeRegistrationResult."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
         response_body = {"id": "node-123", "status": "registered"}
@@ -50,11 +50,11 @@ class TestRegisterNode:
         mock_response.json.return_value = response_body
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            result = register_workflow_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
-        assert isinstance(result, RegisterNodeResult)
+        assert isinstance(result, WorkflowNodeRegistrationResult)
         assert result.node == response_body
         assert result["id"] == "node-123"
         assert "status" in result
@@ -71,8 +71,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_url=invoke_url, service_token=service_token)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, invoke_url=invoke_url, service_token=service_token)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -89,7 +89,7 @@ class TestRegisterNode:
         (node-invoke auth only) without a ctk_ service_token fails fast."""
         node = DummyNode()
         with pytest.raises(ValueError, match="service_token"):
-            register_node(node, "https://registry.example.com/api/nodes", api_key="secret-key")
+            register_workflow_node(node, "https://registry.example.com/api/nodes", api_key="secret-key")
 
     def test_includes_bearer_header_when_ctk_service_token_provided(self) -> None:
         """#239: a ctk_ key rides Authorization: Bearer — the only registry auth."""
@@ -102,8 +102,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, service_token=service_token)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, service_token=service_token)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -116,14 +116,14 @@ class TestRegisterNode:
         mystery engine 401 (the wire leg was retired, engine #3760)."""
         node = DummyNode()
         with pytest.raises(ValueError, match="ask ops to rotate"):
-            register_node(node, "https://registry.example.com/api/nodes", service_token="svs_abc123")
+            register_workflow_node(node, "https://registry.example.com/api/nodes", service_token="svs_abc123")
 
     def test_malformed_ctk_token_raises_truncation_hint(self) -> None:
         """#239: ctk_-prefixed but wrong shape → local error with the expected
         shape (DA-1948), before any network call."""
         node = DummyNode()
         with pytest.raises(ValueError, match="truncated or mistyped"):
-            register_node(node, "https://registry.example.com/api/nodes", service_token="ctk_short")
+            register_workflow_node(node, "https://registry.example.com/api/nodes", service_token="ctk_short")
 
     def test_raises_value_error_when_no_auth_provided(self) -> None:
         """Test that ValueError is raised when service_token is not provided."""
@@ -131,7 +131,7 @@ class TestRegisterNode:
         registry_url = "https://registry.example.com/api/nodes"
 
         with pytest.raises(ValueError, match="service_token"):
-            register_node(node, registry_url)
+            register_workflow_node(node, registry_url)
 
     def test_raises_value_error_when_empty_string_auth_provided(self) -> None:
         """Test that ValueError is raised when auth params are empty strings."""
@@ -139,23 +139,23 @@ class TestRegisterNode:
         registry_url = "https://registry.example.com/api/nodes"
 
         with pytest.raises(ValueError, match="service_token"):
-            register_node(node, registry_url, api_key="", service_token="")
+            register_workflow_node(node, registry_url, api_key="", service_token="")
 
     def test_raises_registration_error_on_network_failure(self) -> None:
-        """Test that RegistrationError is raised on network failure."""
+        """Test that WorkflowNodeRegistrationError is raised on network failure."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
-            with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
+            with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
+                register_workflow_node(node, registry_url, service_token=CTK)
 
         assert "Registration failed" in str(exc_info.value)
         assert exc_info.value.status_code is None
         assert exc_info.value.body is None
 
     def test_raises_registration_error_on_http_401(self) -> None:
-        """Test that RegistrationError is raised on HTTP 401 error."""
+        """Test that WorkflowNodeRegistrationError is raised on HTTP 401 error."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
@@ -164,14 +164,14 @@ class TestRegisterNode:
         mock_response.text = "Unauthorized"
         error = httpx.HTTPStatusError("401", request=MagicMock(), response=mock_response)
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=error):
-            with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", side_effect=error):
+            with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
+                register_workflow_node(node, registry_url, service_token=CTK)
 
         assert exc_info.value.status_code == 401
 
     def test_raises_registration_error_on_http_500(self) -> None:
-        """Test that RegistrationError is raised on HTTP 500 error."""
+        """Test that WorkflowNodeRegistrationError is raised on HTTP 500 error."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
@@ -180,9 +180,9 @@ class TestRegisterNode:
         mock_response.text = "Internal Server Error"
         error = httpx.HTTPStatusError("500", request=MagicMock(), response=mock_response)
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=error):
-            with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", side_effect=error):
+            with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
+                register_workflow_node(node, registry_url, service_token=CTK)
 
         assert exc_info.value.status_code == 500
 
@@ -197,8 +197,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_url=invoke_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, invoke_url=invoke_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -215,8 +215,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -233,8 +233,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, invoke_type=invoke_type, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, invoke_type=invoke_type, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -250,8 +250,8 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
@@ -268,26 +268,26 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, registry_url, timeout=timeout, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, registry_url, timeout=timeout, service_token=CTK)
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args[1]
         assert call_kwargs["timeout"] == timeout
 
     def test_network_error_with_service_token(self) -> None:
-        """Test that RegistrationError is raised on network failure with service_token."""
+        """Test that WorkflowNodeRegistrationError is raised on network failure with service_token."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
-            with pytest.raises(RegistrationError) as exc_info:
-                register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", side_effect=httpx.ConnectError("Network error")):
+            with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
+                register_workflow_node(node, registry_url, service_token=CTK)
 
         assert "Registration failed" in str(exc_info.value)
 
     def test_successful_registration_unwraps_register_node_response(self) -> None:
-        """Test that RegisterNodeResponse wrapper is unwrapped via register_node."""
+        """Test that RegisterNodeResponse wrapper is unwrapped via register_workflow_node."""
         node = DummyNode()
         registry_url = "https://registry.example.com/api/nodes"
 
@@ -296,11 +296,11 @@ class TestRegisterNode:
         mock_response.json.return_value = {"data": {"id": "node-123", "name": "test"}, "action": "created"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            result = register_workflow_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
-        assert isinstance(result, RegisterNodeResult)
+        assert isinstance(result, WorkflowNodeRegistrationResult)
         assert result.node == {"id": "node-123", "name": "test"}
         assert result.action == "created"
         assert "action" not in result.node
@@ -315,11 +315,11 @@ class TestRegisterNode:
         mock_response.json.return_value = {"id": "node-123", "name": "test"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            result = register_node(node, registry_url, service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            result = register_workflow_node(node, registry_url, service_token=CTK)
 
         mock_post.assert_called_once()
-        assert isinstance(result, RegisterNodeResult)
+        assert isinstance(result, WorkflowNodeRegistrationResult)
         assert result.node == {"id": "node-123", "name": "test"}
         assert result["name"] == "test"
 
@@ -353,26 +353,26 @@ class TestExtractNodeData:
 
 
 class TestRegistrationError:
-    """Tests for RegistrationError exception."""
+    """Tests for WorkflowNodeRegistrationError exception."""
 
     def test_error_message(self) -> None:
         """Test that error message is stored correctly."""
-        error = RegistrationError("Failed to register")
+        error = WorkflowNodeRegistrationError("Failed to register")
         assert str(error) == "Failed to register"
 
     def test_status_code_attribute(self) -> None:
         """Test that status_code attribute is stored correctly."""
-        error = RegistrationError("Failed", status_code=401)
+        error = WorkflowNodeRegistrationError("Failed", status_code=401)
         assert error.status_code == 401
 
     def test_body_attribute(self) -> None:
         """Test that body attribute is stored correctly."""
-        error = RegistrationError("Failed", body='{"error": "details"}')
+        error = WorkflowNodeRegistrationError("Failed", body='{"error": "details"}')
         assert error.body == '{"error": "details"}'
 
     def test_all_attributes(self) -> None:
         """Test that all attributes are stored correctly."""
-        error = RegistrationError("Failed", status_code=500, body='{"error": "details"}')
+        error = WorkflowNodeRegistrationError("Failed", status_code=500, body='{"error": "details"}')
         assert str(error) == "Failed"
         assert error.status_code == 500
         assert error.body == '{"error": "details"}'
@@ -381,14 +381,14 @@ class TestRegistrationError:
         """Test that error can be chained from another exception."""
         original_error = httpx.ConnectError("Network error")
         try:
-            raise RegistrationError("Registration failed", status_code=None, body=None) from original_error
-        except RegistrationError as e:
+            raise WorkflowNodeRegistrationError("Registration failed", status_code=None, body=None) from original_error
+        except WorkflowNodeRegistrationError as e:
             assert str(e) == "Registration failed"
             assert e.__cause__ is original_error
 
 
 class TestBuildRegistryPayload:
-    """Tests for build_registry_payload shared helper."""
+    """Tests for build_workflow_node_registry_payload shared helper."""
 
     def _make_definition(self, **overrides) -> WorkflowNodeManifest:
         defaults = dict(
@@ -404,8 +404,8 @@ class TestBuildRegistryPayload:
 
     def test_contract_rides_constraints_when_declared(self) -> None:
         """D8/#110: declared contract lands in constraints (engine extra=forbid wire-compat)."""
-        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["constraints"]["contract"] == {
             "transport": "http",
             "routes": ["/execute", "/health", "/manifest"],
@@ -415,117 +415,117 @@ class TestBuildRegistryPayload:
         assert "contract" not in payload
 
     def test_contract_absent_when_undeclared(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "contract" not in payload.get("constraints", {})
 
     def test_caller_contract_wins(self) -> None:
-        definition = self._make_definition(contract=NodeContract(routes=["/execute", "/health", "/manifest"]))
-        payload = build_registry_payload(definition, constraints={"contract": {"caller": True}})
+        manifest = self._make_definition(contract=WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"]))
+        payload = build_workflow_node_registry_payload(manifest, constraints={"contract": {"caller": True}})
         assert payload["constraints"]["contract"] == {"caller": True}
 
     def test_maps_title_to_label(self) -> None:
-        definition = self._make_definition(title="My Node")
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition(title="My Node")
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["label"] == "My Node"
         assert "title" not in payload
 
     def test_retry_not_in_request_payload(self) -> None:
         """DA-1955 B1: engine RegisterWorkflowNodeRequest is extra='forbid' with no retry key."""
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "retry" not in payload
         assert "default_retry" not in payload
 
     def test_omits_id_field(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "id" not in payload
 
     def test_node_role_not_in_request_payload(self) -> None:
         """DA-1955 B1: node_role is not an engine request field."""
-        from canvastekk_workflow_sdk.definition import WorkflowNodeRole
+        from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeRole
 
-        definition = self._make_definition(role=WorkflowNodeRole.START)
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition(role=WorkflowNodeRole.START)
+        payload = build_workflow_node_registry_payload(manifest)
         assert "node_role" not in payload
 
     def test_hard_max_runtime_seconds_not_in_request_payload(self) -> None:
         """#3499: hard_max_runtime_seconds is a host-side contract — the
         engine's extra='forbid' register request would reject it."""
-        definition = self._make_definition(hard_max_runtime_seconds=14400)
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition(hard_max_runtime_seconds=14400)
+        payload = build_workflow_node_registry_payload(manifest)
         assert "hard_max_runtime_seconds" not in payload
-        assert definition.hard_max_runtime_seconds == 14400
+        assert manifest.hard_max_runtime_seconds == 14400
 
     def test_default_node_role_is_operation(self) -> None:
-        definition = self._make_definition()
-        assert definition.role.value == "operation"
+        manifest = self._make_definition()
+        assert manifest.role.value == "operation"
 
     def test_styles_none_produces_null(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["styles"] is None
 
     def test_styles_serialized_when_set(self) -> None:
-        from canvastekk_workflow_sdk.definition import WorkflowNodeStyles
+        from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeStyles
 
-        definition = self._make_definition(styles=WorkflowNodeStyles(icon="Brain", color="emerald"))
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition(styles=WorkflowNodeStyles(icon="Brain", color="emerald"))
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["styles"] == {"icon": "Brain", "color": "emerald"}
 
     def test_default_tags_is_empty_list(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["tags"] == []
 
     def test_custom_tags(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition, tags=["ml", "segmentation"])
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, tags=["ml", "segmentation"])
         assert payload["tags"] == ["ml", "segmentation"]
 
     def test_invoke_url_omitted_when_none(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "invoke_url" not in payload
 
     def test_invoke_url_with_value(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition, invoke_url="https://node.example.com")
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, invoke_url="https://node.example.com")
         assert payload["invoke_url"] == "https://node.example.com"
 
     def test_invoke_config_included_when_provided(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition, invoke_config={"region": "us-east-1"})
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, invoke_config={"region": "us-east-1"})
         assert payload["invoke_config"] == {"region": "us-east-1"}
 
     def test_invoke_config_not_included_by_default(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "invoke_config" not in payload
 
     def test_constraints_included_when_provided(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition, constraints={"gpu": True})
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, constraints={"gpu": True})
         assert payload["constraints"]["gpu"] is True
-        assert payload["constraints"].get("sdk_version") == definition.sdk_version
+        assert payload["constraints"].get("sdk_version") == manifest.sdk_version
 
     def test_constraints_always_carry_stamp(self) -> None:
         """DA-3359/#123: provenance is always present — sdk_version is the sole version key."""
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
         assert "minimum_sdk_version" not in constraints
 
     def test_constraints_merges_manifest_docs_fields(self) -> None:
         """DA-1955/#123: docs fields land in constraints; legacy version keys never do."""
-        definition = self._make_definition(
+        manifest = self._make_definition(
             minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
             changelog_url="https://example.com/changelog",
         )
-        payload = build_registry_payload(definition)
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["constraints"]["docs_url"] == "https://example.com/docs"
         assert payload["constraints"]["changelog_url"] == "https://example.com/changelog"
         assert "minimum_sdk_version" not in payload["constraints"]
@@ -533,9 +533,9 @@ class TestBuildRegistryPayload:
 
     def test_constraints_caller_wins_on_key_collision(self) -> None:
         """DA-1955: caller-supplied constraints override manifest compat fields."""
-        definition = self._make_definition(minimum_sdk_version="0.22.0")
-        payload = build_registry_payload(
-            definition,
+        manifest = self._make_definition(minimum_sdk_version="0.22.0")
+        payload = build_workflow_node_registry_payload(
+            manifest,
             constraints={"minimum_sdk_version": "0.21.0", "gpu_required": True},
         )
         assert payload["constraints"]["minimum_sdk_version"] == "0.21.0"
@@ -544,20 +544,20 @@ class TestBuildRegistryPayload:
     def test_constraints_stamp_when_all_none(self) -> None:
         """DA-3359: no manifest fields + no caller constraints -> stamped
         provenance still lands (the old "omitted" contract is retired)."""
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
 
     def test_node_status_not_in_request_payload(self) -> None:
         """DA-1955 B1: node_status is not an engine request field (param kept for compat)."""
-        definition = self._make_definition()
-        payload = build_registry_payload(definition, node_status="inactive")
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest, node_status="inactive")
         assert "node_status" not in payload
 
     def test_all_standard_fields_present(self) -> None:
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         expected_keys = {
             "name",
             "label",
@@ -599,13 +599,13 @@ class TestBuildRegistryPayload:
             "timeout_seconds",
             "deprecation",
         }
-        definition = self._make_definition(
+        manifest = self._make_definition(
             minimum_sdk_version="0.22.0",
             docs_url="https://example.com/docs",
-            deprecation=DeprecationInfo(deprecated_at=None, notice="soon"),
+            deprecation=WorkflowNodeDeprecationInfo(deprecated_at=None, notice="soon"),
         )
-        payload = build_registry_payload(
-            definition,
+        payload = build_workflow_node_registry_payload(
+            manifest,
             invoke_url="https://node.example.com",
             invoke_config={"region": "us-east-1"},
             constraints={"gpu": True},
@@ -614,21 +614,21 @@ class TestBuildRegistryPayload:
 
     def test_deprecation_omitted_when_none(self) -> None:
         """DA-1582: non-deprecated nodes never send the deprecation key."""
-        definition = self._make_definition()
-        payload = build_registry_payload(definition)
+        manifest = self._make_definition()
+        payload = build_workflow_node_registry_payload(manifest)
         assert "deprecation" not in payload
 
     def test_deprecation_in_request_payload_when_set(self) -> None:
         """DA-2305: deprecation IS emitted to the engine register endpoint."""
         from datetime import date
 
-        definition = self._make_definition(
-            deprecation=DeprecationInfo(
+        manifest = self._make_definition(
+            deprecation=WorkflowNodeDeprecationInfo(
                 deprecated_at=date(2026, 8, 1),
                 notice="use test-v2",
             )
         )
-        payload = build_registry_payload(definition)
+        payload = build_workflow_node_registry_payload(manifest)
         assert payload["deprecation"] == {
             "deprecated_at": "2026-08-01",
             "sunset_date": None,
@@ -660,12 +660,12 @@ class TestExtractNodeDataNewFormat:
 
 
 class TestRegisterNodeNewFeatures:
-    """Tests for new register_node parameters and validation."""
+    """Tests for new register_workflow_node parameters and validation."""
 
     def test_rejects_invalid_invoke_type(self) -> None:
         node = DummyNode()
         with pytest.raises(ValueError, match="Invalid invoke_type"):
-            register_node(
+            register_workflow_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 invoke_type="invalid",
@@ -673,9 +673,9 @@ class TestRegisterNodeNewFeatures:
             )
 
     def test_registry_auth_header_shapes(self) -> None:
-        """#239: ctk_-only wire form — the shared helper register_node, the
+        """#239: ctk_-only wire form — the shared helper register_workflow_node, the
         registry-diff, and convergence all route through."""
-        from canvastekk_workflow_sdk.registry import invalid_ctk_reason, registry_auth_header
+        from canvastekk_workflow_sdk.workflow_node_registry import invalid_ctk_reason, registry_auth_header
 
         ctk = "ctk_" + "a" * 43
         assert registry_auth_header(ctk) == ("Authorization", f"Bearer {ctk}")
@@ -699,8 +699,8 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
         ctk = "ctk_" + "b" * 43
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 service_token=ctk,
@@ -714,7 +714,7 @@ class TestRegisterNodeNewFeatures:
         riding a header the engine retired (#3760)."""
         node = DummyNode()
         with pytest.raises(ValueError, match="rotate"):
-            register_node(
+            register_workflow_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 service_token="svs_legacy",
@@ -723,12 +723,12 @@ class TestRegisterNodeNewFeatures:
     def test_rejects_lambda_invoke_type_with_policy_error(self) -> None:
         """#131: direct AWS invoke is not a platform surface — every node is
         HTTP-contract. The rejection names the HTTP path, fires in
-        build_registry_payload (the choke every entry point routes through),
+        build_workflow_node_registry_payload (the choke every entry point routes through),
         and happens BEFORE any HTTP call."""
         node = DummyNode()
-        with patch("canvastekk_workflow_sdk.registry.httpx.post") as mock_post:
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post") as mock_post:
             with pytest.raises(ValueError, match="not a\\s+supported platform surface.*invoke_type='http'"):
-                register_node(
+                register_workflow_node(
                     node,
                     "https://registry.example.com/api/nodes",
                     invoke_type="lambda",
@@ -738,9 +738,9 @@ class TestRegisterNodeNewFeatures:
         mock_post.assert_not_called()
 
     def test_build_registry_payload_rejects_lambda(self) -> None:
-        """The export_definition path hits the same choke guard (no HTTP
+        """The export_workflow_node_manifest path hits the same choke guard (no HTTP
         involved at all)."""
-        from canvastekk_workflow_sdk.registry import build_registry_payload
+        from canvastekk_workflow_sdk.workflow_node_registry import build_workflow_node_registry_payload
 
         manifest = WorkflowNodeManifest(
             slug="lambda-node",
@@ -751,11 +751,11 @@ class TestRegisterNodeNewFeatures:
             output_schema={"type": "object"},
         )
         with pytest.raises(ValueError, match="Function URL"):
-            build_registry_payload(manifest, invoke_type="lambda")
+            build_workflow_node_registry_payload(manifest, invoke_type="lambda")
 
     def test_http_payload_unchanged_by_lambda_rejection(self) -> None:
         """#131 AC: no behavior change for HTTP nodes — byte-level pin."""
-        from canvastekk_workflow_sdk.registry import build_registry_payload
+        from canvastekk_workflow_sdk.workflow_node_registry import build_workflow_node_registry_payload
 
         manifest = WorkflowNodeManifest(
             slug="http-node",
@@ -765,7 +765,7 @@ class TestRegisterNodeNewFeatures:
             input_schema={"type": "object"},
             output_schema={"type": "object"},
         )
-        payload = build_registry_payload(
+        payload = build_workflow_node_registry_payload(
             manifest,
             invoke_type="http",
             invoke_url="https://my-node.example.com",
@@ -782,8 +782,8 @@ class TestRegisterNodeNewFeatures:
             mock_response.json.return_value = {"id": "123"}
             mock_response.raise_for_status = MagicMock()
 
-            with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-                register_node(
+            with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+                register_workflow_node(
                     node,
                     "https://registry.example.com/api/nodes",
                     invoke_type=invoke_type,
@@ -800,8 +800,8 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 tags=["ml", "point-cloud"],
@@ -818,8 +818,8 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(
                 node,
                 "https://registry.example.com/api/nodes",
                 invoke_config={"region": "ap-southeast-1"},
@@ -836,8 +836,8 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         call_kwargs = mock_post.call_args[1]
         assert "id" not in call_kwargs["json"]
@@ -849,8 +849,8 @@ class TestRegisterNodeNewFeatures:
         mock_response.json.return_value = {"id": "123"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response) as mock_post:
-            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response) as mock_post:
+            register_workflow_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         call_kwargs = mock_post.call_args[1]
         assert "default_retry" not in call_kwargs["json"]
@@ -869,10 +869,10 @@ class TestRegisterNodeNewFeatures:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
-            result = register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response):
+            result = register_workflow_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
-        assert isinstance(result, RegisterNodeResult)
+        assert isinstance(result, WorkflowNodeRegistrationResult)
         assert result.node == {"id": "uuid-123", "name": "test"}
         assert result.action == "created"
         assert result.revision_id == "rev-456"
@@ -893,9 +893,9 @@ class TestRegisterNodeNewFeatures:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
-            with patch("canvastekk_workflow_sdk.registry.logger") as mock_logger:
-                register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response):
+            with patch("canvastekk_workflow_sdk.workflow_node_registry.logger") as mock_logger:
+                register_workflow_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
         mock_logger.info.assert_any_call("Node registration action: %s", "updated")
         mock_logger.info.assert_any_call("Revision ID: %s", "rev-789")
@@ -904,16 +904,16 @@ class TestRegisterNodeNewFeatures:
 
 
 class TestRegisterNodeResult:
-    """Tests for RegisterNodeResult model."""
+    """Tests for WorkflowNodeRegistrationResult model."""
 
     def test_minimal_result(self) -> None:
-        result = RegisterNodeResult(node={"id": "123"})
+        result = WorkflowNodeRegistrationResult(node={"id": "123"})
         assert result.node == {"id": "123"}
         assert result.action is None
         assert result.revision_id is None
 
     def test_full_result(self) -> None:
-        result = RegisterNodeResult(
+        result = WorkflowNodeRegistrationResult(
             node={"id": "123", "name": "test"},
             action="created",
             revision_id="rev-456",
@@ -930,14 +930,14 @@ class TestRegistrationErrorEnrichment:
     """Tests for typed error_code/guidance from engine envelopes (DA-1955)."""
 
     def _raise_via_register(self, node: DummyNode, mock_response: MagicMock) -> None:
-        """Run register_node against a mocked failing response."""
+        """Run register_workflow_node against a mocked failing response."""
         mock_response.raise_for_status = MagicMock(
             side_effect=httpx.HTTPStatusError(
                 str(mock_response.status_code), request=MagicMock(), response=mock_response
             )
         )
-        with patch("canvastekk_workflow_sdk.registry.httpx.post", return_value=mock_response):
-            register_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
+        with patch("canvastekk_workflow_sdk.workflow_node_registry.httpx.post", return_value=mock_response):
+            register_workflow_node(node, "https://registry.example.com/api/nodes", service_token=CTK)
 
     def test_immutable_error_extracts_changed_fields(self) -> None:
         """node_version_immutable 409 yields guidance naming changed fields."""
@@ -957,7 +957,7 @@ class TestRegistrationErrorEnrichment:
         mock_response.json.return_value = {"error": "node_version_immutable", "detail": _json.dumps(detail)}
         mock_response.text = '{"error": "node_version_immutable"}'
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.error_code == "node_version_immutable"
@@ -974,7 +974,7 @@ class TestRegistrationErrorEnrichment:
         mock_response.json.return_value = {"error": "resource_conflict", "detail": "1.2.0 is newer"}
         mock_response.text = "{}"
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.error_code == "resource_conflict"
@@ -990,7 +990,7 @@ class TestRegistrationErrorEnrichment:
         }
         mock_response.text = "{}"
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.status_code == 422
@@ -1008,7 +1008,7 @@ class TestRegistrationErrorEnrichment:
         }
         mock_response.text = "{}"
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.error_code == "bad_request"
@@ -1022,7 +1022,7 @@ class TestRegistrationErrorEnrichment:
         mock_response.json.return_value = {"error": "teapot", "detail": "short and stout"}
         mock_response.text = "{}"
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.error_code == "teapot"
@@ -1036,7 +1036,7 @@ class TestRegistrationErrorEnrichment:
         mock_response.json.side_effect = ValueError("not json")
         mock_response.text = "Internal Server Error"
 
-        with pytest.raises(RegistrationError) as exc_info:
+        with pytest.raises(WorkflowNodeRegistrationError) as exc_info:
             self._raise_via_register(node, mock_response)
 
         assert exc_info.value.error_code is None
@@ -1062,15 +1062,15 @@ class TestStampedDualWrite:
 
     def test_payload_carries_stamp_only(self) -> None:
         """#123: the dual-write is dead — sdk_version only."""
-        definition = self._definition()
-        payload = build_registry_payload(definition)
+        manifest = self._definition()
+        payload = build_workflow_node_registry_payload(manifest)
         constraints = payload.get("constraints", {})
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version
         assert "minimum_sdk_version" not in constraints
 
     def test_explicit_caller_constraints_win(self) -> None:
-        definition = self._definition()
-        payload = build_registry_payload(definition, constraints={"minimum_sdk_version": "0.23.1"})
+        manifest = self._definition()
+        payload = build_workflow_node_registry_payload(manifest, constraints={"minimum_sdk_version": "0.23.1"})
         constraints = payload.get("constraints", {})
         assert constraints.get("minimum_sdk_version") == "0.23.1"
-        assert constraints.get("sdk_version") == definition.sdk_version
+        assert constraints.get("sdk_version") == manifest.sdk_version

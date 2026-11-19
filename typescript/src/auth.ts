@@ -52,8 +52,8 @@ function header(req: AuthRequest, name: string): string | undefined {
 }
 
 /**
- * Property tagged on middleware produced by NodeAuth factories so callers
- * (e.g. createNodeApp) can detect that authentication is configured.
+ * Property tagged on middleware produced by TekkNodeAuth factories so callers
+ * (e.g. createWorkflowNodeApp) can detect that authentication is configured.
  */
 export const CANVASTEKK_AUTH_MARKER = "_canvastekkAuth";
 
@@ -75,7 +75,7 @@ function unauthorized(res: AuthResponse, detail: string): void {
 /**
  * Authentication middleware for CanvasTEKK nodes.
  */
-export class NodeAuth {
+export class TekkNodeAuth {
   /**
    * Creates API key authentication middleware.
    * @param keyEnvVar - Environment variable name for API key
@@ -469,8 +469,8 @@ export class NodeAuth {
 }
 
 /**
- * Tekk-prefixed canonical name for {@link NodeAuth} — the SDK's
- * multi-auth recognition prefix. Alias only; `NodeAuth` keeps working
- * and is never removed before a major.
+ * Canonical name (ADR 0001, #271) — the SDK's multi-auth recognition prefix.
+ * `NodeAuth` remains below as a deprecated alias (removal in 1.0.0, #272).
  */
-export const TekkNodeAuth = NodeAuth;
+/** @deprecated use TekkNodeAuth (ADR 0001, #271; removal in 1.0.0, #272) */
+export const NodeAuth = TekkNodeAuth;

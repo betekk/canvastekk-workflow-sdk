@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   NodeExecutionResponseFactory,
   NodeExecutionResponseSchema,
-  HealthResponseSchema,
-  NodeExecutionStatusSchema,
-  parseNodeExecutionStatus,
-} from "../src/response.js";
+  WorkflowNodeHealthResponseSchema,
+  WorkflowNodeCallOutcomeSchema,
+  parseWorkflowNodeCallOutcome,
+} from "../src/node-execution-response.js";
 import { NodeValidationError } from "../src/exceptions.js";
 
 describe("NodeExecutionResponseFactory", () => {
@@ -81,9 +81,9 @@ describe("NodeExecutionResponseSchema", () => {
   });
 });
 
-describe("HealthResponseSchema", () => {
+describe("WorkflowNodeHealthResponseSchema", () => {
   it("parses a healthy response", () => {
-    const resp = HealthResponseSchema.parse({
+    const resp = WorkflowNodeHealthResponseSchema.parse({
       status: "healthy",
       node_id: "echo-v1.0.0",
       version: "1.0.0",
@@ -93,7 +93,7 @@ describe("HealthResponseSchema", () => {
   });
 
   it("accepts degraded status", () => {
-    const resp = HealthResponseSchema.parse({
+    const resp = WorkflowNodeHealthResponseSchema.parse({
       status: "degraded",
       node_id: "node-v1",
       version: "1.0.0",
@@ -105,7 +105,7 @@ describe("HealthResponseSchema", () => {
 
   it("rejects invalid status", () => {
     expect(() =>
-      HealthResponseSchema.parse({
+      WorkflowNodeHealthResponseSchema.parse({
         status: "ok",
         node_id: "node-v1",
         version: "1.0.0",
@@ -114,9 +114,9 @@ describe("HealthResponseSchema", () => {
   });
 });
 
-describe("NodeExecutionStatus (S.5, SDK#161)", () => {
+describe("WorkflowNodeCallOutcome (S.5, SDK#161)", () => {
   it("wire values lowercase", () => {
-    expect(NodeExecutionStatusSchema.options).toEqual([
+    expect(WorkflowNodeCallOutcomeSchema.options).toEqual([
       "pass",
       "fail",
       "skipped",
@@ -125,18 +125,18 @@ describe("NodeExecutionStatus (S.5, SDK#161)", () => {
   });
 
   it("parses known values", () => {
-    expect(parseNodeExecutionStatus("pass")).toBe("pass");
-    expect(parseNodeExecutionStatus("fail")).toBe("fail");
-    expect(parseNodeExecutionStatus("skipped")).toBe("skipped");
-    expect(parseNodeExecutionStatus("timeout")).toBe("timeout");
+    expect(parseWorkflowNodeCallOutcome("pass")).toBe("pass");
+    expect(parseWorkflowNodeCallOutcome("fail")).toBe("fail");
+    expect(parseWorkflowNodeCallOutcome("skipped")).toBe("skipped");
+    expect(parseWorkflowNodeCallOutcome("timeout")).toBe("timeout");
   });
 
   it("strict: missing/unknown raise validation-class errors", () => {
     for (const bad of [null, undefined, "", "success", "PASS", 1, {}]) {
-      expect(() => parseNodeExecutionStatus(bad)).toThrow(NodeValidationError);
+      expect(() => parseWorkflowNodeCallOutcome(bad)).toThrow(NodeValidationError);
     }
     try {
-      parseNodeExecutionStatus("nope");
+      parseWorkflowNodeCallOutcome("nope");
       throw new Error("unreachable");
     } catch (err) {
       expect((err as NodeValidationError).category).toBe("validation");

@@ -1,4 +1,4 @@
-import type { WorkflowDefinitionSpec } from "./models.js";
+import type { WorkflowDefinitionSpec } from "./workflow-definition.js";
 
 /**
  * Error thrown when workflow input/output resolution fails.

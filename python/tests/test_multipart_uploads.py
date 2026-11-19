@@ -13,14 +13,14 @@ from typing import Any
 import httpx
 import pytest
 
-from canvastekk_workflow_sdk import UploadSession
+from canvastekk_workflow_sdk import NodeOutputUploadSession
+from canvastekk_workflow_sdk.cds_multipart_upload import upload_via_cds_multipart_session
 from canvastekk_workflow_sdk.exceptions import NodeIOError
-from canvastekk_workflow_sdk.multipart import upload_via_session
-from canvastekk_workflow_sdk.request import NodeExecutionRequest
-from canvastekk_workflow_sdk.uploads import S3PresignedUploader
+from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
+from canvastekk_workflow_sdk.node_output_uploads import NodeOutputS3PresignedUploader
 
 
-def _session(**overrides: Any) -> UploadSession:
+def _session(**overrides: Any) -> NodeOutputUploadSession:
     fields = {
         "session_token": "tok-1",
         "initiate_url": "https://engine/sessions/tok-1/initiate",
@@ -29,7 +29,7 @@ def _session(**overrides: Any) -> UploadSession:
         "status_url": "https://engine/sessions/tok-1/status",
     }
     fields.update(overrides)
-    return UploadSession(**fields)
+    return NodeOutputUploadSession(**fields)
 
 
 class TestSessionHandshake:
@@ -42,7 +42,7 @@ class TestSessionHandshake:
             output_upload_url={"legacy": "https://presigned", "modern": sess.model_dump()},
         )
         assert req.output_upload_url["legacy"] == "https://presigned"
-        assert isinstance(req.output_upload_url["modern"], UploadSession)
+        assert isinstance(req.output_upload_url["modern"], NodeOutputUploadSession)
         assert sess.kind == "multipart-upload-session"
 
     def test_capability_descriptor_validates(self):
@@ -54,7 +54,7 @@ class TestSessionHandshake:
             output_upload_url={"modern": sess.model_dump()},
         )
         target = req.output_upload_url["modern"]
-        assert isinstance(target, UploadSession)
+        assert isinstance(target, NodeOutputUploadSession)
         assert target.kind == "multipart-upload-capability"
 
     def test_unknown_descriptor_kind_rejects(self):
@@ -90,9 +90,9 @@ class TestDegradation:
         def _fail(*args: Any, **kwargs: Any) -> None:
             raise AssertionError("multipart client must not run for a legacy target")
 
-        monkeypatch.setattr("canvastekk_workflow_sdk.multipart.upload_via_session", _fail)
+        monkeypatch.setattr("canvastekk_workflow_sdk.cds_multipart_upload.upload_via_cds_multipart_session", _fail)
         with pytest.raises(NodeIOError) as excinfo:
-            S3PresignedUploader().upload_file(str(f), "https://presigned")
+            NodeOutputS3PresignedUploader().upload_file(str(f), "https://presigned")
         assert str(excinfo.value) == "engine sent deprecated presigned target — upgrade the engine"
 
     def test_session_target_takes_multipart_path(self, tmp_path, monkeypatch):
@@ -130,7 +130,7 @@ class TestDegradation:
             return real_client(transport=httpx.MockTransport(handler), **kwargs)
 
         monkeypatch.setattr(httpx, "Client", _client_factory)
-        upload_via_session(sess, str(f))
+        upload_via_cds_multipart_session(sess, str(f))
         assert any(p.endswith("/initiate") for p in seen)
         assert any(p.endswith("/complete") for p in seen)
         assert seen["part-put"]
@@ -177,7 +177,7 @@ class TestMachinery:
             raise AssertionError(f"unexpected call: {request.url}")
 
         self._wire(monkeypatch, handler)
-        upload_via_session(_session(), str(f), max_parallel_parts=1)
+        upload_via_cds_multipart_session(_session(), str(f), max_parallel_parts=1)
 
         assert len(part_puts) == 2
         assert [b["part_number"] for b in complete_bodies[0]["parts"]] == [1, 2]
@@ -220,7 +220,7 @@ class TestMachinery:
 
         self._wire(monkeypatch, handler)
         with pytest.raises(Exception):
-            upload_via_session(
+            upload_via_cds_multipart_session(
                 _session(),
                 str(f),
                 max_parallel_parts=1,
@@ -269,7 +269,7 @@ class TestMachinery:
             raise AssertionError(f"unexpected call: {request.url}")
 
         self._wire(monkeypatch, handler)
-        upload_via_session(
+        upload_via_cds_multipart_session(
             _session(),
             str(f),
             max_parallel_parts=1,
@@ -327,7 +327,7 @@ class TestMachinery:
 
         self._wire(monkeypatch, handler)
         for _ in range(2):
-            upload_via_session(
+            upload_via_cds_multipart_session(
                 sess,
                 str(f),
                 max_parallel_parts=1,
@@ -379,7 +379,7 @@ class TestMachinery:
             raise AssertionError(f"unexpected call: {request.url}")
 
         self._wire(monkeypatch, handler)
-        upload_via_session(sess, str(f), element=element, max_parallel_parts=1)
+        upload_via_cds_multipart_session(sess, str(f), element=element, max_parallel_parts=1)
 
         assert initiate_bodies == [{"size": 8, "content_type": "application/octet-stream", "element": element}]
         expected = {
@@ -432,7 +432,7 @@ class TestMachinery:
 
         self._wire(monkeypatch, handler)
         with pytest.raises(NodeIOError, match="S3 PUT failed"):
-            upload_via_session(
+            upload_via_cds_multipart_session(
                 sess,
                 str(f),
                 element=element,
@@ -475,7 +475,7 @@ class TestMachinery:
 
         self._wire(monkeypatch, handler)
         with pytest.raises(NodeIOError) as exc_info:
-            upload_via_session(
+            upload_via_cds_multipart_session(
                 _session(),
                 str(f),
                 max_parallel_parts=1,

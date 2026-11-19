@@ -4,7 +4,7 @@
  * Sunset = RELEASE_DATE + SUPPORT_HORIZON_DAYS. The import path LOGS ONLY
  * (the engine lazy-imports this package — an import-time throw would silently
  * disable seeding/discovery). The throw lives at the node entrypoints
- * (createNodeApp / createMultiNodeApp / BaseNode.run).
+ * (createWorkflowNodeApp / createMultiWorkflowNodeApp / WorkflowNodeBase.run).
  * CANVASTEKK_SDK_ALLOW_UNSUPPORTED=1 is the break-glass.
  */
 

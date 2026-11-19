@@ -9,13 +9,13 @@ downward only:
 
 ```
 <service>_app/
-├── node/          # CW node surface (BaseNode subclass + manifest + execute)
+├── node/          # CW node surface (WorkflowNodeBase subclass + manifest + execute)
 │   ├── handler.py
-│   └── app.py     # create_authed_app() / mount_node() wiring ONLY
+│   └── app.py     # create_authed_workflow_node_app() / mount_workflow_node() wiring ONLY
 ├── api/           # the service's own HTTP routes (its lane/consumer face)
 ├── faces/         # hosting adapters (same image, different entry)
 │   ├── asgi.py            # compose/local: uvicorn faces.asgi:app
-│   └── lambda_handler.py  # SDK create_lambda_handler(app) — dual dispatch
+│   └── lambda_handler.py  # SDK create_workflow_node_lambda_handler(app) — dual dispatch
 ├── domain/        # transport-agnostic core — imports NO fastapi, NO SDK
 ├── integrations/  # outbound clients (engine, CDS, S3, …)
 ├── cli/           # service-specific extras (configs, plugins) — image content
@@ -38,23 +38,23 @@ contentious becomes a placement question with a mechanical answer:
 ## The bootstrap (canonical, SDK-owned)
 
 ```python
-from canvastekk_workflow_sdk import create_authed_app, mount_node, create_lambda_handler
+from canvastekk_workflow_sdk import create_authed_workflow_node_app, mount_workflow_node, create_workflow_node_lambda_handler
 ```
 
-- **`create_authed_app(node, *, legacy_key_env_var=None, **kwargs)`** — the
-  canonical authed factory: `create_node_app` + `NodeAuth.central()`.
+- **`create_authed_workflow_node_app(node, *, legacy_key_env_var=None, **kwargs)`** — the
+  canonical authed factory: `create_workflow_node_app` + `NodeAuth.central()`.
   Central-only by default (`legacy_key_env_var=None`): greenfield services are
   secretless by construction. Existing fleets pass their key env var during a
   dual-accept window; retirement (#3838 shape) is env removal, not code change.
-- **`mount_node(root_app, node, *, prefix="/node", …)`** — dual-purpose
+- **`mount_workflow_node(root_app, node, *, prefix="/node", …)`** — dual-purpose
   services: your own routes on the root app, the node sub-app mounted under
   `prefix` with its auth boundary intact.
-- **`create_lambda_handler(app, *, plain_event)`** — the serverless face:
+- **`create_workflow_node_lambda_handler(app, *, plain_event)`** — the serverless face:
   structurally-HTTP events dispatch through Mangum onto `app`; plain events
   route to the supplied dispatcher. Python-only (see Parity).
 
 Normative token contract: `NODE-TOKEN-CONTRACT.md` (this factory is the
-blessed `create_node_app` wrapper named there).
+blessed `create_workflow_node_app` wrapper named there).
 
 ## Framework-free law (sdk#225)
 
@@ -127,7 +127,7 @@ parking, not node-side polling.
 
 ## Parity (python + TypeScript)
 
-The SDK ships both stacks in the same change. `create_authed_app` and
-`mount_node` (express sub-app mount) ship in both. `create_lambda_handler` is
+The SDK ships both stacks in the same change. `create_authed_workflow_node_app` and
+`mount_workflow_node` (express sub-app mount) ship in both. `create_workflow_node_lambda_handler` is
 **python-only** — Mangum and the Lambda Runtime API are python-runtime
 concerns; the TS side documents this exception beside its factory.

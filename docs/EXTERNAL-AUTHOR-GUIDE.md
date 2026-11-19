@@ -63,14 +63,14 @@ poetry install
 
 ## Step 2: Create Your Node
 
-Create a file called `handler.py`. Subclass `BaseNode`, define a `WorkflowNodeManifest`, implement `execute()`, and call `.create_app()`:
+Create a file called `handler.py`. Subclass `WorkflowNodeBase`, define a `WorkflowNodeManifest`, implement `execute()`, and call `.create_app()`:
 
 ```python
 # handler.py
-from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest, ExecutionContext
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest, NodeExecutionContext
 
 # Module-level definition — needed for CLI validation
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="my-node",
     version="1.0.0",
     name="My Node",
@@ -87,10 +87,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class MyNode(BaseNode):
+class MyNode(WorkflowNodeBase):
     definition = definition  # Class attribute (same object)
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         context.report_progress(0.5, "Processing")
         return {"result": inputs["text"].upper()}
 
@@ -100,7 +100,7 @@ app = MyNode().create_app()
 
 ### Key Requirements
 
-1. **Subclass `BaseNode`** — inherit from `canvastekk_workflow_sdk.BaseNode`
+1. **Subclass `WorkflowNodeBase`** — inherit from `canvastekk_workflow_sdk.WorkflowNodeBase`
 2. **Define `definition`** as both a module-level variable and a class attribute
 3. **Implement `execute(inputs, context)`** — return a dict matching your `output_schema`
 4. **Call `.create_app()`** — produces a ready-to-run FastAPI app
@@ -143,18 +143,18 @@ Because `deprecation` is additive metadata (not a schema or behavior change), se
 | `notice` | **yes** | Human-readable notice shown to workflow-definition authors. |
 
 ```python
-from canvastekk_workflow_sdk import BaseNode, DeprecationInfo, WorkflowNodeManifest, ExecutionContext
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeDeprecationInfo, WorkflowNodeManifest, NodeExecutionContext
 from datetime import date
 
-class FloorFlatnessNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class FloorFlatnessNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="floor-flatness-assessment",
         version="1.4.2",  # bumped patch to register the deprecation metadata
         name="Floor Flatness Assessment (deprecated)",
         description="...",
         input_schema={...},
         output_schema={...},
-        deprecation=DeprecationInfo(
+        deprecation=WorkflowNodeDeprecationInfo(
             deprecated_at=date(2026, 8, 1),
             sunset_date=date(2027, 1, 1),
             replacement_slug="floor-flatness-per-check-assessment",
@@ -251,7 +251,7 @@ The SDK **automatically downloads** presigned URL file inputs and validates them
 ```python
 from pathlib import Path
 
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     # inputs["point_cloud"] is already a local file path (auto-downloaded)
     cloud_path = Path(inputs["point_cloud"])
     data = cloud_path.read_bytes()
@@ -294,7 +294,7 @@ Nothing changes in **your** node code — the router, not the developer, perform
 When the workflow engine invokes your node's `POST /execute`, it forwards the run's active account as the `X-Account-Id` header. The SDK surfaces it on the execution context:
 
 ```python
-def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
     account_id = context.account_id  # int | None
 ```
 
@@ -312,7 +312,7 @@ In unit tests, skip the header plumbing — construct the request directly: `Nod
 Before deploying, validate your node definition offline:
 
 ```bash
-python -m canvastekk_workflow_sdk validate handler:definition
+python -m canvastekk_workflow_sdk validate handler:manifest
 ```
 
 Exit code `0` = valid, `1` = errors.
@@ -324,7 +324,7 @@ exact payload shape the engine's registration endpoint accepts (required keys,
 no client-set `slug`, whitelist only). Passes locally ⇔ passes registration:
 
 ```bash
-python -m canvastekk_workflow_sdk probe handler:definition
+python -m canvastekk_workflow_sdk probe handler:manifest
 ```
 
 Fully offline — no network calls. Exit code `0` = registration-ready.
@@ -335,7 +335,7 @@ Publish a node to the engine registry from a pipeline under a service identity:
 
 ```bash
 export CANVASTEKK_NODE_REGISTRATION_KEY=<service token>
-python -m canvastekk_workflow_sdk register handler:definition \
+python -m canvastekk_workflow_sdk register handler:manifest \
   --engine-url https://cwe.example.com \
   --invoke-url https://nodes.example.com/my-node/execute \
   [--name-suffix -lambda] [--json]
@@ -360,7 +360,7 @@ probe --manifest <file.json>`) with identical flags, mapping, and exit codes.
 
 `GET /manifest` now carries `code_digest`: a sha256 over the source bytes of
 the module that defines your node (python: the module declaring the node
-class; typescript: the module calling `createNodeApp`), computed once at
+class; typescript: the module calling `createWorkflowNodeApp`), computed once at
 startup and auto-injected next to `sdk_version`/`mode`. Any handler-code
 change changes the digest — it is never author-settable (not a manifest
 field). If the handler source cannot be resolved, the key is omitted and a
@@ -483,16 +483,16 @@ Treat the key like a password: never commit it, never paste it in issues.
 The SDK validates its shape locally and fails fast with a rotation hint;
 legacy `X-Service-Token` registry auth was retired at the engine (#3760).
 
-### Using `register_node()` (Python)
+### Using `register_workflow_node()` (Python)
 
 ```python
-from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest
-from canvastekk_workflow_sdk.registry import register_node
+from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest
+from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node
 
 node = MyNode()
 
 # CI/CD with your ctk_ API key (the registry credential — #239)
-register_node(
+register_workflow_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
@@ -502,7 +502,7 @@ register_node(
 
 # With the optional verify probe (api_key is the NODE's own auth — it
 # never authenticates the registry call)
-register_node(
+register_workflow_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
@@ -515,7 +515,7 @@ register_node(
 # Function URL (or the shared gateway) and register like any HTTP node.
 # invoke_type="lambda" (direct AWS invoke) is NOT a platform surface and
 # raises ValueError (#131).
-register_node(
+register_workflow_node(
     node,
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_type="http",
@@ -528,7 +528,7 @@ register_node(
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `node` | `BaseNode` | Yes | The node instance to register |
+| `node` | `WorkflowNodeBase` | Yes | The node instance to register |
 | `registry_url` | `str` | Yes | Engine registry endpoint (e.g., `/api/workflows/nodes/`) |
 | `invoke_url` | `str \| None` | No | URL where the node is reachable |
 | `invoke_type` | `"http" \| "sagemaker" \| "in-process"` | No | Invocation type (default: `"http"`). `"lambda"` is rejected — not a platform surface (Function URL/gateway + `"http"` instead, [#131](https://github.com/betekk/canvastekk-workflow-sdk/issues/131)) |
@@ -619,9 +619,9 @@ jobs:
           python -c "
           import os
           from handler import MyNode
-          from canvastekk_workflow_sdk.registry import register_node
+          from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node
 
-          register_node(
+          register_workflow_node(
               MyNode(),
               registry_url='${{ env.ENGINE_URL }}',
               invoke_url='https://my-node.example.com',
@@ -665,23 +665,23 @@ When calling the registry API, you may encounter these errors:
 | **403** | Forbidden | Wrong owner — the node is registered under a different owner | Contact the platform team to transfer ownership, or use a different node ID. |
 | **404** | Not Found | Node not found in registry (GET/PUT/DELETE) or registry endpoint doesn't exist | Verify the `registry_url` and node ID. |
 | **409** | Conflict | Node already exists with a different owner, **or** same version registered with different content (immutability violation) | Use a unique node ID, or **bump your version** if you changed the schema or metadata. |
-| **422** | Validation Error | Invalid manifest payload | Validate locally first: `python -m canvastekk_workflow_sdk validate handler:definition` |
+| **422** | Validation Error | Invalid manifest payload | Validate locally first: `python -m canvastekk_workflow_sdk validate handler:manifest` |
 | **500** | Internal Server Error | Engine-side failure | Retry after a few seconds. Contact the platform team if persistent. |
 
 ### Handling Errors in Python
 
 ```python
-from canvastekk_workflow_sdk.registry import register_node, RegistrationError
+from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node, WorkflowNodeRegistrationError
 
 try:
-    result = register_node(
+    result = register_workflow_node(
         node,
         registry_url="https://engine.example.com/api/workflows/nodes/",
         invoke_url="https://my-node.example.com",
         service_token="svs_your-token-here",
     )
     print(f"Registered: {result['name']} v{result['version']}")
-except RegistrationError as e:
+except WorkflowNodeRegistrationError as e:
     if e.status_code == 401:
         print("Authentication failed: check your service token")
     elif e.status_code == 403:
@@ -886,13 +886,13 @@ This exercises the complete download → validate → execute path without S3, m
 
 ### Testing with the Local Workflow Runner
 
-Use `WorkflowRunner` with `InProcessExecutor` to test multi-node pipelines:
+Use `WorkflowRunner` with `InProcessNodeExecutor` to test multi-node pipelines:
 
 ```python
 from canvastekk_workflow_sdk import WorkflowRunner, WorkflowBuilder
-from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import InProcessNodeExecutor
 
-executor = InProcessExecutor()
+executor = InProcessNodeExecutor()
 executor.register("my-node-v1.0.0", MyNode())
 
 # With a shared output_dir — node A writes, node B reads
@@ -933,7 +933,7 @@ Versions differ by design: framework-served OpenAPI tracks the framework (FastAP
 To expose the document itself over HTTP, declare an `/openapi` route in your contract (optional, non-minimum — the SDK adapters do not mount it):
 
 ```python
-contract = NodeContract(
+contract = WorkflowNodeManifestContract(
     routes=["/execute", "/health", "/manifest", "/openapi"],
 )
 ```

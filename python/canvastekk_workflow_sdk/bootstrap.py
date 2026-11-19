@@ -4,12 +4,12 @@ The blessed composition of node serving surfaces — promoted from the
 canvastekk-workflow-nodes repo-local factory plus the hand-rolled
 dual-purpose/lambda faces (see ``docs/NODE-SERVICE-LAYOUT.md``):
 
-- :func:`create_authed_app` — ``create_node_app`` + ``NodeAuth.central()``
+- :func:`create_authed_workflow_node_app` — ``create_workflow_node_app`` + ``NodeAuth.central()``
   (central-only by default; ``legacy_key_env_var`` keeps a dual-accept
   window alive for existing fleets).
-- :func:`mount_node` — dual-purpose services: the service's own routes stay
+- :func:`mount_workflow_node` — dual-purpose services: the service's own routes stay
   on the root app; the authed node sub-app mounts under a prefix.
-- :func:`create_lambda_handler` — serverless dual dispatch:
+- :func:`create_workflow_node_lambda_handler` — serverless dual dispatch:
   structurally-HTTP events run through Mangum onto the ASGI app; plain
   events route to the caller's dispatcher. Python-only (no TS parity —
   Mangum/Lambda Runtime API are python-runtime concerns).
@@ -23,13 +23,13 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
-from canvastekk_workflow_sdk.base import BaseNode
+from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 
-__all__ = ["create_authed_app", "mount_node", "create_lambda_handler"]
+__all__ = ["create_authed_workflow_node_app", "mount_workflow_node", "create_workflow_node_lambda_handler"]
 
 
-def create_authed_app(
-    node: BaseNode,
+def create_authed_workflow_node_app(
+    node: WorkflowNodeBase,
     *,
     legacy_key_env_var: str | None = None,
     **kwargs: Any,
@@ -47,34 +47,34 @@ def create_authed_app(
         node: The workflow node instance.
         legacy_key_env_var: Env var holding the legacy static key during a
             dual-accept window. ``None`` (default) = central-only.
-        **kwargs: Forwarded to ``create_node_app``.
+        **kwargs: Forwarded to ``create_workflow_node_app``.
 
     Returns:
         The node's FastAPI app with the auth dependency wired.
 
     Raises:
-        ValueError: If ``extra_routes`` is passed — ``create_node_app``
+        ValueError: If ``extra_routes`` is passed — ``create_workflow_node_app``
             mounts extra routes without the auth dependency, so auth would
             not cover them (verified still true: app.py ``include_router``
             call carries no router dependencies).
     """
     if kwargs.get("extra_routes"):
         raise ValueError(
-            "create_authed_app does not support extra_routes — SDK mounts them without the auth dependency"
+            "create_authed_workflow_node_app does not support extra_routes — SDK mounts them without the auth dependency"
         )
-    from canvastekk_workflow_sdk.app import create_node_app
     from canvastekk_workflow_sdk.auth import NodeAuth
+    from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
-    return create_node_app(
+    return create_workflow_node_app(
         node,
         auth=NodeAuth.central(legacy_key_env_var=legacy_key_env_var),
         **kwargs,
     )
 
 
-def mount_node(
+def mount_workflow_node(
     root_app: Any,
-    node: BaseNode,
+    node: WorkflowNodeBase,
     *,
     prefix: str = "/node",
     legacy_key_env_var: str | None = None,
@@ -95,14 +95,14 @@ def mount_node(
         root_app: The service's FastAPI app (its own routes already on it).
         node: The workflow node instance.
         prefix: Mount path for the node sub-app (default ``/node``).
-        legacy_key_env_var: Passed to :func:`create_authed_app`.
-        **kwargs: Forwarded to :func:`create_node_app`.
+        legacy_key_env_var: Passed to :func:`create_authed_workflow_node_app`.
+        **kwargs: Forwarded to :func:`create_workflow_node_app`.
 
     Returns:
-        ``root_app`` (for chaining/uvicorn ``app = mount_node(...)``).
+        ``root_app`` (for chaining/uvicorn ``app = mount_workflow_node(...)``).
     """
 
-    sub_app = create_authed_app(node, legacy_key_env_var=legacy_key_env_var, **kwargs)
+    sub_app = create_authed_workflow_node_app(node, legacy_key_env_var=legacy_key_env_var, **kwargs)
     root_app.mount(prefix, sub_app)
 
     root_lifespan = root_app.router.lifespan_context
@@ -132,7 +132,7 @@ def _is_structurally_http(event: Any) -> bool:
     return isinstance(request_context, dict) and isinstance(request_context.get("http"), dict)
 
 
-def create_lambda_handler(
+def create_workflow_node_lambda_handler(
     app: Any,
     *,
     plain_event: Callable[[dict[str, Any], Any], dict[str, Any]],
@@ -171,7 +171,7 @@ def create_lambda_handler(
                     from mangum import Mangum
                 except ImportError as error:  # pragma: no cover - env-dependent
                     raise ImportError(
-                        "create_lambda_handler needs mangum for HTTP events — "
+                        "create_workflow_node_lambda_handler needs mangum for HTTP events — "
                         "install canvastekk-workflow-sdk[lambda] or mangum"
                     ) from error
                 mangum_asgi = Mangum(app, lifespan="off")
@@ -179,3 +179,25 @@ def create_lambda_handler(
         return plain_event(event, context)
 
     return handler
+
+
+# Deprecated public names (ADR 0001, #271): old function names -> renamed.
+_DEPRECATED_ALIASES = {
+    "mount_node": "mount_workflow_node",
+    "create_authed_app": "create_authed_workflow_node_app",
+    "create_lambda_handler": "create_workflow_node_lambda_handler",
+}
+
+
+def __getattr__(name: str):  # PEP 562
+    if name in _DEPRECATED_ALIASES:
+        import warnings
+
+        warnings.warn(
+            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
+            " (ADR 0001; removal in 1.0.0).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[_DEPRECATED_ALIASES[name]]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
-from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
+from canvastekk_workflow_sdk import NodeExecutionContext, WorkflowNodeBase, WorkflowNodeManifest
 from canvastekk_workflow_sdk.workflow.level import compute_levels
-from canvastekk_workflow_sdk.workflow.models import (
+from canvastekk_workflow_sdk.workflow.node_executor import InProcessNodeExecutor
+from canvastekk_workflow_sdk.workflow.resolver import _resolve_output, _walk_dot_path, resolve_inputs
+from canvastekk_workflow_sdk.workflow.runner import WorkflowRunErrorPolicy, WorkflowRunner, WorkflowRunResult
+from canvastekk_workflow_sdk.workflow.workflow_definition import (
     WorkflowDefinitionNode,
     WorkflowDefinitionSpec,
     WorkflowEdgeDefinition,
 )
-from canvastekk_workflow_sdk.workflow.resolver import _resolve_output, _walk_dot_path, resolve_inputs
-from canvastekk_workflow_sdk.workflow.runner import ErrorPolicy, WorkflowRunner, WorkflowRunResult
 
 
 class TestResolverOutput:
@@ -224,14 +224,14 @@ class TestLevelComputation:
 
 class TestInProcessExecutor:
     def test_executor_registration(self) -> None:
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         node = EchoNode()
         result = executor.register("echo-v1.0.0", node)
         assert result is executor
         assert executor.has("echo-v1.0.0")
 
     def test_executor_has_checks_registry(self) -> None:
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         assert executor.has("missing") is False
 
         executor.register("echo-v1.0.0", EchoNode())
@@ -252,7 +252,7 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("echo-v1.0.0", EchoNode())
         runner = WorkflowRunner(executor)
 
@@ -276,9 +276,9 @@ class TestWorkflowRunner:
         assert result.duration_ms == 100
 
     def test_node_results_structure(self) -> None:
-        from canvastekk_workflow_sdk.workflow.runner import NodeResult
+        from canvastekk_workflow_sdk.workflow.runner import WorkflowRunNodeResult
 
-        node_result = NodeResult(
+        node_result = WorkflowRunNodeResult(
             node_id="n1",
             slug="echo-v1.0.0",
             status="completed",
@@ -304,7 +304,7 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("failing-v1.0.0", FailingNode())
         runner = WorkflowRunner(executor)
 
@@ -328,9 +328,9 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("failing-v1.0.0", FailingNode())
-        runner = WorkflowRunner(executor, error_policy=ErrorPolicy.FAIL_FAST)
+        runner = WorkflowRunner(executor, error_policy=WorkflowRunErrorPolicy.FAIL_FAST)
 
         result = runner.run(spec, inputs={})
 
@@ -355,10 +355,10 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("failing-v1.0.0", FailingNode())
         executor.register("echo-v1.0.0", EchoNode())
-        runner = WorkflowRunner(executor, error_policy=ErrorPolicy.CONTINUE)
+        runner = WorkflowRunner(executor, error_policy=WorkflowRunErrorPolicy.CONTINUE)
 
         result = runner.run(spec, inputs={})
 
@@ -379,7 +379,7 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         runner = WorkflowRunner(executor)
 
         result = runner.run(spec, inputs={})
@@ -404,10 +404,10 @@ class TestWorkflowRunner:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("failing-v1.0.0", FailingNode())
         executor.register("echo-v1.0.0", EchoNode())
-        runner = WorkflowRunner(executor, error_policy=ErrorPolicy.CONTINUE)
+        runner = WorkflowRunner(executor, error_policy=WorkflowRunErrorPolicy.CONTINUE)
 
         result = runner.run(spec, inputs={})
 
@@ -416,8 +416,8 @@ class TestWorkflowRunner:
         assert dependent_result.skipped_reason == "upstream_failed"
 
 
-class EchoNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class EchoNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -426,12 +426,12 @@ class EchoNode(BaseNode):
         output_schema={"type": "object", "properties": {"message": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class FailingNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -440,12 +440,12 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         raise ValueError("Intentional failure")
 
 
-class FileWriterNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class FileWriterNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="file-writer",
         version="1.0.0",
         name="File Writer",
@@ -457,14 +457,14 @@ class FileWriterNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         path = context.output_path("data.txt")
         path.write_text("hello from A")
         return {"file_path": str(path)}
 
 
-class FileReaderNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class FileReaderNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="file-reader",
         version="1.0.0",
         name="File Reader",
@@ -479,13 +479,13 @@ class FileReaderNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         content = Path(inputs["file_path"]).read_text()
         return {"content": content}
 
 
-class OutputDirCaptureNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class OutputDirCaptureNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="dir-capture",
         version="1.0.0",
         name="Dir Capture",
@@ -501,7 +501,7 @@ class OutputDirCaptureNode(BaseNode):
         super().__init__()
         self._capture_list = capture_list
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         dir_str = str(context.output_dir)
         if self._capture_list is not None:
             self._capture_list.append(dir_str)
@@ -534,7 +534,7 @@ class TestWorkflowRunnerOutputDir:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("file-writer-v1.0.0", FileWriterNode())
         executor.register("file-reader-v1.0.0", FileReaderNode())
         runner = WorkflowRunner(executor)
@@ -565,7 +565,7 @@ class TestWorkflowRunnerOutputDir:
                 ],
             )
 
-            executor = InProcessExecutor()
+            executor = InProcessNodeExecutor()
             executor.register("echo-v1.0.0", EchoNode())
             runner = WorkflowRunner(executor, output_dir=output_dir)
 
@@ -590,7 +590,7 @@ class TestWorkflowRunnerOutputDir:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("dir-capture-v1.0.0", OutputDirCaptureNode(captured_dir))
         runner = WorkflowRunner(executor)
 
@@ -616,7 +616,7 @@ class TestWorkflowRunnerOutputDir:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("dir-capture-v1.0.0", OutputDirCaptureNode(captured_dir))
         runner = WorkflowRunner(executor, cleanup=False)
 
@@ -644,7 +644,7 @@ class TestWorkflowRunnerOutputDir:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("dir-capture-v1.0.0", OutputDirCaptureNode(captured_dir))
         executor.register("failing-v1.0.0", FailingNode())
         runner = WorkflowRunner(executor)
@@ -676,7 +676,7 @@ class TestWorkflowRunnerOutputDir:
                 ],
             )
 
-            executor = InProcessExecutor()
+            executor = InProcessNodeExecutor()
             executor.register("echo-v1.0.0", EchoNode())
             runner = WorkflowRunner(executor, output_dir=output_dir)
 
@@ -702,7 +702,7 @@ class TestWorkflowRunnerOutputDir:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("echo-v1.0.0", EchoNode())
         runner = WorkflowRunner(executor)
 
@@ -731,7 +731,7 @@ class TestStartInputSeeding:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("echo-v1.0.0", EchoNode())
         runner = WorkflowRunner(executor)
 
@@ -753,7 +753,7 @@ class TestStartInputSeeding:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("echo-v1.0.0", EchoNode())
         runner = WorkflowRunner(executor)
 
@@ -784,7 +784,7 @@ class TestResolverErrorIsolation:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("echo-v1.0.0", EchoNode())
         runner = WorkflowRunner(executor)
 
@@ -803,8 +803,8 @@ class TestPerNodeOutputSubdirs:
     def test_parallel_nodes_same_filename_no_collision(self) -> None:
         captured: list[str] = []
 
-        class CollisionNode(BaseNode):
-            definition = WorkflowNodeManifest(
+        class CollisionNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
                 slug="collision",
                 version="1.0.0",
                 name="Collision",
@@ -834,7 +834,7 @@ class TestPerNodeOutputSubdirs:
             ],
         )
 
-        executor = InProcessExecutor()
+        executor = InProcessNodeExecutor()
         executor.register("collision-v1.0.0", CollisionNode())
         runner = WorkflowRunner(executor, cleanup=False)
 

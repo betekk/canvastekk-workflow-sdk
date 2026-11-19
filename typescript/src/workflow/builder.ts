@@ -1,5 +1,5 @@
-import type { EdgeType, WorkflowEdgeDefinition, WorkflowDefinitionNode, WorkflowDefinitionSpec } from "./models.js";
-import { validate } from "./validation.js";
+import type { EdgeType, WorkflowEdgeDefinition, WorkflowDefinitionNode, WorkflowDefinitionSpec } from "./workflow-definition.js";
+import { validateWorkflowDefinition } from "./validation.js";
 
 /**
  * Builder for creating workflow specifications.
@@ -178,7 +178,7 @@ export class WorkflowBuilder {
     };
 
     if (opts?.validate !== false) {
-      const result = validate(spec);
+      const result = validateWorkflowDefinition(spec);
       if (!result.isValid) {
         throw new Error(`Workflow validation failed: ${result.errors.join("; ")}`);
       }

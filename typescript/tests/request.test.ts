@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NodeExecutionRequestSchema } from "../src/request.js";
-import { UploadSessionDescriptorSchema } from "../src/uploads.js";
+import { NodeExecutionRequestSchema } from "../src/node-execution-request.js";
+import { NodeOutputUploadSessionDescriptorSchema } from "../src/node-output-uploads.js";
 
 describe("NodeExecutionRequestSchema", () => {
   it("parses a full request", () => {
@@ -128,13 +128,13 @@ describe("NodeExecutionRequest output_upload_url targets (DA-3314)", () => {
       kind: "multipart-upload-capability",
     });
 
-    const legacyDefault = UploadSessionDescriptorSchema.safeParse(fields);
+    const legacyDefault = NodeOutputUploadSessionDescriptorSchema.safeParse(fields);
     expect(legacyDefault.success).toBe(true);
     expect(legacyDefault.data?.kind).toBe("multipart-upload-session");
   });
 
   it("rejects an unknown descriptor kind", () => {
-    const parsed = UploadSessionDescriptorSchema.safeParse({
+    const parsed = NodeOutputUploadSessionDescriptorSchema.safeParse({
       kind: "multipart-upload-unknown",
       session_token: "tok",
       initiate_url: "https://engine/initiate",

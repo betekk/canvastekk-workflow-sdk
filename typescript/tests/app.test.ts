@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
-import { createNodeApp } from "../src/app.js";
+import { createWorkflowNodeApp } from "../src/workflow-node-app.js";
 import { writeFileSync } from "node:fs";
-import { BaseNode } from "../src/base-node.js";
+import { WorkflowNodeBase } from "../src/workflow-node-base.js";
 import type { WorkflowNodeManifest } from "../src/definition.js";
-import type { ExecutionContext } from "../src/context.js";
+import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import { NodeAuth } from "../src/auth.js";
 
-class TestNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class TestNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "test-node",
     version: "1.0.0",
     name: "Test Node",
@@ -23,13 +23,13 @@ class TestNode extends BaseNode {
     },
   };
 
-  execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+  execute(inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
     return { result: `echo: ${inputs.message ?? ""}` };
   }
 }
 
-class HealthCheckNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class HealthCheckNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "health-node",
     version: "2.0.0",
     name: "Health Node",
@@ -49,7 +49,7 @@ class HealthCheckNode extends BaseNode {
 
 describe("Express endpoints", () => {
   const node = new TestNode();
-  const app = createNodeApp(node);
+  const app = createWorkflowNodeApp(node);
 
   describe("POST /execute", () => {
     it("executes successfully", async () => {
@@ -75,8 +75,8 @@ describe("Express endpoints", () => {
 
     it("enforces the effective runtime bound, not the raw timeout_seconds (DA-3609)", async () => {
       class SlowNode extends TestNode {
-        definition: WorkflowNodeManifest = {
-          ...this.definition,
+        manifest: WorkflowNodeManifest = {
+          ...this.manifest,
           slug: "slow-node",
           name: "Slow Node",
           timeout_seconds: 5,
@@ -88,7 +88,7 @@ describe("Express endpoints", () => {
           return { result: "too late" };
         }
       }
-      const slowApp = createNodeApp(new SlowNode());
+      const slowApp = createWorkflowNodeApp(new SlowNode());
 
       const started = Date.now();
       const resp = await request(slowApp)
@@ -112,7 +112,7 @@ describe("Express endpoints", () => {
 
     it("returns degraded when some checks fail", async () => {
       const healthNode = new HealthCheckNode();
-      const healthApp = createNodeApp(healthNode);
+      const healthApp = createWorkflowNodeApp(healthNode);
       const resp = await request(healthApp).get("/health");
       expect(resp.body.status).toBe("degraded");
       expect(resp.body.checks).toEqual({ db: true, cache: false });
@@ -181,7 +181,7 @@ describe("Express endpoints", () => {
 
     it("returns 503 when checks fail", async () => {
       const healthNode = new HealthCheckNode();
-      const healthApp = createNodeApp(healthNode);
+      const healthApp = createWorkflowNodeApp(healthNode);
       const resp = await request(healthApp).get("/ready");
       expect(resp.status).toBe(503);
       expect(resp.body.status).toBe("not_ready");
@@ -192,7 +192,7 @@ describe("Express endpoints", () => {
 describe("X-SDK-Version header", () => {
   it("is present on all responses", async () => {
     const node = new TestNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const resp = await request(app).get("/health");
     expect(resp.headers["x-sdk-version"]).toBeDefined();
   });
@@ -204,7 +204,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     delete process.env.CANVASTEKK_DEV_MODE;
     const auth = NodeAuth.apiKey();
-    const app = createNodeApp(node, { dependencies: [auth] });
+    const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
       .get("/health");
@@ -218,7 +218,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     delete process.env.CANVASTEKK_DEV_MODE;
     const auth = NodeAuth.apiKey();
-    const app = createNodeApp(node, { dependencies: [auth] });
+    const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
       .get("/health")
@@ -234,7 +234,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY_NEXT = "new-key";
     delete process.env.CANVASTEKK_DEV_MODE;
     const auth = NodeAuth.apiKey();
-    const app = createNodeApp(node, { dependencies: [auth] });
+    const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
       .get("/health")
@@ -251,7 +251,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY_NEXT = "";
     delete process.env.CANVASTEKK_DEV_MODE;
     const auth = NodeAuth.apiKey();
-    const app = createNodeApp(node, { dependencies: [auth] });
+    const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
       .get("/health")
@@ -267,7 +267,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     process.env.CANVASTEKK_DEV_MODE = "true";
     const auth = NodeAuth.apiKey();
-    const app = createNodeApp(node, { dependencies: [auth] });
+    const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
       .get("/health");
@@ -279,8 +279,8 @@ describe("Auth middleware", () => {
 });
 
 describe("POST /execute upload failure (DA-1711 parity)", () => {
-  class FileOutputNode extends BaseNode {
-    definition: WorkflowNodeManifest = {
+  class FileOutputNode extends WorkflowNodeBase {
+    manifest: WorkflowNodeManifest = {
       slug: "file-out-node",
       version: "1.0.0",
       name: "File Out",
@@ -292,7 +292,7 @@ describe("POST /execute upload failure (DA-1711 parity)", () => {
       },
     };
 
-    execute(_inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+    execute(_inputs: Record<string, unknown>, context: NodeExecutionContext): Record<string, unknown> {
       const p = context.outputPath("result.txt");
       writeFileSync(p, "data");
       return { out_file: p };
@@ -301,7 +301,7 @@ describe("POST /execute upload failure (DA-1711 parity)", () => {
 
   it("fails execution with UPLOAD_FAILED when upload PUT fails", async () => {
     const node = new FileOutputNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const server = app.listen(0);
     const port = (server.address() as { port: number }).port;
 
@@ -336,8 +336,8 @@ describe("POST /execute upload failure (DA-1711 parity)", () => {
 
 describe("GET /manifest null-key stripping (DA-1955)", () => {
   it("omits null optional keys instead of leaking explicit nulls", async () => {
-    class NullOptionalsNode extends BaseNode {
-      definition: WorkflowNodeManifest = {
+    class NullOptionalsNode extends WorkflowNodeBase {
+      manifest: WorkflowNodeManifest = {
         slug: "null-opt-node",
         version: "1.0.0",
         name: "Null Optionals",
@@ -355,7 +355,7 @@ describe("GET /manifest null-key stripping (DA-1955)", () => {
         return {};
       }
     }
-    const app = createNodeApp(new NullOptionalsNode());
+    const app = createWorkflowNodeApp(new NullOptionalsNode());
     const resp = await request(app).get("/manifest");
     expect(resp.status).toBe(200);
     expect(resp.body).not.toHaveProperty("deprecation");
@@ -384,8 +384,8 @@ describe("manifest code_digest (DA-2603)", () => {
   it("serves a 64-hex digest of the handler module source (this test file)", async () => {
     const { createHash } = await import("node:crypto");
     const { readFileSync } = await import("node:fs");
-    const node = new (class extends BaseNode {
-      definition = {
+    const node = new (class extends WorkflowNodeBase {
+      manifest = {
         slug: "digest-node",
         version: "1.0.0",
         name: "Digest",
@@ -398,7 +398,7 @@ describe("manifest code_digest (DA-2603)", () => {
         return {};
       }
     })();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const res = await request(app).get("/manifest");
     expect(res.status).toBe(200);
     const digest = res.body.code_digest as string;
@@ -410,8 +410,8 @@ describe("manifest code_digest (DA-2603)", () => {
 
 describe("dry-run upload guard (D10 #111)", () => {
   it("never uploads on a dry-run pass even with output_upload_url", async () => {
-    class DryFileNode extends BaseNode {
-      definition: WorkflowNodeManifest = {
+    class DryFileNode extends WorkflowNodeBase {
+      manifest: WorkflowNodeManifest = {
         slug: "dry-file-node",
         version: "1.0.0",
         name: "Dry File Node",
@@ -430,14 +430,14 @@ describe("dry-run upload guard (D10 #111)", () => {
         },
       };
 
-      execute(_inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+      execute(_inputs: Record<string, unknown>, context: NodeExecutionContext): Record<string, unknown> {
         const p = context.outputPath("out.txt");
         writeFileSync(p, "data");
         return { out_file: p };
       }
     }
 
-    const app = createNodeApp(new DryFileNode());
+    const app = createWorkflowNodeApp(new DryFileNode());
     const server = app.listen(0);
     const port = (server.address() as { port: number }).port;
 
@@ -475,8 +475,8 @@ describe("dry-run upload guard (D10 #111)", () => {
 });
 
 describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
-  class CapabilityCaptureNode extends BaseNode {
-    definition: WorkflowNodeManifest = {
+  class CapabilityCaptureNode extends WorkflowNodeBase {
+    manifest: WorkflowNodeManifest = {
       slug: "cap-node",
       version: "1.0.0",
       name: "Cap Node",
@@ -485,7 +485,7 @@ describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
       output_schema: { type: "object" },
     };
     static captured: string | null | undefined;
-    execute(_inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+    execute(_inputs: Record<string, unknown>, context: NodeExecutionContext): Record<string, unknown> {
       CapabilityCaptureNode.captured = context.capability;
       return {};
     }
@@ -493,7 +493,7 @@ describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
 
   it("header reaches the execution context", async () => {
     const node = new CapabilityCaptureNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const resp = await request(app)
       .post("/execute")
       .send({ run_id: "r-cap", node_id: "n-cap", inputs: {} })
@@ -504,7 +504,7 @@ describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
 
   it("body-supplied capability is stripped", async () => {
     const node = new CapabilityCaptureNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const resp = await request(app)
       .post("/execute")
       .send({
@@ -519,7 +519,7 @@ describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
 
   it("absent header → null", async () => {
     const node = new CapabilityCaptureNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     await request(app)
       .post("/execute")
       .send({ run_id: "r-cap3", node_id: "n-cap3", inputs: {} });
@@ -528,7 +528,7 @@ describe("capability passthrough + version stamp (S.4, SDK#161)", () => {
 
   it("X-SDK-Version stamped on responses", async () => {
     const node = new CapabilityCaptureNode();
-    const app = createNodeApp(node);
+    const app = createWorkflowNodeApp(node);
     const resp = await request(app).get("/health");
     expect(resp.headers["x-sdk-version"]).toBeTruthy();
   });

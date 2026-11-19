@@ -34,7 +34,7 @@ def _load_definition(module_path: str):
     module = importlib.import_module(module_name)
     definition = getattr(module, attr_name)
 
-    from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
+    from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
     if not isinstance(definition, WorkflowNodeManifest):
         raise TypeError(f"Expected WorkflowNodeManifest, got {type(definition).__name__}")
@@ -137,12 +137,12 @@ def _build_engine_request(definition, *, invoke_url: str | None = None, name_suf
     """Map a canonical manifest to the engine registration request.
 
     Delegates the field mapping to the shipped, engine-boundary-tested
-    ``build_registry_payload`` (single source of truth — the engine request
+    ``build_workflow_node_registry_payload`` (single source of truth — the engine request
     is ``extra="forbid"``), then applies the CLI-only name suffix.
     """
-    from canvastekk_workflow_sdk.registry import build_registry_payload
+    from canvastekk_workflow_sdk.workflow_node_registry import build_workflow_node_registry_payload
 
-    payload = build_registry_payload(definition, invoke_url=invoke_url)
+    payload = build_workflow_node_registry_payload(definition, invoke_url=invoke_url)
     if name_suffix:
         payload["name"] = definition.slug + name_suffix
     return payload
@@ -251,7 +251,7 @@ def _apply_registry_diff(
         report["warnings"].append("registry diff skipped (no credential: set CANVASTEKK_NODE_REGISTRATION_KEY)")
         return
 
-    from canvastekk_workflow_sdk.registry import invalid_ctk_reason
+    from canvastekk_workflow_sdk.workflow_node_registry import invalid_ctk_reason
 
     token_error = invalid_ctk_reason(token)
     if token_error:
@@ -260,12 +260,15 @@ def _apply_registry_diff(
         report["errors"].append(token_error)
         return
 
-    from canvastekk_workflow_sdk.diff import _version_tuple
-    from canvastekk_workflow_sdk.registry import diff_against_published, fetch_published_definition
+    from canvastekk_workflow_sdk.workflow_node_manifest_diff import _version_tuple
+    from canvastekk_workflow_sdk.workflow_node_registry import (
+        diff_against_published_workflow_node_manifest,
+        fetch_published_workflow_node_manifest,
+    )
 
     name = str(payload.get("name", ""))
     try:
-        published = fetch_published_definition(engine_url, name, token=token)
+        published = fetch_published_workflow_node_manifest(engine_url, name, token=token)
     except httpx.HTTPError as exc:
         report["registry_diff"] = {"status": "skipped", "published_version": None, "changed_fields": []}
         report["warnings"].append(f"registry diff skipped (engine error: {exc})")
@@ -286,7 +289,7 @@ def _apply_registry_diff(
         )
         return
 
-    changed = [f for f in diff_against_published(payload, published) if f != "version"]
+    changed = [f for f in diff_against_published_workflow_node_manifest(payload, published) if f != "version"]
     if older:
         report["registry_diff"] = {
             "status": "older-version",
@@ -334,7 +337,7 @@ def _manifest_from_source(source: str):
         else:
             with open(source, encoding="utf-8") as f:
                 raw = json.load(f)
-        from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
+        from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
         return WorkflowNodeManifest(**raw)
     except Exception as e:
@@ -361,7 +364,7 @@ def _run_register(args: list[str]) -> int:
     import urllib.parse
     import urllib.request
 
-    from canvastekk_workflow_sdk.registry import registry_auth_header
+    from canvastekk_workflow_sdk.workflow_node_registry import registry_auth_header
 
     def _usage() -> int:
         print(
@@ -385,7 +388,7 @@ def _run_register(args: list[str]) -> int:
         print("Error: CANVASTEKK_NODE_REGISTRATION_KEY is not set (service credential)", file=sys.stderr)
         return 2
 
-    from canvastekk_workflow_sdk.registry import invalid_ctk_reason
+    from canvastekk_workflow_sdk.workflow_node_registry import invalid_ctk_reason
 
     token_error = invalid_ctk_reason(token)
     if token_error:
@@ -638,9 +641,9 @@ def _run_diff(args: list[str]) -> int:
         print(f"Error loading manifests: {e}", file=sys.stderr)
         return 2
 
-    from canvastekk_workflow_sdk.diff import diff_manifests
+    from canvastekk_workflow_sdk.workflow_node_manifest_diff import diff_workflow_node_manifests
 
-    result = diff_manifests(old, new)
+    result = diff_workflow_node_manifests(old, new)
 
     if use_json:
         from dataclasses import asdict
@@ -680,7 +683,7 @@ def main() -> None:
         print("Usage: ctk <command> [options]  (alias: python -m canvastekk_workflow_sdk)")
         print()
         print("Commands:")
-        print("  validate <module:attribute> [--json]  Validate a node manifest definition")
+        print("  validate <module:attribute> [--json]  Validate a workflow node manifest")
         print(
             "  probe <module:attribute | --manifest FILE> [--engine-url URL] [--json]  Registration probes (offline mirror + optional registry diff)"
         )
@@ -740,7 +743,7 @@ def main() -> None:
                 file=sys.stderr,
             )
             sys.exit(2)
-        from canvastekk_workflow_sdk.conformance import verify_node
+        from canvastekk_workflow_sdk.workflow_node_conformance import verify_node
 
         report = verify_node(url, timeout=v_timeout, api_key=v_api_key, dry_run=v_dry_run)
         print(report.summary())
@@ -750,7 +753,7 @@ def main() -> None:
         sys.exit(_run_register(args[1:]))
 
     if args[0] == "registry-convergence":
-        from canvastekk_workflow_sdk.convergence import main as _convergence_main
+        from canvastekk_workflow_sdk.workflow_node_registry_convergence import main as _convergence_main
 
         sys.exit(_convergence_main(args[1:]))
 
@@ -793,7 +796,7 @@ def main() -> None:
             sys.exit(load_fail_code)
 
     try:
-        if args[0] == "validate":
+        if args[0] == "validate_workflow_definition":
             report = _validate_definition(definition)
         else:
             engine_url = _flag_value(args, "--engine-url")

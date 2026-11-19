@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { ExecutionContext } from "../src/context.js";
+import { NodeExecutionContext } from "../src/node-execution-context.js";
 
-describe("ExecutionContext", () => {
+describe("NodeExecutionContext", () => {
   const testDir = "/tmp/sdk-test-context";
 
   afterEach(() => {
@@ -13,46 +13,46 @@ describe("ExecutionContext", () => {
   });
 
   it("creates output directory on construction", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-1/node-1") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-1/node-1") });
     expect(existsSync(ctx.outputDir)).toBe(true);
   });
 
   it("uses CANVASTEKK_OUTPUT_DIR env var", () => {
     process.env.CANVASTEKK_OUTPUT_DIR = testDir;
-    const ctx = new ExecutionContext({ runId: "run-1", nodeId: "node-1" });
+    const ctx = new NodeExecutionContext({ runId: "run-1", nodeId: "node-1" });
     expect(ctx.outputDir).toBe(join(testDir, "run-1", "node-1"));
     delete process.env.CANVASTEKK_OUTPUT_DIR;
   });
 
   it("defaults to /tmp when no env var", () => {
     delete process.env.CANVASTEKK_OUTPUT_DIR;
-    const ctx = new ExecutionContext({ runId: "r", nodeId: "n" });
+    const ctx = new NodeExecutionContext({ runId: "r", nodeId: "n" });
     expect(ctx.outputDir).toContain("/tmp/");
     expect(ctx.outputDir).toContain("r");
     expect(ctx.outputDir).toContain("n");
   });
 
   it("extracts runId from request", () => {
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { run_id: "run-abc", node_id: "node-1", inputs: {} },
     });
     expect(ctx.runId).toBe("run-abc");
   });
 
   it("extracts nodeId from request", () => {
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { run_id: "run-abc", node_id: "node-1", inputs: {} },
     });
     expect(ctx.nodeId).toBe("node-1");
   });
 
   it("returns outputPath with filename", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-1/node-1") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-1/node-1") });
     expect(ctx.outputPath("result.json")).toBe(join(testDir, "run-1/node-1/result.json"));
   });
 
   it("lazily creates downloadsDir", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-2/node-2") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-2/node-2") });
     expect(existsSync(join(testDir, "run-2/node-2/downloads"))).toBe(false);
     const dlDir = ctx.downloadsDir;
     expect(existsSync(dlDir)).toBe(true);
@@ -60,13 +60,13 @@ describe("ExecutionContext", () => {
   });
 
   it("tracks metadata", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-3/node-3") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-3/node-3") });
     ctx.metadata["key"] = "value";
     expect(ctx.metadata["key"]).toBe("value");
   });
 
   it("records token usage", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-4/node-4") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-4/node-4") });
     ctx.recordTokenUsage({ promptTokens: 10, completionTokens: 5, totalTokens: 15 });
     expect(ctx.tokenUsage).toEqual({
       prompt_tokens: 10,
@@ -76,7 +76,7 @@ describe("ExecutionContext", () => {
   });
 
   it("token_usage returns a copy", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-5/node-5") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-5/node-5") });
     ctx.recordTokenUsage({ totalTokens: 100 });
     const usage = ctx.tokenUsage;
     usage.total_tokens = 999;
@@ -84,19 +84,19 @@ describe("ExecutionContext", () => {
   });
 
   it("reportProgress does not throw", () => {
-    const ctx = new ExecutionContext({ outputDir: join(testDir, "run-6/node-6") });
+    const ctx = new NodeExecutionContext({ outputDir: join(testDir, "run-6/node-6") });
     expect(() => ctx.reportProgress(0.5, "halfway")).not.toThrow();
   });
 
   it("executionId defaults to null and accepts an explicit value", () => {
-    const ctxA = new ExecutionContext({ outputDir: join(testDir, "run-7/node-7") });
+    const ctxA = new NodeExecutionContext({ outputDir: join(testDir, "run-7/node-7") });
     expect(ctxA.executionId).toBeNull();
-    const ctxB = new ExecutionContext({ executionId: "exec-123" });
+    const ctxB = new NodeExecutionContext({ executionId: "exec-123" });
     expect(ctxB.executionId).toBe("exec-123");
   });
 });
 
-describe("ExecutionContext progress ping (DA-3232)", () => {
+describe("NodeExecutionContext progress ping (DA-3232)", () => {
   const testDir = "/tmp/sdk-test-context-ping";
   const baseRequest = {
     run_id: "run-abc",
@@ -114,7 +114,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("no-op without callback_url — fetch never called", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: null },
       executionId: "exec-1",
       outputDir: join(testDir, "n1"),
@@ -127,7 +127,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("no-op without execution_id even when callback_url present", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/callbacks/run-abc/node-1" },
       outputDir: join(testDir, "n2"),
     });
@@ -139,7 +139,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("happy path — POSTs execution_id, percent and message to callback_url/progress", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/callbacks/run-abc/node-1" },
       executionId: "exec-42",
       outputDir: join(testDir, "n3"),
@@ -160,7 +160,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("omits message key when message is empty", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/cb" },
       executionId: "exec-43",
       outputDir: join(testDir, "n4"),
@@ -177,7 +177,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("clamps percent above 100 and truncates message to the payload cap", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/cb" },
       executionId: "exec-44",
       outputDir: join(testDir, "n5"),
@@ -193,7 +193,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
   it("normalizes a trailing slash on callback_url", async () => {
     const fetchSpy = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/cb/" },
       executionId: "exec-46",
       outputDir: join(testDir, "n7"),
@@ -210,7 +210,7 @@ describe("ExecutionContext progress ping (DA-3232)", () => {
       throw new Error("engine unreachable");
     });
     vi.stubGlobal("fetch", fetchSpy);
-    const ctx = new ExecutionContext({
+    const ctx = new NodeExecutionContext({
       request: { ...baseRequest, callback_url: "http://engine/cb" },
       executionId: "exec-45",
       outputDir: join(testDir, "n6"),

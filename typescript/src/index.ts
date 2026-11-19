@@ -2,8 +2,8 @@
  * CanvasTEKK Workflow SDK for TypeScript.
  *
  * Provides:
- * - BaseNode abstract class for creating workflow nodes
- * - Express app creation with createNodeApp/createMultiNodeApp
+ * - WorkflowNodeBase abstract class for creating workflow nodes
+ * - Express app creation with createWorkflowNodeApp/createMultiWorkflowNodeApp
  * - Authentication middleware (API key, JWT, Keycloak)
  * - Workflow builder and runner for local DAG execution
  * - Contract types for Point3D, Instance, Measurement, Plane
@@ -12,25 +12,89 @@
  * @see https://github.com/betekk/canvastekk-workflow-sdk
  */
 export { VERSION } from "./version.js";
+// --- Deprecated name aliases, phase 3 (ADR 0001, #271; removal in 1.0.0, #272) ---
+/** @deprecated use WorkflowNodeBase */
+export { WorkflowNodeBase as BaseNode } from "./workflow-node-base.js";
+/** @deprecated use NodeExecutionContext */
+export { NodeExecutionContext as ExecutionContext } from "./node-execution-context.js";
+/** @deprecated use WorkflowNodeHealthResponse */
+export { WorkflowNodeHealthResponseSchema as HealthResponseSchema, type WorkflowNodeHealthResponse as HealthResponse } from "./node-execution-response.js";
+/** @deprecated use WorkflowNodeCallOutcome / parseWorkflowNodeCallOutcome */
+export { WorkflowNodeCallOutcomeSchema as NodeExecutionStatusSchema, parseWorkflowNodeCallOutcome as parseNodeExecutionStatus, type WorkflowNodeCallOutcome as NodeExecutionStatus } from "./node-execution-response.js";
+/** @deprecated use NODE_CALL_PROTOCOL_HEADER etc. */
+export { NODE_CALL_PROTOCOL_HEADER as NODE_PROTOCOL_HEADER, NODE_CALL_PROTOCOL_VERSION as NODE_PROTOCOL_VERSION, NODE_CALL_PROTOCOL_2_OUTCOMES as PROTOCOL_2_OUTCOMES, nodeCallOutcomeForProtocol as outcomeForProtocol, readNodeCallOutcome as readOutcome, requestedNodeCallProtocol as requestedProtocol } from "./node-call-protocol.js";
+/** @deprecated use NodeExecutionMetric / NodeExecutionMetricsCollector */
+export { NodeExecutionMetricsCollector as MetricsCollector, createNodeExecutionMetric as createExecutionMetric, nodeExecutionMetricToDict as metricToDict, type NodeExecutionMetric as ExecutionMetric } from "./observability.js";
+/** @deprecated use NodeOutput* names */
+export { NodeOutputS3PresignedUploader as S3PresignedUploader, getDefaultNodeOutputUploader as getDefaultUploader, NodeOutputUploadSessionDescriptorSchema as UploadSessionDescriptorSchema, type NodeOutputUploader as OutputUploader, type NodeOutputUploadTarget as UploadTarget, type NodeOutputUploadSessionDescriptor as UploadSessionDescriptor } from "./node-output-uploads.js";
+/** @deprecated use uploadViaCdsMultipartSession */
+export { uploadViaCdsMultipartSession as uploadViaSession } from "./cds-multipart-upload.js";
+/** @deprecated use NODE_IO_DATA_CONTRACT_VERSION */
+export { NODE_IO_DATA_CONTRACT_VERSION as CONTRACT_VERSION, type NodeIoDataContractData as BaseContractData } from "./node-io-data-contracts/index.js";
+// --- end phase-3 deprecated aliases ---
+// --- Deprecated name aliases, phase 4 (ADR 0001, #271; removal in 1.0.0, #272) ---
+/** @deprecated use validateWorkflowDefinition */
+export { validateWorkflowDefinition as validate } from "./workflow/index.js";
+/** @deprecated use WorkflowDefinitionValidationResult */
+export { type WorkflowDefinitionValidationResult as ValidationResult } from "./workflow/index.js";
+/** @deprecated use WorkflowRunNodeResult */
+export { type WorkflowRunNodeResult as NodeResult } from "./workflow/index.js";
+/** @deprecated use WorkflowRunErrorPolicy */
+export { type WorkflowRunErrorPolicy as ErrorPolicy } from "./workflow/index.js";
+/** @deprecated use WorkflowRunNodeExecutor / InProcessNodeExecutor / HttpNodeExecutor */
+export { type WorkflowRunNodeExecutor as NodeExecutor, InProcessNodeExecutor as InProcessExecutor, HttpNodeExecutor as HttpExecutor } from "./workflow/index.js";
+/** @deprecated use WorkflowRunError */
+export { WorkflowRunError as WorkflowExecutionError } from "./exceptions.js";
+/** @deprecated use WorkflowDefinitionValidationError */
+export { WorkflowDefinitionValidationError as WorkflowValidationError } from "./exceptions.js";
+// --- end phase-4 deprecated aliases ---
+export type { WorkflowNodeManifestContract, WorkflowNodeContractCapabilities } from "./workflow-node-manifest.js";
+
+// --- Deprecated name aliases (ADR 0001, #271; removal in 1.0.0, #272) ---
+/** @deprecated use WorkflowNodeColorPreset */
+export { WorkflowNodeColorPresetSchema as ColorPresetSchema, type WorkflowNodeColorPreset as ColorPreset } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeRetryConfig */
+export { WorkflowNodeRetryConfigSchema as RetryConfigSchema, type WorkflowNodeRetryConfig as RetryConfig } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeDeprecationInfo */
+export { WorkflowNodeDeprecationInfoSchema as DeprecationInfoSchema, type WorkflowNodeDeprecationInfo as DeprecationInfo } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeManifestContract */
+export { type WorkflowNodeManifestContract as NodeContract } from "./workflow-node-manifest.js";
+/** @deprecated use WorkflowNodeContractCapabilities */
+export { type WorkflowNodeContractCapabilities as ContractCapabilities } from "./workflow-node-manifest.js";
+/** @deprecated use getWorkflowNodeManifestId */
+export { getWorkflowNodeManifestId as getNodeId } from "./workflow-node-manifest.js";
+/** @deprecated use diffWorkflowNodeManifests / WorkflowNodeManifestDiff */
+export { diffWorkflowNodeManifests as diffManifests, type WorkflowNodeManifestDiff as ManifestDiff } from "./workflow-node-manifest-diff.js";
+/** @deprecated use registerWorkflowNode */
+export { registerWorkflowNode as registerNode } from "./workflow-node-registry.js";
+/** @deprecated use WorkflowNodeRegistrationResult */
+export { type WorkflowNodeRegistrationResult as RegisterNodeResult } from "./workflow-node-registry.js";
+/** @deprecated use WorkflowNodeRegistrationError */
+export { WorkflowNodeRegistrationError as RegistrationError } from "./exceptions.js";
+/** @deprecated use buildWorkflowNodeRegistryPayload */
+export { buildWorkflowNodeRegistryPayload as buildRegistryPayload } from "./workflow-node-registry.js";
+/** @deprecated use exportWorkflowNodeManifest */
+export { exportWorkflowNodeManifest as exportDefinition } from "./workflow-node-registry.js";
+// --- end deprecated aliases ---
 export {
-  ColorPresetSchema,
+  WorkflowNodeColorPresetSchema,
   WorkflowNodeStylesSchema,
-  RetryConfigSchema,
+  WorkflowNodeRetryConfigSchema,
   WorkflowNodeManifestSchema,
   WorkflowNodeRoleSchema,
-  DeprecationInfoSchema,
-  getNodeId,
+  WorkflowNodeDeprecationInfoSchema,
+  getWorkflowNodeManifestId,
   getFileInputFields,
   getFileOutputFields,
   validateFileInput,
   effectiveRuntimeSeconds,
-  type ColorPreset,
+  type WorkflowNodeColorPreset,
   type WorkflowNodeStyles,
-  type RetryConfig,
+  type WorkflowNodeRetryConfig,
   type WorkflowNodeManifest,
   type WorkflowNodeRole,
-  type DeprecationInfo,
-} from "./definition.js";
+  type WorkflowNodeDeprecationInfo,
+} from "./workflow-node-manifest.js";
 export {
   NodeExecutionError,
   NodeTimeoutError,
@@ -38,9 +102,9 @@ export {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
-  WorkflowExecutionError,
-  WorkflowValidationError,
-  RegistrationError,
+  WorkflowRunError,
+  WorkflowDefinitionValidationError,
+  WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
   ERROR_CATEGORIES,
@@ -54,25 +118,25 @@ export type { ErrorCategory } from "./exceptions.js";
 export {
   NodeExecutionRequestSchema,
   type NodeExecutionRequest,
-} from "./request.js";
+} from "./node-execution-request.js";
 export {
   NodeExecutionResponseSchema,
-  NodeExecutionStatusSchema,
-  parseNodeExecutionStatus,
+  WorkflowNodeCallOutcomeSchema,
+  parseWorkflowNodeCallOutcome,
   NodeExecutionResponseFactory,
-  HealthResponseSchema,
+  WorkflowNodeHealthResponseSchema,
   type NodeExecutionResponse,
-  type NodeExecutionStatus,
-  type HealthResponse,
-} from "./response.js";
+  type WorkflowNodeCallOutcome,
+  type WorkflowNodeHealthResponse,
+} from "./node-execution-response.js";
 export {
-  NODE_PROTOCOL_HEADER,
-  NODE_PROTOCOL_VERSION,
-  PROTOCOL_2_OUTCOMES,
-  outcomeForProtocol,
-  readOutcome,
-  requestedProtocol,
-} from "./protocol.js";
+  NODE_CALL_PROTOCOL_HEADER,
+  NODE_CALL_PROTOCOL_VERSION,
+  NODE_CALL_PROTOCOL_2_OUTCOMES,
+  nodeCallOutcomeForProtocol,
+  readNodeCallOutcome,
+  requestedNodeCallProtocol,
+} from "./node-call-protocol.js";
 export {
   StructuredJsonFormatter,
   HumanReadableFormatter,
@@ -81,7 +145,7 @@ export {
   createLogger,
   type SdkLogger,
 } from "./logging.js";
-export { ExecutionContext } from "./context.js";
+export { NodeExecutionContext } from "./node-execution-context.js";
 export {
   LoggingMiddleware,
   TimingMiddleware,
@@ -89,21 +153,23 @@ export {
 } from "./middleware.js";
 export type { NodeMiddleware } from "./middleware.js";
 export {
-  MetricsCollector,
-  createExecutionMetric,
-  metricToDict,
-  type ExecutionMetric,
+  NodeExecutionMetricsCollector,
+  createNodeExecutionMetric,
+  nodeExecutionMetricToDict,
+  type NodeExecutionMetric,
 } from "./observability.js";
-export { BaseNode } from "./base-node.js";
-export { NodeAuth, TekkNodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
+export { WorkflowNodeBase } from "./workflow-node-base.js";
+export { TekkNodeAuth, CANVASTEKK_AUTH_MARKER } from "./auth.js";
+/** @deprecated use TekkNodeAuth (ADR 0001, #271) */
+export { NodeAuth } from "./auth.js";
 export type { AuthMiddleware, AuthResult } from "./auth.js";
 export { NODE_TOKEN_PREFIX, isNodeToken } from "./node-token.js";
 export type { NodeTokenClaims } from "./node-token.js";
-export { S3PresignedUploader, getDefaultUploader, UploadSessionDescriptorSchema } from "./uploads.js";
-export type { OutputUploader, UploadTarget, UploadSessionDescriptor } from "./uploads.js";
-export { uploadViaSession } from "./multipart.js";
+export { NodeOutputS3PresignedUploader, getDefaultNodeOutputUploader, NodeOutputUploadSessionDescriptorSchema } from "./node-output-uploads.js";
+export type { NodeOutputUploader, NodeOutputUploadTarget, NodeOutputUploadSessionDescriptor } from "./node-output-uploads.js";
+export { uploadViaCdsMultipartSession } from "./cds-multipart-upload.js";
 export {
-  CONTRACT_VERSION,
+  NODE_IO_DATA_CONTRACT_VERSION,
   saveJson,
   loadJson,
   point3DToList,
@@ -118,9 +184,9 @@ export {
   getPlaneByLabel,
   STANDARD_CLASSES,
   STANDARD_CLASS_NAMES,
-} from "./contracts/index.js";
+} from "./node-io-data-contracts/index.js";
 export type {
-  BaseContractData,
+  NodeIoDataContractData,
   Point3D,
   BoundingBox3D,
   Instance,
@@ -129,38 +195,38 @@ export type {
   MeasurementSetData,
   Plane,
   PlaneSetData,
-} from "./contracts/index.js";
+} from "./node-io-data-contracts/index.js";
 export {
-  buildRegistryPayload,
-  registerNode,
-  exportDefinition,
+  buildWorkflowNodeRegistryPayload,
+  registerWorkflowNode,
+  exportWorkflowNodeManifest,
   extractNodeData,
   registerNodeResultGet,
   registerNodeResultHas,
-} from "./registry.js";
-export type { InvokeType, RegisterNodeResult } from "./registry.js";
-export { diffManifests } from "./diff.js";
-export type { ManifestDiff } from "./diff.js";
+} from "./workflow-node-registry.js";
+export type { InvokeType, WorkflowNodeRegistrationResult } from "./workflow-node-registry.js";
+export { diffWorkflowNodeManifests } from "./workflow-node-manifest-diff.js";
+export type { WorkflowNodeManifestDiff } from "./workflow-node-manifest-diff.js";
 export {
   WorkflowBuilder,
-  InProcessExecutor,
-  HttpExecutor,
+  InProcessNodeExecutor,
+  HttpNodeExecutor,
   WorkflowRunner,
   computeLevels,
   resolveInputs,
   ResolverError,
-  validate,
+  validateWorkflowDefinition,
 } from "./workflow/index.js";
 export type {
   EdgeType,
   WorkflowEdgeDefinition,
   WorkflowDefinitionNode,
   WorkflowDefinitionSpec,
-  NodeExecutor,
-  ErrorPolicy,
-  NodeResult,
+  WorkflowRunNodeExecutor,
+  WorkflowRunErrorPolicy,
+  WorkflowRunNodeResult,
   WorkflowRunResult,
-  ValidationResult,
+  WorkflowDefinitionValidationResult,
 } from "./workflow/index.js";
 
 import { warnSupportHorizon } from "./support-horizon.js";

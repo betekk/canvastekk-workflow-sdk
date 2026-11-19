@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { BaseNode, downloadDeadline } from "../src/base-node.js";
+import { WorkflowNodeBase, downloadDeadline } from "../src/workflow-node-base.js";
 import { effectiveRuntimeSeconds } from "../src/definition.js";
 import type { WorkflowNodeManifest } from "../src/definition.js";
-import type { ExecutionContext } from "../src/context.js";
+import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import { TimingMiddleware } from "../src/middleware.js";
 
-class EchoNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class EchoNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "echo",
     version: "1.0.0",
     name: "Echo",
@@ -23,13 +23,13 @@ class EchoNode extends BaseNode {
     },
   };
 
-  execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+  execute(inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
     return { message: inputs.message as string };
   }
 }
 
-class FailingNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class FailingNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "fail-node",
     version: "1.0.0",
     name: "Fail",
@@ -43,8 +43,8 @@ class FailingNode extends BaseNode {
   }
 }
 
-class ValidatingNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class ValidatingNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "validating",
     version: "1.0.0",
     name: "Validating",
@@ -70,7 +70,7 @@ class ValidatingNode extends BaseNode {
   }
 }
 
-describe("BaseNode", () => {
+describe("WorkflowNodeBase", () => {
   describe("run() success path", () => {
     it("executes and returns success response", async () => {
       const node = new EchoNode();
@@ -188,8 +188,8 @@ import { join } from "node:path";
 const PUBLIC_HOST = "s3.example.com";
 const PRIVATE_IP = ["192", "168", "1", "10"].join(".");
 
-class DownloadNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class DownloadNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "download-node",
     version: "1.0.0",
     name: "Download",
@@ -208,7 +208,7 @@ class DownloadNode extends BaseNode {
     output_schema: { type: "object" },
   };
 
-  execute(inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+  execute(inputs: Record<string, unknown>, context: NodeExecutionContext): Record<string, unknown> {
     return { got: inputs.point_cloud as string, ctx: context.outputDir };
   }
 }
@@ -378,8 +378,8 @@ describe("download policy (Phase 1)", () => {
   });
 });
 
-class ProgressNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class ProgressNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "progress-node",
     version: "1.0.0",
     name: "Progress",
@@ -392,7 +392,7 @@ class ProgressNode extends BaseNode {
     },
   };
 
-  execute(_inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+  execute(_inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
     this.reportProgress(50, "still calculating");
     return { done: true };
   }
@@ -400,13 +400,13 @@ class ProgressNode extends BaseNode {
 
 class SlowProgressNode extends ProgressNode {
   override definition: WorkflowNodeManifest = {
-    ...new ProgressNode().definition,
+    ...new ProgressNode().manifest,
     slug: "slow-progress-node",
   };
 
   override async execute(
     _inputs: Record<string, unknown>,
-    _context: ExecutionContext,
+    _context: NodeExecutionContext,
   ): Promise<Record<string, unknown>> {
     await new Promise((resolve) => setTimeout(resolve, 20));
     this.reportProgress(75, "nearly there");
@@ -416,7 +416,7 @@ class SlowProgressNode extends ProgressNode {
 
 describe("download deadline (#3515 effective-bound clamp)", () => {
   it("aborts a download whose budget is already spent at the chunk check", async () => {
-    const inner = BaseNode.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
+    const inner = WorkflowNodeBase.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
     const origInner = inner.downloadOneInner;
     vi.spyOn(inner, "downloadOneInner").mockImplementation(function (this: unknown, ...args: unknown[]) {
       args[4] = Date.now() - 1;
@@ -450,7 +450,7 @@ describe("download deadline (#3515 effective-bound clamp)", () => {
   });
 });
 
-describe("BaseNode.reportProgress (DA-3232)", () => {
+describe("WorkflowNodeBase.reportProgress (DA-3232)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -522,7 +522,7 @@ describe("BaseNode.reportProgress (DA-3232)", () => {
   });
 });
 
-describe("BaseNode execution_id propagation (#3498)", () => {
+describe("WorkflowNodeBase execution_id propagation (#3498)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -557,8 +557,8 @@ describe("BaseNode execution_id propagation (#3498)", () => {
 
 describe("run() dry-run (D10 #111)", () => {
   class DryEchoNode extends EchoNode {
-    definition: WorkflowNodeManifest = {
-      ...new EchoNode().definition,
+    manifest: WorkflowNodeManifest = {
+      ...new EchoNode().manifest,
       contract: {
         transport: "http",
         routes: ["/execute", "/health", "/manifest"],
@@ -614,8 +614,8 @@ describe("run() dry-run (D10 #111)", () => {
 });
 
 describe("array file inputs (S.1, SDK#161)", () => {
-  class ArrayDownloadNode extends BaseNode {
-    definition: WorkflowNodeManifest = {
+  class ArrayDownloadNode extends WorkflowNodeBase {
+    manifest: WorkflowNodeManifest = {
       slug: "array-download",
       version: "1.0.0",
       name: "Array Download",
@@ -637,7 +637,7 @@ describe("array file inputs (S.1, SDK#161)", () => {
       output_schema: { type: "object" },
     };
 
-    execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+    execute(inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
       return {
         sizes: (inputs.parts as string[]).map((p) =>
           p.startsWith("/") ? readFileSync(p, "utf8").length : -1,
@@ -671,7 +671,7 @@ describe("array file inputs (S.1, SDK#161)", () => {
   it("passes non-URL elements through and records per-element metadata", async () => {
     let captured: Record<string, unknown> = {};
     class CaptureNode extends ArrayDownloadNode {
-      execute(inputs: Record<string, unknown>, context: ExecutionContext): Record<string, unknown> {
+      execute(inputs: Record<string, unknown>, context: NodeExecutionContext): Record<string, unknown> {
         captured = { inputs: { ...inputs }, metadata: { ...context.metadata } };
         const parts = inputs.parts as string[];
         return {

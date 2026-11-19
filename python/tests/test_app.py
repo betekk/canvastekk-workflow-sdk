@@ -11,20 +11,20 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.testclient import TestClient
 
 from canvastekk_workflow_sdk import (
-    BaseNode,
-    ContractCapabilities,
-    ExecutionContext,
-    NodeContract,
+    NodeExecutionContext,
+    WorkflowNodeBase,
+    WorkflowNodeContractCapabilities,
     WorkflowNodeManifest,
+    WorkflowNodeManifestContract,
     __version__,
-    create_node_app,
+    create_workflow_node_app,
 )
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     """Simple echo node for testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -40,14 +40,14 @@ class EchoNode(BaseNode):
         token_cost=0.0,
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class FileProcessingNode(BaseNode):
+class FileProcessingNode(WorkflowNodeBase):
     """Node that accepts file uploads and scalar inputs."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-proc",
         version="1.0.0",
         name="File Processor",
@@ -70,7 +70,7 @@ class FileProcessingNode(BaseNode):
         token_cost=0.0,
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         result: dict[str, Any] = {}
         if "point_cloud" in inputs:
             file_path = Path(inputs["point_cloud"])
@@ -85,10 +85,10 @@ class FileProcessingNode(BaseNode):
         return result
 
 
-class FailingNode(BaseNode):
+class FailingNode(WorkflowNodeBase):
     """Node that always fails."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -97,14 +97,14 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise ValueError("Intentional failure")
 
 
-class DegradedNode(BaseNode):
+class DegradedNode(WorkflowNodeBase):
     """Node with mixed health checks."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="degraded",
         version="1.0.0",
         name="Degraded",
@@ -113,7 +113,7 @@ class DegradedNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {}
 
     def health_check(self) -> dict[str, Any]:
@@ -127,7 +127,7 @@ class DegradedNode(BaseNode):
 def echo_client() -> TestClient:
     """Create test client for echo node."""
     node = EchoNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -135,7 +135,7 @@ def echo_client() -> TestClient:
 def failing_client() -> TestClient:
     """Create test client for failing node."""
     node = FailingNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -143,7 +143,7 @@ def failing_client() -> TestClient:
 def degraded_client() -> TestClient:
     """Create test client for degraded node."""
     node = DegradedNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -203,7 +203,7 @@ class TestExecuteEndpoint:
     def test_execute_with_presigned_url_input(self) -> None:
         """Test execution with presigned URL for file input field."""
         node = FileProcessingNode()
-        client = TestClient(create_node_app(node))
+        client = TestClient(create_workflow_node_app(node))
 
         with tempfile.NamedTemporaryFile(suffix=".ply", delete=False, mode="w") as f:
             f.write("fake point cloud data")
@@ -269,10 +269,10 @@ class TestManifestBasic:
         assert "default_retry" in data
 
 
-class FileOutputNode(BaseNode):
+class FileOutputNode(WorkflowNodeBase):
     """Node that produces file outputs for S3 upload testing."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="file-output",
         version="1.0.0",
         name="File Output",
@@ -290,17 +290,17 @@ class FileOutputNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         fd, path = tempfile.mkstemp(suffix=".ply")
         os.close(fd)
         Path(path).write_bytes(b"fake binary output data")
         return {"result_path": path, "summary": "done"}
 
 
-class FailingOutputNode(BaseNode):
+class FailingOutputNode(WorkflowNodeBase):
     """Node that always fails — for testing S3 upload skip on failure."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="fail-output",
         version="1.0.0",
         name="Fail Output",
@@ -314,14 +314,14 @@ class FailingOutputNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise RuntimeError("Node execution failed")
 
 
-class BogusPathOutputNode(BaseNode):
+class BogusPathOutputNode(WorkflowNodeBase):
     """Node whose file output points at a missing path (DA-2337)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="bogus-path-output",
         version="1.0.0",
         name="Bogus Path Output",
@@ -335,7 +335,7 @@ class BogusPathOutputNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"result_path": "/nonexistent/does-not-exist.ply"}
 
 
@@ -343,7 +343,7 @@ class BogusPathOutputNode(BaseNode):
 def file_output_client() -> TestClient:
     """Create test client for file output node."""
     node = FileOutputNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -351,7 +351,7 @@ def file_output_client() -> TestClient:
 def failing_output_client() -> TestClient:
     """Create test client for failing output node."""
     node = FailingOutputNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -359,7 +359,7 @@ def failing_output_client() -> TestClient:
 def bogus_path_output_client() -> TestClient:
     """Create test client for bogus-path output node (DA-2337)."""
     node = BogusPathOutputNode()
-    app = create_node_app(node)
+    app = create_workflow_node_app(node)
     return TestClient(app)
 
 
@@ -368,7 +368,7 @@ class TestOutputUploadToS3:
 
     def test_output_upload_url_triggers_s3_upload(self, file_output_client: TestClient) -> None:
         """When output_upload_url is provided and status=pass, upload_file is called."""
-        with patch("canvastekk_workflow_sdk.uploads.S3PresignedUploader.upload_file") as mock_upload:
+        with patch("canvastekk_workflow_sdk.node_output_uploads.NodeOutputS3PresignedUploader.upload_file") as mock_upload:
             response = file_output_client.post(
                 "/execute",
                 json={
@@ -393,7 +393,7 @@ class TestOutputUploadToS3:
 
     def test_output_upload_url_skipped_on_failure(self, failing_output_client: TestClient) -> None:
         """When node returns status=fail, upload_file should NOT be called."""
-        with patch("canvastekk_workflow_sdk.uploads.S3PresignedUploader.upload_file") as mock_upload:
+        with patch("canvastekk_workflow_sdk.node_output_uploads.NodeOutputS3PresignedUploader.upload_file") as mock_upload:
             response = failing_output_client.post(
                 "/execute",
                 json={
@@ -439,7 +439,7 @@ class TestOutputUploadToS3:
 
     def test_output_upload_url_skipped_when_not_provided(self, file_output_client: TestClient) -> None:
         """When output_upload_url is None, no upload is attempted."""
-        with patch("canvastekk_workflow_sdk.uploads.S3PresignedUploader.upload_file") as mock_upload:
+        with patch("canvastekk_workflow_sdk.node_output_uploads.NodeOutputS3PresignedUploader.upload_file") as mock_upload:
             response = file_output_client.post(
                 "/execute",
                 json={
@@ -529,7 +529,7 @@ class TestDependencyInjection:
             dependency_invocations.append(request.url.path)
 
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(custom_dependency)])
+        app = create_workflow_node_app(node, dependencies=[Depends(custom_dependency)])
         client = TestClient(app)
 
         client.get("/health")
@@ -552,7 +552,7 @@ class TestDependencyInjection:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         response = client.get("/health", headers={})
@@ -572,7 +572,7 @@ class TestDependencyInjection:
             dependency_order.append("dep2")
 
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(dep1), Depends(dep2)])
+        app = create_workflow_node_app(node, dependencies=[Depends(dep1), Depends(dep2)])
         client = TestClient(app)
 
         client.get("/health")
@@ -581,7 +581,7 @@ class TestDependencyInjection:
     def test_empty_dependencies_list(self) -> None:
         """Test that empty dependencies list works."""
         node = EchoNode()
-        app = create_node_app(node, dependencies=[])
+        app = create_workflow_node_app(node, dependencies=[])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -600,7 +600,7 @@ class TestExtraRoutes:
             return {"message": "Custom endpoint"}
 
         node = EchoNode()
-        app = create_node_app(node, extra_routes=[extra_router])
+        app = create_workflow_node_app(node, extra_routes=[extra_router])
         client = TestClient(app)
 
         response = client.get("/custom/info")
@@ -622,7 +622,7 @@ class TestExtraRoutes:
             return {"version": "v2"}
 
         node = EchoNode()
-        app = create_node_app(node, extra_routes=[router1, router2])
+        app = create_workflow_node_app(node, extra_routes=[router1, router2])
         client = TestClient(app)
 
         response1 = client.get("/api/v1/data")
@@ -642,7 +642,7 @@ class TestExtraRoutes:
             return {"extra": "route"}
 
         node = EchoNode()
-        app = create_node_app(node, extra_routes=[extra_router])
+        app = create_workflow_node_app(node, extra_routes=[extra_router])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -668,7 +668,7 @@ class TestExtraRoutes:
             return {"test": "data"}
 
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(custom_dependency)], extra_routes=[extra_router])
+        app = create_workflow_node_app(node, dependencies=[Depends(custom_dependency)], extra_routes=[extra_router])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -682,7 +682,7 @@ class TestExtraRoutes:
     def test_empty_extra_routes_list(self) -> None:
         """Test that empty extra routes list works."""
         node = EchoNode()
-        app = create_node_app(node, extra_routes=[])
+        app = create_workflow_node_app(node, extra_routes=[])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -700,7 +700,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         headers = {"X-API-Key": "test-secret-key"}
@@ -730,7 +730,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         headers = {"X-API-Key": "wrong-key"}
@@ -751,7 +751,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -765,7 +765,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         headers = {"X-API-Key": "any-key"}
@@ -782,7 +782,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key()
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         response = client.get("/health")
@@ -796,7 +796,7 @@ class TestApiKeyAuthIntegration:
 
         auth = NodeAuth.api_key(key_env_var="MY_CUSTOM_API_KEY")
         node = EchoNode()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         client = TestClient(app)
 
         headers = {"X-API-Key": "custom-secret"}
@@ -832,7 +832,7 @@ class TestIntegrationLifecycle:
         node.on_startup = custom_startup
         node.on_shutdown = custom_shutdown
 
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
         headers = {"X-API-Key": "test-integration-key"}
 
         with TestClient(app) as client:
@@ -846,7 +846,7 @@ class TestIntegrationLifecycle:
             assert response.status_code == 200
             assert response.json()["slug"] == "file-output"
 
-            with patch("canvastekk_workflow_sdk.uploads.S3PresignedUploader.upload_file") as mock_upload:
+            with patch("canvastekk_workflow_sdk.node_output_uploads.NodeOutputS3PresignedUploader.upload_file") as mock_upload:
                 response = client.post(
                     "/execute",
                     json={
@@ -973,8 +973,8 @@ class TestReadinessProbe:
         assert data["checks"] == {}
 
     def test_readiness_returns_200_when_all_checks_pass(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        class HealthyNode(BaseNode):
-            definition = WorkflowNodeManifest(
+        class HealthyNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
                 slug="healthy",
                 version="1.0.0",
                 name="Healthy",
@@ -986,17 +986,17 @@ class TestReadinessProbe:
             def health_check(self) -> dict[str, Any]:
                 return {"db": True, "cache": True}
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
-        client = TestClient(create_node_app(HealthyNode()))
+        client = TestClient(create_workflow_node_app(HealthyNode()))
         response = client.get("/ready")
         assert response.status_code == 200
         assert response.json()["status"] == "ready"
 
     def test_readiness_returns_503_when_check_fails(self) -> None:
-        class UnhealthyNode(BaseNode):
-            definition = WorkflowNodeManifest(
+        class UnhealthyNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
                 slug="unhealthy",
                 version="1.0.0",
                 name="Unhealthy",
@@ -1008,10 +1008,10 @@ class TestReadinessProbe:
             def health_check(self) -> dict[str, Any]:
                 return {"db": True, "model": False}
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 return {}
 
-        client = TestClient(create_node_app(UnhealthyNode()))
+        client = TestClient(create_workflow_node_app(UnhealthyNode()))
         response = client.get("/ready")
         assert response.status_code == 503
         assert response.json()["status"] == "not_ready"
@@ -1063,13 +1063,13 @@ class TestBodyLimitAndRedaction:
 
 
 class TestCreateNodeAppAuthParam:
-    """Tests for the auth= shorthand on create_node_app (DA-1955)."""
+    """Tests for the auth= shorthand on create_workflow_node_app (DA-1955)."""
 
     def test_api_key_shorthand_requires_key_on_execute(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """auth='api-key' rejects unauthenticated /execute and accepts the key."""
 
         monkeypatch.setenv("CANVASTEKK_API_KEY", "test-key-123")
-        app = create_node_app(EchoNode(), auth="api-key")
+        app = create_workflow_node_app(EchoNode(), auth="api-key")
         client = TestClient(app)
 
         unauthenticated = client.post("/execute", json={"run_id": "r1", "node_id": "n1", "inputs": {}})
@@ -1084,7 +1084,7 @@ class TestCreateNodeAppAuthParam:
 
     def test_auth_none_keeps_current_behavior(self) -> None:
         """auth=None leaves every endpoint unauthenticated (default)."""
-        app = create_node_app(EchoNode(), auth=None)
+        app = create_workflow_node_app(EchoNode(), auth=None)
         client = TestClient(app)
 
         resp = client.post("/execute", json={"run_id": "r1", "node_id": "n1", "inputs": {}})
@@ -1095,7 +1095,7 @@ class TestCreateNodeAppAuthParam:
         from canvastekk_workflow_sdk.auth import NodeAuth
 
         monkeypatch.setenv("CANVASTEKK_API_KEY", "test-key-123")
-        app = create_node_app(EchoNode(), auth=NodeAuth.api_key())
+        app = create_workflow_node_app(EchoNode(), auth=NodeAuth.api_key())
         client = TestClient(app)
 
         with_key = client.post(
@@ -1108,7 +1108,7 @@ class TestCreateNodeAppAuthParam:
     def test_unknown_shorthand_raises(self) -> None:
         """Unknown strings raise ValueError with the valid options."""
         with pytest.raises(ValueError, match="api-key"):
-            create_node_app(EchoNode(), auth="oauth")  # type: ignore[arg-type]
+            create_workflow_node_app(EchoNode(), auth="oauth")  # type: ignore[arg-type]
 
     def test_dependencies_and_auth_merge(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Custom dependencies and auth coexist on the same router."""
@@ -1120,7 +1120,7 @@ class TestCreateNodeAppAuthParam:
         def custom_dep() -> None:
             calls.append("custom_dep")
 
-        app = create_node_app(EchoNode(), dependencies=[Depends(custom_dep)], auth="api-key")
+        app = create_workflow_node_app(EchoNode(), dependencies=[Depends(custom_dep)], auth="api-key")
         client = TestClient(app)
 
         resp = client.post(
@@ -1137,7 +1137,7 @@ class TestCreateNodeAppAuthParam:
 
         monkeypatch.setenv("CANVASTEKK_API_KEY", "test-key-123")
         explicit = NodeAuth.api_key()
-        app = create_node_app(EchoNode(), dependencies=[Depends(explicit)], auth="api-key")
+        app = create_workflow_node_app(EchoNode(), dependencies=[Depends(explicit)], auth="api-key")
         client = TestClient(app)
 
         with_key = client.post(
@@ -1148,10 +1148,10 @@ class TestCreateNodeAppAuthParam:
         assert with_key.status_code == 200
 
 
-class AccountEchoNode(BaseNode):
+class AccountEchoNode(WorkflowNodeBase):
     """Echoes context.account_id into outputs (DA-2242 header-capture tests)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="account-echo",
         version="1.0.0",
         name="Account Echo",
@@ -1160,14 +1160,14 @@ class AccountEchoNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"account_id": context.account_id}
 
 
 @pytest.fixture
 def account_client() -> TestClient:
     """TestClient around an AccountEchoNode /execute endpoint."""
-    return TestClient(create_node_app(AccountEchoNode()))
+    return TestClient(create_workflow_node_app(AccountEchoNode()))
 
 
 class TestAccountIdHeaderPropagation:
@@ -1255,7 +1255,7 @@ class TestManifestCodeDigest:
 
         from fastapi.testclient import TestClient
 
-        from canvastekk_workflow_sdk.app import create_node_app
+        from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
         from .test_base import EchoNode  # noqa: F401  (ensure echo import path exists)
 
@@ -1270,12 +1270,12 @@ class TestManifestCodeDigest:
             if "digestmod.handler" in sys.modules:
                 del sys.modules["digestmod.handler"]
             module = importlib.import_module("digestmod.handler")
-            return create_node_app(module.DigestNode())
+            return create_workflow_node_app(module.DigestNode())
 
         base = (
-            "from canvastekk_workflow_sdk import BaseNode, WorkflowNodeManifest\n"
-            "class DigestNode(BaseNode):\n"
-            "    definition = WorkflowNodeManifest(\n"
+            "from canvastekk_workflow_sdk import WorkflowNodeBase, WorkflowNodeManifest\n"
+            "class DigestNode(WorkflowNodeBase):\n"
+            "    manifest = WorkflowNodeManifest(\n"
             "        slug='digest-node', version='1.0.0', name='Digest',\n"
             "        description='digest probe',\n"
             "        input_schema={'type': 'object'},\n"
@@ -1290,10 +1290,10 @@ class TestManifestCodeDigest:
         assert len(digest_a) == 64 and len(digest_b) == 64
 
 
-class HangingNode(BaseNode):
+class HangingNode(WorkflowNodeBase):
     """Sleeps past its budget — drives the inline wait_for timeout path."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="hang",
         version="1.0.0",
         name="Hang",
@@ -1303,7 +1303,7 @@ class HangingNode(BaseNode):
         timeout_seconds=1,
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         import time
 
         time.sleep(5)
@@ -1315,7 +1315,7 @@ class TestInlineTimeoutDetails:
     all 7 keys present, execution_id null when the request carried none."""
 
     def _client(self) -> TestClient:
-        app = create_node_app(HangingNode())
+        app = create_workflow_node_app(HangingNode())
         return TestClient(app, raise_server_exceptions=False)
 
     def test_timeout_details_canonical_null_execution_id(self) -> None:
@@ -1363,11 +1363,11 @@ class TestManifestContract:
 
     def test_manifest_declared_contract_wins(self) -> None:
         """A declared subset is served verbatim — the default never overrides it."""
-        from canvastekk_workflow_sdk.definition import NodeContract
+        from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifestContract
 
         node = EchoNode()
-        node.definition.contract = NodeContract(routes=["/execute", "/health", "/manifest"])
-        client = TestClient(create_node_app(node))
+        node.definition.contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"])
+        client = TestClient(create_workflow_node_app(node))
         data = client.get("/manifest").json()
         assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
 
@@ -1382,13 +1382,13 @@ class TestDryRunExecution:
 
     def _declaring_client(self) -> TestClient:
         class DryEchoNode(EchoNode):
-            definition = EchoNode.definition.model_copy(deep=True)
+            manifest = EchoNode.definition.model_copy(deep=True)
 
-        DryEchoNode.definition.contract = NodeContract(
+        DryEchoNode.definition.contract = WorkflowNodeManifestContract(
             routes=["/execute", "/health", "/manifest"],
-            capabilities=ContractCapabilities(dry_run=True),
+            capabilities=WorkflowNodeContractCapabilities(dry_run=True),
         )
-        return TestClient(create_node_app(DryEchoNode()))
+        return TestClient(create_workflow_node_app(DryEchoNode()))
 
     def test_dry_run_on_declaring_node_passes_with_zero_cost(self) -> None:
         """AC4/AC2: declaring node → pass, token 0, dryrun- id, no execution."""
@@ -1422,19 +1422,19 @@ class TestDryRunExecution:
 
     def test_dry_run_never_executes_handler(self) -> None:
         """AC2: zero executor invocation — the handler would explode."""
-        from canvastekk_workflow_sdk.base import BaseNode
+        from canvastekk_workflow_sdk.workflow_node_base import WorkflowNodeBase
 
-        class BoomNode(BaseNode):
-            definition = WorkflowNodeManifest(
+        class BoomNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
                 slug="boom",
                 version="1.0.0",
                 name="Boom",
                 description="explodes if executed",
                 input_schema={"type": "object"},
                 output_schema={"type": "object"},
-                contract=NodeContract(
+                contract=WorkflowNodeManifestContract(
                     routes=["/execute", "/health", "/manifest"],
-                    capabilities=ContractCapabilities(dry_run=True),
+                    capabilities=WorkflowNodeContractCapabilities(dry_run=True),
                 ),
             )
 
@@ -1442,7 +1442,7 @@ class TestDryRunExecution:
                 raise AssertionError("dry_run must never invoke execute()")
 
         node = BoomNode()
-        from canvastekk_workflow_sdk.request import NodeExecutionRequest
+        from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
 
         resp = node.run(NodeExecutionRequest(run_id="r1", node_id="n1", inputs={}, dry_run=True))
         assert resp.status == "pass"
@@ -1454,7 +1454,7 @@ class TestDryRunExecution:
 class HookedEchoNode(EchoNode):
     """EchoNode that overrides hook() — the webhook contract is real."""
 
-    definition = EchoNode.definition.model_copy()
+    manifest = EchoNode.definition.model_copy()
 
     def hook(self, payload: dict[str, Any]) -> dict[str, Any]:
         return {"received": True}
@@ -1463,8 +1463,8 @@ class HookedEchoNode(EchoNode):
 class DeclaredHookNode(EchoNode):
     """Author-declared contract including /hook, WITHOUT a hook override."""
 
-    definition = EchoNode.definition.model_copy(
-        update={"contract": NodeContract(routes=["/execute", "/health", "/manifest", "/hook"])}
+    manifest = EchoNode.definition.model_copy(
+        update={"contract": WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/hook"])}
     )
 
 
@@ -1479,12 +1479,12 @@ class TestManifestContractStamping:
         assert "/manifest" in routes
 
     def test_hook_override_serves_hook_route(self) -> None:
-        client = TestClient(create_node_app(HookedEchoNode()))
+        client = TestClient(create_workflow_node_app(HookedEchoNode()))
         routes = client.get("/manifest").json()["contract"]["routes"]
         assert "/hook" in routes
 
     def test_declared_contract_served_untouched(self) -> None:
-        client = TestClient(create_node_app(DeclaredHookNode()))
+        client = TestClient(create_workflow_node_app(DeclaredHookNode()))
         routes = client.get("/manifest").json()["contract"]["routes"]
         assert "/hook" in routes
 
@@ -1502,7 +1502,7 @@ class TestCapabilityAndVersionHeaderSdk161:
 
         from fastapi.testclient import TestClient
 
-        client = TestClient(create_node_app(CaptureNode()))
+        client = TestClient(create_workflow_node_app(CaptureNode()))
         response = client.post(
             "/execute",
             json={"run_id": "r-cap", "node_id": "n-cap", "inputs": {}},
@@ -1521,7 +1521,7 @@ class TestCapabilityAndVersionHeaderSdk161:
                 captured["capability"] = context.capability
                 return super().execute(inputs, context)
 
-        client = TestClient(create_node_app(CaptureNode()))
+        client = TestClient(create_workflow_node_app(CaptureNode()))
         response = client.post(
             "/execute",
             json={
@@ -1544,7 +1544,7 @@ class TestCapabilityAndVersionHeaderSdk161:
                 captured["capability"] = context.capability
                 return super().execute(inputs, context)
 
-        client = TestClient(create_node_app(CaptureNode()))
+        client = TestClient(create_workflow_node_app(CaptureNode()))
         client.post("/execute", json={"run_id": "r-cap3", "node_id": "n-cap3", "inputs": {}})
         assert captured["capability"] is None
 

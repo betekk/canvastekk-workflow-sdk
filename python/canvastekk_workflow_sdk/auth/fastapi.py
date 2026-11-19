@@ -13,7 +13,7 @@ Example::
     from canvastekk_workflow_sdk.auth import NodeAuth
 
     auth = NodeAuth.api_key()
-    app = create_node_app(node, dependencies=[Depends(auth)])
+    app = create_workflow_node_app(node, dependencies=[Depends(auth)])
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ class NodeAuth:
     """Factory for FastAPI-compatible node authentication backends.
 
     Provides class methods that return FastAPI dependency callables.
-    Use with ``create_node_app(dependencies=[Depends(auth)])``.
+    Use with ``create_workflow_node_app(dependencies=[Depends(auth)])``.
 
     The framework-free equivalent is ``TekkNodeAuth``
     (``canvastekk_workflow_sdk.auth.core``) — same layers, no framework.
@@ -123,15 +123,15 @@ class NodeAuth:
 
         # Layer 1: API key (simplest)
         auth = NodeAuth.api_key()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
 
         # Layer 2: JWT (HMAC)
         auth = NodeAuth.jwt()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
 
         # Layer 3: Keycloak (enterprise)
         auth = NodeAuth.keycloak()
-        app = create_node_app(node, dependencies=[Depends(auth)])
+        app = create_workflow_node_app(node, dependencies=[Depends(auth)])
     """
 
     @staticmethod

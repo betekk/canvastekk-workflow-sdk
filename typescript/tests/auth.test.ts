@@ -64,7 +64,7 @@ describe("isNodeToken", () => {
   });
 });
 
-describe("NodeAuth.central", () => {
+describe("TekkNodeAuth.central", () => {
   const VALID_BODY = {
     valid: true,
     run_id: "run-7",
@@ -91,7 +91,7 @@ describe("NodeAuth.central", () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify(VALID_BODY), { status: 200 }),
     );
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const first = await run(middleware, makeReq(VALID_TOKEN));
     const second = await run(middleware, makeReq(VALID_TOKEN));
     expect(first.statusCode).toBe(0);
@@ -104,7 +104,7 @@ describe("NodeAuth.central", () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ valid: false }), { status: 200 }),
     );
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const first = await run(middleware, makeReq(VALID_TOKEN));
     const second = await run(middleware, makeReq(VALID_TOKEN));
     expect(first.statusCode).toBe(401);
@@ -117,7 +117,7 @@ describe("NodeAuth.central", () => {
     fetchMock.mockResolvedValueOnce(
       new Response(JSON.stringify(VALID_BODY), { status: 200 }),
     );
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const first = await run(middleware, makeReq(VALID_TOKEN));
     const second = await run(middleware, makeReq(VALID_TOKEN));
     expect(first.statusCode).toBe(503);
@@ -127,28 +127,28 @@ describe("NodeAuth.central", () => {
 
   it("answers 503 on malformed verify responses", async () => {
     fetchMock.mockResolvedValue(new Response("<not-json>", { status: 200 }));
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq(VALID_TOKEN));
     expect(res.statusCode).toBe(503);
   });
 
   it("answers 401 when no engine URL is configured and no legacy key matches", async () => {
     delete process.env.CWE_API_BASE_URL;
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq(VALID_TOKEN));
     expect(res.statusCode).toBe(401);
     expect((res.body as { detail: string }).detail).toBe("Authentication not configured");
   });
 
   it("answers 401 when the header is missing", async () => {
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq());
     expect(res.statusCode).toBe(401);
   });
 
   it("accepts the legacy static key during dual-accept (incl. _NEXT rotation)", async () => {
     process.env.CANVASTEKK_API_KEY = "legacy-secret";
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq("legacy-secret"));
     expect(res.statusCode).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("NodeAuth.central", () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ valid: false }), { status: 200 }),
     );
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq("legacy-secret"));
     expect(res.statusCode).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -171,7 +171,7 @@ describe("NodeAuth.central", () => {
 
   it("dev mode bypasses everything", async () => {
     process.env.CANVASTEKK_DEV_MODE = "true";
-    const middleware = NodeAuth.central();
+    const middleware = TekkNodeAuth.central();
     const res = await run(middleware, makeReq("anything"));
     expect(res.statusCode).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("NodeAuth.central", () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ valid: false }), { status: 200 }),
     );
-    const middleware = NodeAuth.central({ legacyKeyEnvVar: null });
+    const middleware = TekkNodeAuth.central({ legacyKeyEnvVar: null });
     const res = await run(middleware, makeReq("legacy-secret"));
     expect(res.statusCode).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(1);

@@ -1,6 +1,6 @@
 """Lazy server-symbol exports: core imports (and works) without fastapi.
 
-The `[fastapi]` extra gates `create_node_app`, `create_multi_node_app`, and
+The `[fastapi]` extra gates `create_workflow_node_app`, `create_multi_workflow_node_app`, and
 `NodeAuth`. These tests run the package in a subprocess with fastapi import
 blocked (`sys.modules["fastapi"] = None`), proving no module-level fastapi
 dependency remains in the core import path (#104).
@@ -21,17 +21,17 @@ _PROBE = textwrap.dedent(
 
     import canvastekk_workflow_sdk
 
-    assert "create_node_app" in canvastekk_workflow_sdk.__all__
-    assert "create_multi_node_app" in canvastekk_workflow_sdk.__all__
+    assert "create_workflow_node_app" in canvastekk_workflow_sdk.__all__
+    assert "create_multi_workflow_node_app" in canvastekk_workflow_sdk.__all__
     assert "NodeAuth" in canvastekk_workflow_sdk.__all__
     assert "SDKVersionMiddleware" in canvastekk_workflow_sdk.__all__
 
     try:
-        canvastekk_workflow_sdk.create_node_app
+        canvastekk_workflow_sdk.create_workflow_node_app
     except ImportError as exc:
         assert "[fastapi]" in str(exc), f"unguided error: {exc}"
     else:
-        raise SystemExit("expected guided ImportError for create_node_app")
+        raise SystemExit("expected guided ImportError for create_workflow_node_app")
 
     try:
         canvastekk_workflow_sdk.SDKVersionMiddleware
@@ -88,8 +88,8 @@ def test_core_import_succeeds_without_fastapi() -> None:
 def test_lazy_symbols_resolve_with_fastapi_installed() -> None:
     import canvastekk_workflow_sdk as sdk
 
-    assert callable(sdk.create_node_app)
-    assert callable(sdk.create_multi_node_app)
+    assert callable(sdk.create_workflow_node_app)
+    assert callable(sdk.create_multi_workflow_node_app)
     assert callable(sdk.NodeAuth)
 
 

@@ -1,257 +1,34 @@
-"""
-Output Upload Handlers
+"""Deprecated alias module — renamed to canvastekk_workflow_sdk.node_output_uploads.
 
-Provides the OutputUploader protocol and concrete implementations
-for uploading node output files to external storage (e.g., S3).
+ADR 0001 (explicit node naming, #271): every old module path keeps working
+and warns as deprecated; removed in 1.0.0 (#272).
 """
 
 from __future__ import annotations
 
-import logging
-import os
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+import warnings
 
-from pydantic import BaseModel, Field
+_deprecated_alias_of = "canvastekk_workflow_sdk.node_output_uploads"
 
-from canvastekk_workflow_sdk.exceptions import NodeIOError
+warnings.warn(
+    "canvastekk_workflow_sdk.uploads is deprecated; import"
+    " canvastekk_workflow_sdk.node_output_uploads instead (ADR 0001; removal in 1.0.0).",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-if TYPE_CHECKING:
-    from canvastekk_workflow_sdk.response import NodeExecutionResponse
+from canvastekk_workflow_sdk.node_output_uploads import *  # noqa: E402, F401, F403
+from canvastekk_workflow_sdk.node_output_uploads import (  # noqa: E402
+    NodeOutputS3PresignedUploader,
+    NodeOutputUploader,
+    NodeOutputUploadSession,
+    NodeOutputUploadTarget,
+    get_default_node_output_uploader,
+)
 
-logger = logging.getLogger(__name__)
-
-
-class UploadSession(BaseModel):
-    """Engine-provided multipart upload descriptor (session or capability).
-
-    The SDK feature-detects ``kind`` and redeems either contract lazily:
-    POST the file size to ``initiate_url``, PUT parts in bounded parallel
-    batches, then finalize via ``complete_url``. Legacy sessions keep the
-    original wire shape. For ``multipart-upload-capability`` descriptors,
-    complete/abort carry the array element ref and status carries
-    ``upload_id`` (plus ``index``/``suffix`` for arrays), because the engine
-    has no session binding to consult. See ``multipart.py`` for the flow.
-
-    Shared wire contract (snake_case): ``initiate`` POST
-    ``{"size", "content_type"}`` → ``{"upload_id", "part_size",
-    "part_urls": [...]}``; array initiation also carries
-    ``element: {"index", "suffix"}`` on both contracts.
-    """
-
-    kind: Literal["multipart-upload-session", "multipart-upload-capability"] = Field(
-        default="multipart-upload-session",
-        description="Engine contract discriminator; omitted means legacy session.",
-    )
-    session_token: str = Field(description="Opaque, TTL-bound engine token.")
-    initiate_url: str
-    complete_url: str
-    abort_url: str
-    status_url: str
-    expires_at: str | None = Field(default=None, description="ISO-8601 expiry (informational).")
-    array: bool | None = Field(
-        default=None,
-        description=(
-            "tracker#3969: prefix-scoped session for an array-declared file-output"
-            " field — redeem once per element (element {index, suffix} rides the"
-            " initiate body); absent on single-file sessions."
-        ),
-    )
-
-
-UploadTarget = UploadSession
-
-
-def _element_suffix(file_path: str) -> str:
-    """tracker#3969: the element's extension — the engine validates it
-    against the same ^(.\\.[A-Za-z0-9_-]{1,15})?$ contract and stamps with
-    the identical derivation, so uploads and stamps cannot drift."""
-    ext = os.path.splitext(file_path)[1]
-    import re
-
-    return ext if re.fullmatch(r"(\.[A-Za-z0-9_-]{1,15})?", ext) else ""
-
-
-@runtime_checkable
-class OutputUploader(Protocol):
-    """Protocol for output upload handlers.
-
-    Implement this protocol to provide custom upload behaviour
-    (e.g., GCS, Azure Blob, local NFS). The SDK calls ``upload_outputs``
-    after a successful execution when upload URLs are available.
-    """
-
-    def upload_file(self, file_path: str, target: UploadTarget, element_index: int | None = None) -> None:
-        """Upload a single file to storage via an upload target.
-
-        Since SDK 0.36.0 (DA-3340) the target is an :class:`UploadSession`
-        descriptor only. A legacy presigned-PUT string reaching this seam
-        raises :class:`NodeIOError` — fail-loud compliance, never a silent
-        fallback; the fix is upgrading the engine, not node changes.
-
-        Args:
-            file_path: Local path to the file.
-            target: Multipart upload-session descriptor.
-            element_index: tracker#3969 — position of this file within an
-                array-declared output field (``None`` for single-file
-                fields); rides the initiate body as the element ref.
-        """
-        ...
-
-    def upload_outputs(
-        self,
-        response: NodeExecutionResponse,
-        upload_urls: dict[str, UploadTarget],
-        file_output_fields: list[str],
-    ) -> None:
-        """Upload multiple output files to storage.
-
-        Implementations MUST raise (not skip) when a file-output field that
-        is present in ``response.outputs`` and has an upload target holds a
-        value that is not an existing local file — silently skipping would
-        report success while the engine stamps a storage URI for the
-        missing object, corrupting downstream consumers (DA-2337).
-
-        Args:
-            response: The node execution response.
-            upload_urls: Mapping of field name to upload target
-                (multipart session descriptor; a legacy string target
-                raises :class:`NodeIOError`).
-            file_output_fields: List of output fields that produce files.
-        """
-        ...
-
-
-class S3PresignedUploader:
-    """Upload binary outputs via engine-provided upload sessions.
-
-    Sessions are redeemed through the multipart client
-    (``multipart.upload_via_session``). A failed upload raises
-    :class:`NodeIOError` / :class:`NodeExecutionError`, which the router
-    layer (``app.py``) converts into a ``fail``/``UPLOAD_FAILED``
-    response — silently reporting success with local-only paths would
-    strand downstream consumers (DA-1711 4.1).
-    """
-
-    def upload_file(self, file_path: str, target: UploadTarget, element_index: int | None = None) -> None:
-        """Upload a single file to an engine-provided upload target.
-
-        Session-only since SDK 0.36.0 (DA-3340): an
-        :class:`UploadSession` descriptor takes the multipart client
-        (lazy initiate → bounded parallel part PUTs → complete;
-        per-part retry; resume-from-server-truth; abort-on-failure). A
-        legacy presigned-PUT string raises :class:`NodeIOError` —
-        fail-loud compliance, never a silent fallback; the engine must
-        be upgraded (DA-3338), not the node. Terminal failures re-raise
-        so the router layer (``app.py``) converts them into
-        ``fail``/``UPLOAD_FAILED`` responses (DA-1711).
-
-        Args:
-            file_path: Local path to the file.
-            target: Multipart upload-session descriptor.
-
-        Raises:
-            NodeIOError: A legacy presigned-PUT string target was
-                received, or a part-PUT/local I/O failure survived
-                retries/resume/abort.
-            NodeExecutionError: Control-plane failure.
-        """
-        if isinstance(target, UploadSession):
-            from canvastekk_workflow_sdk.multipart import upload_via_session
-
-            if element_index is not None and target.array:
-                upload_via_session(
-                    target,
-                    file_path,
-                    element={"index": element_index, "suffix": _element_suffix(file_path)},
-                )
-                return
-            upload_via_session(target, file_path)
-            return
-
-        raise NodeIOError("engine sent deprecated presigned target — upgrade the engine")
-
-    def upload_outputs(
-        self,
-        response: NodeExecutionResponse,
-        upload_urls: dict[str, UploadTarget],
-        file_output_fields: list[str],
-    ) -> None:
-        """Upload binary output files via engine upload targets.
-
-        A declared file-output field that HAS an upload target but whose
-        value is not a string referencing an existing local file RAISES
-        :class:`NodeIOError` — the engine stamps an ``s3://`` URI for every
-        present output field on pass, so skipping the upload would report
-        success while corrupting every downstream consumer (DA-2337). A
-        legacy presigned-PUT string target raises :class:`NodeIOError`
-        (DA-3340).
-
-        Args:
-            response: The node execution response containing output values.
-            upload_urls: Mapping of output field name to upload target
-                (multipart session descriptor).
-            file_output_fields: Output field names that produce files.
-
-        Raises:
-            NodeIOError: If a present file-output field with an upload
-                target holds a non-string value, a path that is not an
-                existing local file, or the target itself is a legacy
-                presigned-PUT string.
-        """
-        if not response.outputs:
-            return
-
-        for field_name in file_output_fields:
-            if field_name not in upload_urls:
-                continue
-
-            if field_name not in response.outputs:
-                continue
-
-            value = response.outputs[field_name]
-            target = upload_urls[field_name]
-
-            if isinstance(value, list):
-                if not getattr(target, "array", None):
-                    logger.error(
-                        "Output field '%s' value is a list but its target is not an array session",
-                        field_name,
-                    )
-                    raise NodeIOError(
-                        f"Output field '{field_name}' value is a list but its target is not an array session"
-                    )
-                for index, element in enumerate(value):
-                    if not isinstance(element, str):
-                        raise NodeIOError(
-                            f"Output field '{field_name}' element {index} is not a string: {type(element).__name__}"
-                        )
-                    if not os.path.isfile(element):
-                        raise NodeIOError(
-                            f"Output field '{field_name}' element {index} is not a local file: {element}",
-                            path=element,
-                        )
-                    self.upload_file(element, target, element_index=index)
-                    logger.info("Uploaded output '%s[%d]' to S3", field_name, index)
-                continue
-
-            if not isinstance(value, str):
-                logger.error("Output field '%s' value is not a string: %s", field_name, type(value).__name__)
-                raise NodeIOError(f"Output field '{field_name}' value is not a string: {type(value).__name__}")
-
-            if not os.path.isfile(value):
-                logger.error("Output field '%s' value is not a local file: %s", field_name, value)
-                raise NodeIOError(
-                    f"Output field '{field_name}' value is not a local file: {value}",
-                    path=value,
-                )
-
-            self.upload_file(value, upload_urls[field_name])
-            logger.info("Uploaded output '%s' to S3 (%d bytes)", field_name, os.path.getsize(value))
-
-
-_default_uploader = S3PresignedUploader()
-
-
-def get_default_uploader() -> S3PresignedUploader:
-    """Return the process-wide default :class:`S3PresignedUploader` instance."""
-    return _default_uploader
+# Deprecated public names (ADR 0001, #271) — old name -> renamed symbol.
+OutputUploader = NodeOutputUploader  # deprecated name (ADR 0001, #271)
+S3PresignedUploader = NodeOutputS3PresignedUploader  # deprecated name (ADR 0001, #271)
+UploadSession = NodeOutputUploadSession  # deprecated name (ADR 0001, #271)
+UploadTarget = NodeOutputUploadTarget  # deprecated name (ADR 0001, #271)
+get_default_uploader = get_default_node_output_uploader  # deprecated name (ADR 0001, #271)

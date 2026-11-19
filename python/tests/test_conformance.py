@@ -12,10 +12,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from canvastekk_workflow_sdk import BaseNode
-from canvastekk_workflow_sdk.conformance import verify_node
-from canvastekk_workflow_sdk.definition import WorkflowNodeManifest
-from canvastekk_workflow_sdk.registry import RegistrationError, register_node
+from canvastekk_workflow_sdk import WorkflowNodeBase
+from canvastekk_workflow_sdk.workflow_node_conformance import verify_node
+from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
+from canvastekk_workflow_sdk.workflow_node_registry import WorkflowNodeRegistrationError, register_workflow_node
 
 MANIFEST = {
     "slug": "echo",
@@ -123,18 +123,18 @@ def test_register_node_verify_refuses_nonconforming(monkeypatch) -> None:
 
     _patch_client(monkeypatch)(handler)
     monkeypatch.setattr(
-        "canvastekk_workflow_sdk.registry.httpx.post",
+        "canvastekk_workflow_sdk.workflow_node_registry.httpx.post",
         lambda url, **kw: post_urls.append(url) or httpx.Response(201, json={}, request=httpx.Request("POST", url)),
     )
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
-    with pytest.raises(RegistrationError, match="conformance verification"):
-        register_node(
+    with pytest.raises(WorkflowNodeRegistrationError, match="conformance verification"):
+        register_workflow_node(
             FakeNode(),  # type: ignore[arg-type]
             "https://engine.test/api/workflows/nodes/",
             invoke_url="http://node.test",
@@ -157,7 +157,7 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     client = _transport(handler)
     monkeypatch.setattr(httpx, "Client", lambda **kw: client)
     monkeypatch.setattr(
-        "canvastekk_workflow_sdk.registry.httpx.post",
+        "canvastekk_workflow_sdk.workflow_node_registry.httpx.post",
         lambda url, **kw: (
             post_calls.append(url)
             or httpx.Response(
@@ -169,12 +169,12 @@ def test_register_node_verify_accepts_conforming(monkeypatch) -> None:
     )
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
-    result = register_node(
+    result = register_workflow_node(
         FakeNode(),  # type: ignore[arg-type]
         "https://engine.test/api/workflows/nodes/",
         invoke_url="http://node.test",
@@ -191,13 +191,13 @@ def test_register_node_verify_requires_invoke_url(monkeypatch) -> None:
     _patch_client(monkeypatch)(_conforming_handler)
 
     class FakeNode:
-        definition = WorkflowNodeManifest.model_validate(MANIFEST)
+        manifest = WorkflowNodeManifest.model_validate(MANIFEST)
 
-        def export_definition(self) -> dict:
+        def export_workflow_node_manifest(self) -> dict:
             return dict(MANIFEST)
 
     with pytest.raises(ValueError, match="invoke_url"):
-        register_node(
+        register_workflow_node(
             FakeNode(),  # type: ignore[arg-type]
             "https://engine.test/api/workflows/nodes/",
             invoke_type="http",
@@ -344,7 +344,7 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
         return _R()
 
     _patch_client(monkeypatch)(_dry_run_handler)
-    import canvastekk_workflow_sdk.conformance as conf
+    import canvastekk_workflow_sdk.workflow_node_conformance as conf
 
     monkeypatch.setattr(conf, "verify_node", fake_verify)
     from canvastekk_workflow_sdk.__main__ import main
@@ -356,10 +356,10 @@ def test_cli_verify_dry_run_flag_threads_through(monkeypatch, capsys) -> None:
     assert captured.get("dry_run") is True
 
 
-class _CentralEchoNode(BaseNode):
+class _CentralEchoNode(WorkflowNodeBase):
     """Echo node used to probe central-mode authentication end to end."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -414,15 +414,15 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
     End to end over real code paths: verify_node → ASGI app →
     _CentralAuth → local CWE stub → verify_node_token (#3825).
     """
-    from canvastekk_workflow_sdk.app import create_node_app
     from canvastekk_workflow_sdk.auth import NodeAuth
     from canvastekk_workflow_sdk.node_token import mint_node_token
+    from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
     key = "conformance-signing-key-0123456789abcdef"
     server = _start_cwe_stub(key)
     try:
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
-        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+        app = create_workflow_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
 
         def fake_client(**kw: Any) -> TestClient:
             return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))
@@ -440,14 +440,14 @@ def test_verify_node_central_mode_with_valid_token(monkeypatch) -> None:
 
 def test_verify_node_central_mode_without_token_fails_at_manifest(monkeypatch) -> None:
     """Without a token the manifest fetch cannot succeed — report not ok."""
-    from canvastekk_workflow_sdk.app import create_node_app
     from canvastekk_workflow_sdk.auth import NodeAuth
+    from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
     key = "conformance-signing-key-0123456789abcdef"
     server = _start_cwe_stub(key)
     try:
         monkeypatch.setenv("CWE_API_BASE_URL", f"http://127.0.0.1:{server.server_port}")
-        app = create_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
+        app = create_workflow_node_app(_CentralEchoNode(), auth=NodeAuth.central(timeout=2.0))
 
         def fake_client(**kw: Any) -> TestClient:
             return TestClient(app, base_url=kw.get("base_url"), headers=kw.get("headers", {}))

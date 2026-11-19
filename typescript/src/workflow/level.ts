@@ -1,4 +1,4 @@
-import type { WorkflowDefinitionSpec } from "./models.js";
+import type { WorkflowDefinitionSpec } from "./workflow-definition.js";
 
 /**
  * Computes topological levels for workflow execution.

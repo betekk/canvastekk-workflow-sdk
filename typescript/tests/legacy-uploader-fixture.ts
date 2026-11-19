@@ -1,14 +1,14 @@
-import type { NodeExecutionResponse, OutputUploader, UploadTarget } from "../src/index.js";
+import type { NodeExecutionResponse, NodeOutputUploader, NodeOutputUploadTarget } from "../src/index.js";
 
-class SessionUploader implements OutputUploader {
-  async uploadFile(filePath: string, target: UploadTarget): Promise<void> {
+class SessionUploader implements NodeOutputUploader {
+  async uploadFile(filePath: string, target: NodeOutputUploadTarget): Promise<void> {
     void filePath;
     void target;
   }
 
   async uploadOutputs(
     response: NodeExecutionResponse,
-    uploadUrls: Record<string, UploadTarget>,
+    uploadUrls: Record<string, NodeOutputUploadTarget>,
     fileOutputFields: string[],
   ): Promise<void> {
     void response;
@@ -17,5 +17,5 @@ class SessionUploader implements OutputUploader {
   }
 }
 
-const _sessionAssignable: OutputUploader = new SessionUploader();
+const _sessionAssignable: NodeOutputUploader = new SessionUploader();
 void _sessionAssignable;

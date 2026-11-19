@@ -1,16 +1,16 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { WorkflowDefinitionSpec } from "./models.js";
-import type { NodeExecutor } from "./executor.js";
+import type { WorkflowDefinitionSpec } from "./workflow-definition.js";
+import type { WorkflowRunNodeExecutor } from "./node-executor.js";
 import { computeLevels } from "./level.js";
 import { resolveInputs } from "./resolver.js";
 import { CONTROL_FLOW_HANDLERS } from "./control-flow.js";
-import { ExecutionContext } from "../context.js";
+import { NodeExecutionContext } from "../node-execution-context.js";
 
-export type ErrorPolicy = "fail_fast" | "continue";
+export type WorkflowRunErrorPolicy = "fail_fast" | "continue";
 
-export interface NodeResult {
+export interface WorkflowRunNodeResult {
   node_id: string;
   slug: string;
   status: string;
@@ -23,7 +23,7 @@ export interface NodeResult {
 export interface WorkflowRunResult {
   status: string;
   final_outputs: Record<string, unknown>;
-  node_results: NodeResult[];
+  node_results: WorkflowRunNodeResult[];
   duration_ms: number;
   output_dir: string | null;
 }
@@ -32,8 +32,8 @@ export interface WorkflowRunResult {
  * Executes workflows locally using a node executor.
  */
 export class WorkflowRunner {
-  private _executor: NodeExecutor;
-  private _errorPolicy: ErrorPolicy;
+  private _executor: WorkflowRunNodeExecutor;
+  private _errorPolicy: WorkflowRunErrorPolicy;
   private _outputDir: string | null;
   private _cleanup: boolean;
   private _maxConcurrency: number;
@@ -44,9 +44,9 @@ export class WorkflowRunner {
    * @param opts - Runner options
    */
   constructor(
-    executor: NodeExecutor,
+    executor: WorkflowRunNodeExecutor,
     opts?: {
-      errorPolicy?: ErrorPolicy;
+      errorPolicy?: WorkflowRunErrorPolicy;
       outputDir?: string;
       cleanup?: boolean;
       maxConcurrency?: number;
@@ -89,7 +89,7 @@ export class WorkflowRunner {
     const nodeMap = new Map(spec.nodes.map((n) => [n.id, n]));
     const nodeOutputs: Record<string, Record<string, unknown>> = {};
     const seededOutputs = new Map<string, Record<string, unknown>>();
-    const node_results: NodeResult[] = [];
+    const node_results: WorkflowRunNodeResult[] = [];
     const failedNodes = new Set<string>();
 
     let runOutputDir: string;
@@ -149,7 +149,7 @@ export class WorkflowRunner {
           if (slug === "__start__" && seededOutputs.has(nid)) {
             resolved = { ...resolved, ...seededOutputs.get(nid) };
           }
-          const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
+          const context = new NodeExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           const t0 = performance.now();
           try {
             const outputs = handler(resolved, context);
@@ -223,7 +223,7 @@ export class WorkflowRunner {
             if (this._errorPolicy === "fail_fast") break;
             continue;
           }
-          const context = new ExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
+          const context = new NodeExecutionContext({ runId: "local", nodeId: nid, outputDir: join(runOutputDir, nid) });
           tasks.push(this._executor.execute(slug, resolved, context));
           taskNodeIds.push(nid);
         }

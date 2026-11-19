@@ -5,7 +5,7 @@ full input-validation path runs, but no work happens. It is the safe positive
 path that CI and the engine's conformance probe (#112/#113) rely on.
 
 This document is normative for **self-hosted implementers** — authors whose
-nodes do not use the SDK's `BaseNode`/`create_node_app` (Flask, Django, Hono,
+nodes do not use the SDK's `WorkflowNodeBase`/`create_workflow_node_app` (Flask, Django, Hono,
 anything). If your node is built on the SDK, `dry_run` is already implemented;
 you only need the declaration (below).
 
@@ -83,7 +83,7 @@ same point.
 
 ## Who consumes this
 
-- The engine's registration-time conformance gate (`register_node(verify=True)`)
+- The engine's registration-time conformance gate (`register_workflow_node(verify=True)`)
   and the SDK verifier's positive probe (`verify --dry-run`, #113) — both send
   `dry_run: true` and expect the synthetic pass above.
 - CI pipelines that want a deploy check with zero side effects.

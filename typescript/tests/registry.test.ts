@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  buildRegistryPayload,
+  buildWorkflowNodeRegistryPayload,
   extractNodeData,
   registerNodeResultGet,
   registerNodeResultHas,
   registryAuthHeader,
-  registerNode,
-  fetchPublishedDefinition,
+  registerWorkflowNode,
+  fetchPublishedWorkflowNodeManifest,
   invalidCtkReason,
-  diffAgainstPublished,
+  diffAgainstPublishedWorkflowNodeManifest,
 } from "../src/registry.js";
-import { RegistrationError } from "../src/exceptions.js";
+import { WorkflowNodeRegistrationError } from "../src/exceptions.js";
 import { VERSION } from "../src/version.js";
-import { exportDefinition } from "../src/registry.js";
+import { exportWorkflowNodeManifest } from "../src/registry.js";
 import { readFileSync, rmSync } from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -33,52 +33,52 @@ const testDef: WorkflowNodeManifest = {
   styles: null,
 };
 
-describe("buildRegistryPayload", () => {
+describe("buildWorkflowNodeRegistryPayload", () => {
   it("maps title to label", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload.label).toBe("Echo Node");
     expect(payload.name).toBe("echo");
   });
 
   it("omits id from payload", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("id");
   });
 
   it("omits retry from request payload (DA-1955)", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("retry");
     expect(payload).not.toHaveProperty("default_retry");
   });
 
   it("omits the host-side ceiling from the request payload (DA-3609)", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("hard_max_runtime_seconds");
   });
 
   it("includes invoke_url when provided", () => {
-    const payload = buildRegistryPayload(testDef, { invokeUrl: "https://example.com" });
+    const payload = buildWorkflowNodeRegistryPayload(testDef, { invokeUrl: "https://example.com" });
     expect(payload.invoke_url).toBe("https://example.com");
   });
 
   it("omits invoke_url when not provided", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("invoke_url");
   });
 
   it("defaults invoke_type to http", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload.invoke_type).toBe("http");
   });
 
   it("omits node_role from request payload (DA-1955)", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("node_role");
     expect(payload).not.toHaveProperty("node_status");
   });
 
   it("omits deprecation when null (DA-1582)", () => {
-    const payload = buildRegistryPayload(testDef);
+    const payload = buildWorkflowNodeRegistryPayload(testDef);
     expect(payload).not.toHaveProperty("deprecation");
   });
 
@@ -93,7 +93,7 @@ describe("buildRegistryPayload", () => {
         notice: "use echo-v2",
       },
     };
-    const payload = buildRegistryPayload(deprecated);
+    const payload = buildWorkflowNodeRegistryPayload(deprecated);
     expect(payload.deprecation).toEqual({
       deprecated_at: "2026-08-01",
       sunset_date: "2027-01-01",
@@ -111,7 +111,7 @@ describe("buildRegistryPayload", () => {
       docs_url: "https://example.com/docs",
       changelog_url: "https://example.com/changelog",
     };
-    const payload = buildRegistryPayload(def);
+    const payload = buildWorkflowNodeRegistryPayload(def);
     expect(payload.constraints).toMatchObject({
       docs_url: "https://example.com/docs",
       changelog_url: "https://example.com/changelog",
@@ -122,7 +122,7 @@ describe("buildRegistryPayload", () => {
 
   it("caller constraints win on key collision (DA-1955)", () => {
     const def = { ...testDef, docs_url: "https://example.com/docs" };
-    const payload = buildRegistryPayload(def, {
+    const payload = buildWorkflowNodeRegistryPayload(def, {
       constraints: { minimum_sdk_version: "0.21.0", gpu_required: true },
     });
     const constraints = payload.constraints as Record<string, unknown>;
@@ -132,7 +132,7 @@ describe("buildRegistryPayload", () => {
   });
 
   it("always carries the stamped provenance — the sole version key (#123)", () => {
-    const payload = buildRegistryPayload({ ...testDef });
+    const payload = buildWorkflowNodeRegistryPayload({ ...testDef });
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.sdk_version).toBeTruthy();
     expect(constraints.minimum_sdk_version).toBeUndefined();
@@ -145,7 +145,7 @@ describe("buildRegistryPayload", () => {
       docs_url: "https://example.com/docs",
       deprecation: { notice: "soon" },
     };
-    const payload = buildRegistryPayload(def, {
+    const payload = buildWorkflowNodeRegistryPayload(def, {
       invokeUrl: "https://node.example.com",
       invokeConfig: { region: "us-east-1" },
       constraints: { gpu: true },
@@ -185,7 +185,7 @@ describe("extractNodeData", () => {
   });
 });
 
-describe("RegisterNodeResult dict-like access", () => {
+describe("WorkflowNodeRegistrationResult dict-like access", () => {
   const result = {
     node: { name: "echo", version: "1.0.0" },
     action: "created" as const,
@@ -208,7 +208,7 @@ describe("RegisterNodeResult dict-like access", () => {
   });
 });
 
-describe("RegistrationError enrichment (DA-1955)", () => {
+describe("WorkflowNodeRegistrationError enrichment (DA-1955)", () => {
   it("extracts changed fields from node_version_immutable detail", () => {
     const detail = JSON.stringify({
       slug: "test-node",
@@ -218,7 +218,7 @@ describe("RegistrationError enrichment (DA-1955)", () => {
         { field: "invoke_url", expected: "http://old", actual: "http://new" },
       ],
     });
-    const error = new RegistrationError(409, { error: "node_version_immutable", detail });
+    const error = new WorkflowNodeRegistrationError(409, { error: "node_version_immutable", detail });
 
     expect(error.code).toBe("node_version_immutable");
     expect(error.guidance).toContain("input_schema");
@@ -227,14 +227,14 @@ describe("RegistrationError enrichment (DA-1955)", () => {
   });
 
   it("maps other 409 to publish-higher guidance", () => {
-    const error = new RegistrationError(409, { error: "resource_conflict", detail: "1.2.0 is newer" });
+    const error = new WorkflowNodeRegistrationError(409, { error: "resource_conflict", detail: "1.2.0 is newer" });
 
     expect(error.code).toBe("resource_conflict");
     expect(error.guidance).toContain("higher");
   });
 
   it("surfaces FastAPI 422 detail list", () => {
-    const error = new RegistrationError(422, {
+    const error = new WorkflowNodeRegistrationError(422, {
       detail: [{ loc: ["body", "name"], msg: "Field required", type: "missing" }],
     });
 
@@ -244,7 +244,7 @@ describe("RegistrationError enrichment (DA-1955)", () => {
   });
 
   it("surfaces canonical 400 errors[] messages", () => {
-    const error = new RegistrationError(400, {
+    const error = new WorkflowNodeRegistrationError(400, {
       error: "bad_request",
       errors: [{ field: "version", message: "invalid semver" }],
     });
@@ -254,21 +254,21 @@ describe("RegistrationError enrichment (DA-1955)", () => {
   });
 
   it("unmapped codes get null guidance", () => {
-    const error = new RegistrationError(418, { error: "teapot", detail: "short and stout" });
+    const error = new WorkflowNodeRegistrationError(418, { error: "teapot", detail: "short and stout" });
 
     expect(error.code).toBe("teapot");
     expect(error.guidance).toBeNull();
   });
 
   it("plain-text bodies keep null code", () => {
-    const error = new RegistrationError(500, { detail: "Internal Server Error" });
+    const error = new WorkflowNodeRegistrationError(500, { detail: "Internal Server Error" });
 
     expect(error.code).toBeNull();
     expect(error.guidance).toBeNull();
   });
 });
 
-describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
+describe("exportWorkflowNodeManifest full manifest shape (DA-1955 review fix)", () => {
   it("re-adds node_role retry node_status and deprecation for /manifest format", () => {
     const deprecation = {
       deprecated_at: "2026-08-24",
@@ -280,7 +280,7 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
     } as WorkflowNodeManifest;
     const outPath = path.join(os.tmpdir(), `sdk-export-test-${Date.now()}.json`);
     try {
-      exportDefinition(def, outPath);
+      exportWorkflowNodeManifest(def, outPath);
       const exported = JSON.parse(readFileSync(outPath, "utf8")) as Record<string, unknown>;
       expect(exported["node_role"]).toBe("operation");
       expect(exported["retry"]).toEqual(testDef.default_retry);
@@ -300,7 +300,7 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
   it("omits deprecation when unset", () => {
     const outPath = path.join(os.tmpdir(), `sdk-export-test-${Date.now()}.json`);
     try {
-      exportDefinition(testDef, outPath);
+      exportWorkflowNodeManifest(testDef, outPath);
       const exported = JSON.parse(readFileSync(outPath, "utf8")) as Record<string, unknown>;
       expect(exported["deprecation"]).toBeUndefined();
       expect(exported["node_status"]).toBe("active");
@@ -312,14 +312,14 @@ describe("exportDefinition full manifest shape (DA-1955 review fix)", () => {
 
 describe("stamped provenance — dual-write dead (#123)", () => {
   it("payload carries sdk_version ONLY; no legacy minimum_sdk_version", () => {
-    const payload = buildRegistryPayload({ ...testDef });
+    const payload = buildWorkflowNodeRegistryPayload({ ...testDef });
     const constraints = (payload.constraints ?? {}) as Record<string, unknown>;
     expect(constraints.sdk_version).toBe(VERSION);
     expect(constraints).not.toHaveProperty("minimum_sdk_version");
   });
 
   it("caller constraints are caller data (passthrough); the stamp is forced", () => {
-    const payload = buildRegistryPayload(
+    const payload = buildWorkflowNodeRegistryPayload(
       { ...testDef, sdk_version: "0.40.0" },
       { constraints: { minimum_sdk_version: "0.23.1" } },
     );
@@ -352,7 +352,7 @@ describe("registryAuthHeader wire form (#239: ctk_ only)", () => {
   });
 });
 
-describe("registerNode credential wire form (#239: ctk_ only)", () => {
+describe("registerWorkflowNode credential wire form (#239: ctk_ only)", () => {
   const captureHeaders = (): { headers: Record<string, string> } => {
     const state = { headers: {} as Record<string, string> };
     const realFetch = globalThis.fetch;
@@ -373,7 +373,7 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
   it("sends Authorization: Bearer for ctk_ keys — no legacy headers", async () => {
     const cap = captureHeaders();
     try {
-      await registerNode(
+      await registerWorkflowNode(
         { definition: testDef },
         "https://engine.example.com/api/workflows/nodes/",
         { serviceToken: CTK },
@@ -390,7 +390,7 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
     const cap = captureHeaders();
     try {
       await expect(
-        registerNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/", {
+        registerWorkflowNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/", {
           serviceToken: "svs_legacy",
         }),
       ).rejects.toThrow(/ask ops to rotate/);
@@ -402,7 +402,7 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
 
   it("missing serviceToken throws naming it (apiKey registry leg removed)", async () => {
     await expect(
-      registerNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/"),
+      registerWorkflowNode({ definition: testDef }, "https://engine.example.com/api/workflows/nodes/"),
     ).rejects.toThrow(/serviceToken/);
   });
 
@@ -415,9 +415,9 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
     }) as unknown as typeof fetch;
     try {
       await expect(
-        registerNode(
+        registerWorkflowNode(
           {
-            definition: {
+            manifest: {
               ...testDef,
               output_schema: {
                 type: "object",
@@ -437,7 +437,7 @@ describe("registerNode credential wire form (#239: ctk_ only)", () => {
   });
 });
 
-describe("fetchPublishedDefinition (#233)", () => {
+describe("fetchPublishedWorkflowNodeManifest (#233)", () => {
   const realFetch = globalThis.fetch;
   afterEach(() => {
     globalThis.fetch = realFetch;
@@ -448,7 +448,7 @@ describe("fetchPublishedDefinition (#233)", () => {
       new Response(JSON.stringify({ name: "echo", version: "1.9.1", timeout_seconds: 7200 }), { status: 200 }),
     ) as unknown as typeof fetch;
     globalThis.fetch = fetchMock;
-    const node = await fetchPublishedDefinition("https://cwe.example.com", "echo", { token: CTK });
+    const node = await fetchPublishedWorkflowNodeManifest("https://cwe.example.com", "echo", { token: CTK });
     expect(node).toEqual({ name: "echo", version: "1.9.1", timeout_seconds: 7200 });
     const [url, init] = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0] as [
       string,
@@ -460,19 +460,19 @@ describe("fetchPublishedDefinition (#233)", () => {
 
   it("404 returns null (new node)", async () => {
     globalThis.fetch = vi.fn(async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
-    expect(await fetchPublishedDefinition("https://cwe.example.com", "never-published")).toBeNull();
+    expect(await fetchPublishedWorkflowNodeManifest("https://cwe.example.com", "never-published")).toBeNull();
   });
 
   it("register-style full-endpoint URLs are normalized", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
     globalThis.fetch = fetchMock;
-    await fetchPublishedDefinition("https://cwe.example.com/api/workflows/nodes/", "echo");
+    await fetchPublishedWorkflowNodeManifest("https://cwe.example.com/api/workflows/nodes/", "echo");
     const [url] = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0] as [string];
     expect(url).toBe("https://cwe.example.com/api/workflows/nodes/by-name/echo");
   });
 });
 
-describe("diffAgainstPublished (#233)", () => {
+describe("diffAgainstPublishedWorkflowNodeManifest (#233)", () => {
   const local = {
     name: "echo",
     version: "1.9.1",
@@ -482,17 +482,17 @@ describe("diffAgainstPublished (#233)", () => {
   };
 
   it("reports changed fields, deep-comparing schemas", () => {
-    expect(diffAgainstPublished(local, { ...local, timeout_seconds: 3600 })).toEqual(["timeout_seconds"]);
+    expect(diffAgainstPublishedWorkflowNodeManifest(local, { ...local, timeout_seconds: 3600 })).toEqual(["timeout_seconds"]);
     const reordered = { ...local, input_schema: { properties: { a: { type: "string" } }, type: "object" } };
-    expect(diffAgainstPublished(local, reordered)).toEqual([]);
+    expect(diffAgainstPublishedWorkflowNodeManifest(local, reordered)).toEqual([]);
   });
 
   it("ignores engine-assigned fields and local-only keys", () => {
-    expect(diffAgainstPublished(local, { ...local, id: "u", owner: "o", node_status: "inactive" })).toEqual([]);
-    expect(diffAgainstPublished({ ...local, future_field: "x" }, local)).toEqual([]);
+    expect(diffAgainstPublishedWorkflowNodeManifest(local, { ...local, id: "u", owner: "o", node_status: "inactive" })).toEqual([]);
+    expect(diffAgainstPublishedWorkflowNodeManifest({ ...local, future_field: "x" }, local)).toEqual([]);
   });
 
   it("version drift is reported as a field", () => {
-    expect(diffAgainstPublished(local, { ...local, version: "1.9.0" })).toEqual(["version"]);
+    expect(diffAgainstPublishedWorkflowNodeManifest(local, { ...local, version: "1.9.0" })).toEqual(["version"]);
   });
 });

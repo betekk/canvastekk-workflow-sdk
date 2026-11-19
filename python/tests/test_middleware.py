@@ -3,17 +3,17 @@
 from typing import Any
 
 from canvastekk_workflow_sdk import (
-    BaseNode,
-    ExecutionContext,
+    NodeExecutionContext,
     NodeExecutionRequest,
+    WorkflowNodeBase,
     WorkflowNodeManifest,
     __version__,
 )
 from canvastekk_workflow_sdk.middleware import LoggingMiddleware, TimingMiddleware
 
 
-class EchoNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class EchoNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="echo",
         version="1.0.0",
         name="Echo",
@@ -22,12 +22,12 @@ class EchoNode(BaseNode):
         output_schema={"type": "object", "properties": {"message": {"type": "string"}}},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class FailingNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         slug="failing",
         version="1.0.0",
         name="Failing",
@@ -36,7 +36,7 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise ValueError("intentional")
 
 
@@ -48,7 +48,7 @@ class TrackingMiddleware:
         self.after_calls: list[dict] = []
         self.error_calls: list[dict] = []
 
-    def on_before_execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def on_before_execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         self.before_calls.append({"inputs": inputs, "run_id": context.run_id})
         return inputs
 
@@ -56,7 +56,7 @@ class TrackingMiddleware:
         self,
         inputs: dict[str, Any],
         outputs: dict[str, Any],
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         self.after_calls.append({"outputs": outputs, "duration_ms": duration_ms})
@@ -65,7 +65,7 @@ class TrackingMiddleware:
         self,
         inputs: dict[str, Any],
         error: Exception,
-        context: ExecutionContext,
+        context: NodeExecutionContext,
         duration_ms: int,
     ) -> None:
         self.error_calls.append({"error": str(error), "duration_ms": duration_ms})
@@ -74,16 +74,16 @@ class TrackingMiddleware:
 class InputModifyingMiddleware:
     """Middleware that modifies inputs before execution."""
 
-    def on_before_execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def on_before_execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         inputs["injected"] = True
         return inputs
 
     def on_after_execute(
-        self, inputs: dict[str, Any], outputs: dict[str, Any], context: ExecutionContext, duration_ms: int
+        self, inputs: dict[str, Any], outputs: dict[str, Any], context: NodeExecutionContext, duration_ms: int
     ) -> None:
         pass
 
-    def on_error(self, inputs: dict[str, Any], error: Exception, context: ExecutionContext, duration_ms: int) -> None:
+    def on_error(self, inputs: dict[str, Any], error: Exception, context: NodeExecutionContext, duration_ms: int) -> None:
         pass
 
 
@@ -207,9 +207,9 @@ class TestSDKVersionMiddleware:
     def test_adds_header(self) -> None:
         from starlette.testclient import TestClient
 
-        from canvastekk_workflow_sdk.app import create_node_app
+        from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
-        client = TestClient(create_node_app(EchoNode()))
+        client = TestClient(create_workflow_node_app(EchoNode()))
         response = client.get("/health")
         assert response.headers["x-sdk-version"] == __version__
 
@@ -220,18 +220,18 @@ class TestNodeSlugHeader:
     def test_slug_present_on_single_node_app(self) -> None:
         from starlette.testclient import TestClient
 
-        from canvastekk_workflow_sdk.app import create_node_app
+        from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
-        client = TestClient(create_node_app(EchoNode()))
+        client = TestClient(create_workflow_node_app(EchoNode()))
         response = client.get("/health")
         assert response.headers["x-canvastekk-node-slug"] == EchoNode().definition.slug
 
     def test_exactly_one_version_header(self) -> None:
         from starlette.testclient import TestClient
 
-        from canvastekk_workflow_sdk.app import create_node_app
+        from canvastekk_workflow_sdk.workflow_node_app import create_workflow_node_app
 
-        client = TestClient(create_node_app(EchoNode()))
+        client = TestClient(create_workflow_node_app(EchoNode()))
         response = client.get("/health")
         assert response.headers["x-sdk-version"] == __version__
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { S3PresignedUploader, type UploadTarget } from "../src/uploads.js";
+import { NodeOutputS3PresignedUploader, type NodeOutputUploadTarget } from "../src/node-output-uploads.js";
 
 interface SessionCall {
   method?: string;
@@ -65,7 +65,7 @@ async function startSessionServer() {
       complete_url: `http://127.0.0.1:${port}/complete`,
       abort_url: `http://127.0.0.1:${port}/abort`,
       status_url: `http://127.0.0.1:${port}/status`,
-    } satisfies UploadTarget,
+    } satisfies NodeOutputUploadTarget,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
@@ -77,9 +77,9 @@ const untouchedTarget = {
   complete_url: "http://127.0.0.1:1/complete",
   abort_url: "http://127.0.0.1:1/abort",
   status_url: "http://127.0.0.1:1/status",
-} satisfies UploadTarget;
+} satisfies NodeOutputUploadTarget;
 
-describe("S3PresignedUploader", () => {
+describe("NodeOutputS3PresignedUploader", () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe("S3PresignedUploader", () => {
       writeFileSync(filePath, "data");
 
       await expect(
-        new S3PresignedUploader().uploadFile(filePath, "http://127.0.0.1:1/presigned" as never),
+        new NodeOutputS3PresignedUploader().uploadFile(filePath, "http://127.0.0.1:1/presigned" as never),
       ).rejects.toMatchObject({
         name: "NodeIOError",
         message: "engine sent deprecated presigned target — upgrade the engine",
@@ -109,10 +109,10 @@ describe("S3PresignedUploader", () => {
       const response = {
         status: "pass",
         outputs: { out: filePath },
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
       await expect(
-        new S3PresignedUploader().uploadOutputs(
+        new NodeOutputS3PresignedUploader().uploadOutputs(
           response,
           { out: "http://127.0.0.1:1/presigned" as never },
           ["out"],
@@ -136,8 +136,8 @@ describe("S3PresignedUploader", () => {
           status: "pass" as const,
           outputs: { buffers: files },
           duration_ms: 1,
-        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
-        await new S3PresignedUploader().uploadOutputs(
+        } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
+        await new NodeOutputS3PresignedUploader().uploadOutputs(
           response,
           { buffers: { ...srv.target, array: true } },
           ["buffers"],
@@ -160,9 +160,9 @@ describe("S3PresignedUploader", () => {
         status: "pass" as const,
         outputs: { buffers: ["/nonexistent/a.las"] },
         duration_ms: 1,
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
       await expect(
-        new S3PresignedUploader().uploadOutputs(
+        new NodeOutputS3PresignedUploader().uploadOutputs(
           response,
           { buffers: { ...untouchedTarget, array: true } },
           ["buffers"],
@@ -180,9 +180,9 @@ describe("S3PresignedUploader", () => {
           status: "pass" as const,
           outputs: { buffers: [p] },
           duration_ms: 1,
-        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+        } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
         await expect(
-          new S3PresignedUploader().uploadOutputs(response, { buffers: untouchedTarget }, ["buffers"]),
+          new NodeOutputS3PresignedUploader().uploadOutputs(response, { buffers: untouchedTarget }, ["buffers"]),
         ).rejects.toThrow(/not an array session/);
       } finally {
         rmSync(dir, { recursive: true, force: true });
@@ -195,8 +195,8 @@ describe("S3PresignedUploader", () => {
         status: "pass" as const,
         outputs: { buffers: [] },
         duration_ms: 1,
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
-      await new S3PresignedUploader().uploadOutputs(
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
+      await new NodeOutputS3PresignedUploader().uploadOutputs(
         response,
         { buffers: { ...untouchedTarget, array: true } },
         ["buffers"],
@@ -206,11 +206,11 @@ describe("S3PresignedUploader", () => {
 
   describe("uploadOutputs fail-loud (DA-2337)", () => {
     it("throws when a present file-output value is not a string", async () => {
-      const uploader = new S3PresignedUploader();
+      const uploader = new NodeOutputS3PresignedUploader();
       const response = {
         success: true,
         outputs: { count: 123 },
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
       await expect(
         uploader.uploadOutputs(response, { count: untouchedTarget }, ["count"]),
@@ -218,11 +218,11 @@ describe("S3PresignedUploader", () => {
     });
 
     it("throws when the value is not an existing local file", async () => {
-      const uploader = new S3PresignedUploader();
+      const uploader = new NodeOutputS3PresignedUploader();
       const response = {
         success: true,
         outputs: { frag_file: "/nonexistent/converted.frag" },
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
       const promise = uploader.uploadOutputs(response, { frag_file: untouchedTarget }, [
         "frag_file",
@@ -235,11 +235,11 @@ describe("S3PresignedUploader", () => {
     });
 
     it("throws when the value is a directory (not a regular file)", async () => {
-      const uploader = new S3PresignedUploader();
+      const uploader = new NodeOutputS3PresignedUploader();
       const response = {
         success: true,
         outputs: { frag_file: tmpDir },
-      } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+      } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
       await expect(
         uploader.uploadOutputs(response, { frag_file: untouchedTarget }, ["frag_file"]),
@@ -252,9 +252,9 @@ describe("S3PresignedUploader", () => {
         const response = {
           success: true,
           outputs: { note: "done" },
-        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+        } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
-        await new S3PresignedUploader().uploadOutputs(response, { frag_file: srv.target }, [
+        await new NodeOutputS3PresignedUploader().uploadOutputs(response, { frag_file: srv.target }, [
           "frag_file",
         ]);
 
@@ -272,7 +272,7 @@ describe("S3PresignedUploader", () => {
         const filePath = join(tmpDir, "out.bin");
         writeFileSync(filePath, "session-bytes");
 
-        await new S3PresignedUploader().uploadOutputs(
+        await new NodeOutputS3PresignedUploader().uploadOutputs(
           { status: "pass", outputs: { out: filePath } } as never,
           { out: srv.target },
           ["out"],
@@ -287,7 +287,7 @@ describe("S3PresignedUploader", () => {
 
     it("keeps the NodeIOError contract for descriptor targets with non-file values", async () => {
       await expect(
-        new S3PresignedUploader().uploadOutputs(
+        new NodeOutputS3PresignedUploader().uploadOutputs(
           { status: "pass", outputs: { out: "/nonexistent/missing.bin" } } as never,
           { out: untouchedTarget },
           ["out"],
@@ -304,10 +304,10 @@ describe("S3PresignedUploader", () => {
         const response = {
           success: true,
           outputs: { good_file: goodPath, bad_file: "/nonexistent/bad.frag" },
-        } as Parameters<S3PresignedUploader["uploadOutputs"]>[0];
+        } as Parameters<NodeOutputS3PresignedUploader["uploadOutputs"]>[0];
 
         await expect(
-          new S3PresignedUploader().uploadOutputs(
+          new NodeOutputS3PresignedUploader().uploadOutputs(
             response,
             { good_file: srv.target, bad_file: untouchedTarget },
             ["good_file", "bad_file"],

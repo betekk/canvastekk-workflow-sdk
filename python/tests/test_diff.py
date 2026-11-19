@@ -4,14 +4,14 @@ Pins the classification contract mirrored from the engine's
 detect_breaking_changes (fastapi_app/services/workflow_definition_service.py):
 new required input and removed output are the only breaking signals.
 
-diff_manifests is pure stdlib (no SDK model imports needed here).
+diff_workflow_node_manifests is pure stdlib (no SDK model imports needed here).
 """
 
 from __future__ import annotations
 
 import pytest
 
-from canvastekk_workflow_sdk.diff import ManifestDiff, diff_manifests
+from canvastekk_workflow_sdk.workflow_node_manifest_diff import WorkflowNodeManifestDiff, diff_workflow_node_manifests
 
 
 def _manifest(**overrides: object) -> dict:
@@ -33,7 +33,7 @@ class TestBreakingClassification:
         old = _manifest(output_schema={"type": "object", "properties": {"result": {"type": "string"}}})
         new = _manifest(version="2.0.0", output_schema={"type": "object", "properties": {}})
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is True
         assert any("removed output" in entry and "result" in entry for entry in diff.breaking_changes)
@@ -49,7 +49,7 @@ class TestBreakingClassification:
             },
         )
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is True
         assert any("new required input" in entry and "data" in entry for entry in diff.breaking_changes)
@@ -58,7 +58,7 @@ class TestBreakingClassification:
         old = _manifest(output_schema={"type": "object", "properties": {"result": {"type": "string"}}})
         new = _manifest(version="2.0.0", output_schema={"type": "object", "properties": {}})
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is True
         assert not any("MAJOR" in entry for entry in diff.errors)
@@ -74,7 +74,7 @@ class TestNonBreakingClassification:
             input_schema={"type": "object", "properties": {"opt": {"type": "string"}}, "required": []},
         )
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is False
         assert any("new optional input" in entry and "opt" in entry for entry in diff.non_breaking_changes)
@@ -84,7 +84,7 @@ class TestNonBreakingClassification:
         old = _manifest(output_schema={"type": "object", "properties": {}})
         new = _manifest(version="1.1.0", output_schema={"type": "object", "properties": {"extra": {"type": "string"}}})
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is False
         assert any("new output" in entry and "extra" in entry for entry in diff.non_breaking_changes)
@@ -93,7 +93,7 @@ class TestNonBreakingClassification:
         old = _manifest(name="Old Title")
         new = _manifest(version="1.0.1", name="New Title")
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is False
         assert any("metadata" in entry and "name" in entry for entry in diff.non_breaking_changes)
@@ -106,7 +106,7 @@ class TestVersionRules:
         old = _manifest(name="Old")
         new = _manifest(name="New")
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is False
         assert any("same version" in entry for entry in diff.errors)
@@ -115,7 +115,7 @@ class TestVersionRules:
         old = _manifest()
         new = _manifest()
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is False
         assert diff.breaking_changes == []
@@ -126,19 +126,19 @@ class TestVersionRules:
         old = _manifest(output_schema={"type": "object", "properties": {"result": {"type": "string"}}})
         new = _manifest(version="1.1.0", output_schema={"type": "object", "properties": {}})
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.breaking is True
         assert any("MAJOR version bump" in entry for entry in diff.errors)
 
     def test_version_bump_classification(self) -> None:
-        assert diff_manifests(_manifest(), _manifest(version="2.0.0")).version_bump == "major"
-        assert diff_manifests(_manifest(), _manifest(version="1.1.0")).version_bump == "minor"
-        assert diff_manifests(_manifest(), _manifest(version="1.0.1")).version_bump == "patch"
-        assert diff_manifests(_manifest(), _manifest()).version_bump is None
+        assert diff_workflow_node_manifests(_manifest(), _manifest(version="2.0.0")).version_bump == "major"
+        assert diff_workflow_node_manifests(_manifest(), _manifest(version="1.1.0")).version_bump == "minor"
+        assert diff_workflow_node_manifests(_manifest(), _manifest(version="1.0.1")).version_bump == "patch"
+        assert diff_workflow_node_manifests(_manifest(), _manifest()).version_bump is None
 
     def test_versions_recorded_on_result(self) -> None:
-        diff = diff_manifests(_manifest(), _manifest(version="1.1.0"))
+        diff = diff_workflow_node_manifests(_manifest(), _manifest(version="1.1.0"))
 
         assert diff.old_version == "1.0.0"
         assert diff.new_version == "1.1.0"
@@ -148,11 +148,11 @@ class TestErrorCases:
     """Malformed inputs surface as errors, not exceptions (where reasonable)."""
 
     def test_slug_mismatch_detected_from_registry_shaped_manifests(self) -> None:
-        """Registry-shaped inputs (export_definition output) carry identity under "name"."""
+        """Registry-shaped inputs (export_workflow_node_manifest output) carry identity under "name"."""
         old = {"name": "old-node", "version": "1.0.0", "input_schema": {}, "output_schema": {}}
         new = {"name": "new-node", "version": "2.0.0", "input_schema": {}, "output_schema": {}}
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert any("slug mismatch" in entry for entry in diff.errors)
 
@@ -160,7 +160,7 @@ class TestErrorCases:
         old = _manifest(slug="old-node")
         new = _manifest(slug="new-node", version="2.0.0")
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert any("slug mismatch" in entry for entry in diff.errors)
 
@@ -168,7 +168,7 @@ class TestErrorCases:
         old = {"slug": "test-node", "input_schema": {}}
         new = _manifest(version="1.1.0")
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert any("version" in entry for entry in diff.errors)
 
@@ -176,24 +176,24 @@ class TestErrorCases:
         old = _manifest(version="1.0")
         new = _manifest(version="1.1")
 
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert any("MAJOR.MINOR.PATCH" in entry for entry in diff.errors)
 
     def test_non_dict_input_raises_type_error(self) -> None:
         with pytest.raises(TypeError):
-            diff_manifests("not a dict", _manifest())  # type: ignore[arg-type]
+            diff_workflow_node_manifests("not a dict", _manifest())  # type: ignore[arg-type]
 
     def test_non_dict_second_input_raises_type_error(self) -> None:
         with pytest.raises(TypeError):
-            diff_manifests(_manifest(), ["not", "a", "dict"])  # type: ignore[arg-type]
+            diff_workflow_node_manifests(_manifest(), ["not", "a", "dict"])  # type: ignore[arg-type]
 
 
 class TestManifestDiffDefaults:
     """The result dataclass defaults support falsy construction."""
 
     def test_defaults(self) -> None:
-        diff = ManifestDiff()
+        diff = WorkflowNodeManifestDiff()
 
         assert diff.breaking is False
         assert diff.breaking_changes == []
@@ -210,14 +210,14 @@ class TestVersionDowngradeAndParseGating:
     def test_version_downgrade_is_error(self) -> None:
         old = {"slug": "n", "version": "2.0.0", "input_schema": {}}
         new = {"slug": "n", "version": "1.0.0", "input_schema": {}}
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.errors == ["version downgrade: '2.0.0' -> '1.0.0' (publish a higher semver)"]
 
     def test_unparsable_version_no_same_version_error(self) -> None:
         old = {"slug": "n", "version": "1.0", "input_schema": {}}
         new = {"slug": "n", "version": "1.0", "input_schema": {}, "name": "T"}
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert len(diff.errors) == 1
         assert "MAJOR.MINOR.PATCH" in diff.errors[0]
@@ -226,6 +226,6 @@ class TestVersionDowngradeAndParseGating:
     def test_missing_version_no_same_version_error(self) -> None:
         old = {"slug": "n", "input_schema": {}}
         new = {"slug": "n", "input_schema": {}, "name": "T"}
-        diff = diff_manifests(old, new)
+        diff = diff_workflow_node_manifests(old, new)
 
         assert diff.errors == ["both manifests must carry a 'version' field"]

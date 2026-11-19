@@ -106,7 +106,7 @@ The SDK's auto-download only triggers on `http://`/`https://` values — a plain
 Offline validation without starting the server (also checks that `input_schema` / `output_schema` are structurally valid draft-7 JSON schemas):
 
 ```bash
-python -m canvastekk_workflow_sdk validate my_node.handler:definition --json
+python -m canvastekk_workflow_sdk validate my_node.handler:manifest --json
 ```
 
 ### Registration Pre-flight (registry diff)
@@ -114,7 +114,7 @@ python -m canvastekk_workflow_sdk validate my_node.handler:definition --json
 `ctk probe` runs the offline registration probes and — with `--engine-url` — additionally fetches the published definition by name and applies the engine's registration gate locally (#233): same-version data drift (the deploy-time 409 `node_version_immutable`) and version downgrades fail in seconds instead of at minute 20 of a deploy. Requires `CANVASTEKK_NODE_REGISTRATION_KEY` (or `CANVASTEKK_REGISTRY_TOKEN`) in the environment; without the flag, the credential, or with the engine unreachable, the registry diff is skipped with a warning and the offline probes stay authoritative. The bump level (major/minor/patch) is never judged — that stays the author's declaration.
 
 ```bash
-python -m canvastekk_workflow_sdk probe my_node.handler:definition --engine-url https://cwe-dev.canvastekk.com --json
+python -m canvastekk_workflow_sdk probe my_node.handler:manifest --engine-url https://cwe-dev.canvastekk.com --json
 ```
 
 ### Manifest Diff (breaking-change classification)
@@ -203,7 +203,7 @@ Build, validate, and test-run workflow DAGs locally without the engine:
 
 ```python
 from canvastekk_workflow_sdk import WorkflowBuilder, WorkflowRunner
-from canvastekk_workflow_sdk.workflow.executor import InProcessExecutor
+from canvastekk_workflow_sdk.workflow.node_executor import InProcessNodeExecutor
 
 # Build a workflow
 spec = (
@@ -216,8 +216,8 @@ spec = (
     .build()  # validates the DAG
 )
 
-# Test run locally with BaseNode instances
-executor = InProcessExecutor()
+# Test run locally with WorkflowNodeBase instances
+executor = InProcessNodeExecutor()
 executor.register("segmentation-v1.0.0", MySegmentNode())
 
 runner = WorkflowRunner(executor)
@@ -247,21 +247,21 @@ Three ways to put a node on the engine's map. Pick the rung that matches where y
 
 ### Rung 1 — SDK-served (recommended)
 
-The SDK mounts your HTTP contract for you: `create_node_app` serves `/execute`, `/health`, `/manifest` (plus the optional routes), stamps the manifest's effective contract, and implements `dry_run` for free.
+The SDK mounts your HTTP contract for you: `create_workflow_node_app` serves `/execute`, `/health`, `/manifest` (plus the optional routes), stamps the manifest's effective contract, and implements `dry_run` for free.
 
 ```python
-from canvastekk_workflow_sdk import create_node_app
+from canvastekk_workflow_sdk import create_workflow_node_app
 from my_node.handler import MyNode
 
-app = create_node_app(MyNode())  # contract stamped from the manifest (D8)
+app = create_workflow_node_app(MyNode())  # contract stamped from the manifest (D8)
 ```
 
 Deploy the container, then register (see the node-builder skill's *Engine Registration* section for credential paths):
 
 ```python
-from canvastekk_workflow_sdk.registry import register_node
+from canvastekk_workflow_sdk.workflow_node_registry import register_workflow_node
 
-register_node(
+register_workflow_node(
     MyNode(),
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_url="https://my-node.example.com",
@@ -306,7 +306,7 @@ seeds and terminal nodes only); `verify=True` is unavailable by definition
 (nothing to probe):
 
 ```python
-register_node(
+register_workflow_node(
     MyNode(),
     registry_url="https://engine.example.com/api/workflows/nodes/",
     invoke_type="in-process",
@@ -325,7 +325,7 @@ register_node(
 
 | Caller | When | Credential | Where the credential comes from |
 |--------|------|------------|--------------------------------|
-| SDK verifier (registration-time probes) | `register_node(..., verify=True)` | `X-API-Key` | the `api_key` parameter you pass to `register_node` — never serialized into the registry payload |
+| SDK verifier (registration-time probes) | `register_workflow_node(..., verify=True)` | `X-API-Key` | the `api_key` parameter you pass to `register_workflow_node` — never serialized into the registry payload |
 | Engine (execution time) | every workflow run that reaches your node | your node's auth posture (e.g. `X-API-Key`) | engine-side invocation config — delivered out-of-band (`invoke_config` at registration, or engine configuration); the registration `api_key` is NOT reused here |
 | Gateway / workflow consumers | when a workflow step targets your node | same as engine execution time | same channel |
 
@@ -341,7 +341,7 @@ sequenceDiagram
     participant E as Engine registry
 
     A->>N: deploy (serve the declared contract)
-    A->>SDK: register_node(verify=True)
+    A->>SDK: register_workflow_node(verify=True)
     SDK->>N: GET /manifest (derives the probe set)
     N-->>SDK: manifest (contract routes)
     SDK->>N: probe each declared route (+ dry-run positive if declared)
@@ -351,7 +351,7 @@ sequenceDiagram
         E-->>SDK: created / updated
         E->>N: execution-time invokes at run time
     else any route fails
-        SDK-->>A: RegistrationError (per-route report; nothing registered)
+        SDK-->>A: WorkflowNodeRegistrationError (per-route report; nothing registered)
     end
 ```
 
@@ -398,7 +398,7 @@ Each language SDK follows the same pattern:
 1. Create a new directory at the repo root (e.g., `typescript/`)
 2. Initialize with language-appropriate package manager
 3. Mirror the same API surface as existing SDKs:
-   - `BaseNode` class with `execute()` method
+   - `WorkflowNodeBase` class with `execute()` method
    - `WorkflowNodeManifest` with schema validation
    - HTTP endpoints: `/execute`, `/health`, `/manifest`, `/hook`, `/metrics`
    - Error handling with structured error codes
@@ -414,10 +414,10 @@ Node authors can validate their node definition offline without starting the ser
 
 ```bash
 # Validate a node definition
-python -m canvastekk_workflow_sdk validate my_node.handler:definition
+python -m canvastekk_workflow_sdk validate my_node.handler:manifest
 
 # Structured JSON output for CI
-python -m canvastekk_workflow_sdk validate my_node.handler:definition --json
+python -m canvastekk_workflow_sdk validate my_node.handler:manifest --json
 
 # Exit codes: 0 = valid, 1 = validation errors
 ```
@@ -462,7 +462,7 @@ the engine additionally gates MAJOR bumps with schema diffs — update
 Node manifests carry a **stamped** `sdk_version` (computed from the installed SDK at instantiation — authors never set it) plus optional docs links. Both are exported through the registration payload's `constraints` channel:
 
 ```python
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     ...,
     docs_url="https://docs.example.com/my-node",
     changelog_url="https://docs.example.com/my-node/changelog",
@@ -473,10 +473,10 @@ The former `minimum_sdk_version` / `maximum_sdk_version` manifest fields were **
 
 ### Auth Shorthand
 
-`create_node_app` accepts an `auth` keyword for one-line DA-1890 adoption:
+`create_workflow_node_app` accepts an `auth` keyword for one-line DA-1890 adoption:
 
 ```python
-app = create_node_app(node, auth="api-key")  # reads CANVASTEKK_API_KEY
+app = create_workflow_node_app(node, auth="api-key")  # reads CANVASTEKK_API_KEY
 ```
 
 ### Central Token Auth (org production mode, v0.54.0)
@@ -489,10 +489,10 @@ from canvastekk_workflow_sdk.auth import NodeAuth
 
 # Dual-accept transition (default): legacy static key still honored;
 # the legacy leg goes inert when CANVASTEKK_API_KEY is unset.
-app = create_node_app(node, auth=NodeAuth.central())          # reads CWE_API_BASE_URL
+app = create_workflow_node_app(node, auth=NodeAuth.central())          # reads CWE_API_BASE_URL
 
 # Central-only (steady state / post-purge):
-app = create_node_app(node, auth=NodeAuth.central(legacy_key_env_var=None))
+app = create_workflow_node_app(node, auth=NodeAuth.central(legacy_key_env_var=None))
 ```
 
 Verdicts are cached ~60s, bounded by token expiry; the validator fails
@@ -685,7 +685,7 @@ Key decisions recorded as the SDK evolves. See [`PLANS/PLAN-DA-894.md`](./PLANS/
 | `WorkflowRunResult.output_dir` field | Exposes the output directory path on the result (set to `None` if auto-cleaned) |
 | `finally`-style cleanup | Temp dirs cleaned up even when nodes raise exceptions, preventing leaks |
 | `LocalFileServer` test utility | Serves local files over HTTP so the full presigned URL download pipeline can be tested without S3 or mocking |
-| `HttpExecutor` limitation documented | Shared `output_dir` only effective with `InProcessExecutor` — remote nodes don't share the local filesystem |
+| `HttpNodeExecutor` limitation documented | Shared `output_dir` only effective with `InProcessNodeExecutor` — remote nodes don't share the local filesystem |
 
 ## Repository
 

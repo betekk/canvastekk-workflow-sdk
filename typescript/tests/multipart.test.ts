@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { createServer, type Server } from "node:http";
 import { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { uploadViaSession } from "../src/multipart.js";
-import type { UploadSessionDescriptor } from "../src/uploads.js";
+import { uploadViaCdsMultipartSession } from "../src/cds-multipart-upload.js";
+import type { NodeOutputUploadSessionDescriptor } from "../src/node-output-uploads.js";
 
 interface CapturedCall {
   method: string;
@@ -108,8 +108,8 @@ async function startServer(opts: {
   return {
     calls,
     descriptor: (
-      kind: UploadSessionDescriptor["kind"] = "multipart-upload-session",
-    ): UploadSessionDescriptor => ({
+      kind: NodeOutputUploadSessionDescriptor["kind"] = "multipart-upload-session",
+    ): NodeOutputUploadSessionDescriptor => ({
       kind,
       session_token: "tok",
       initiate_url: `http://127.0.0.1:${port}/initiate`,
@@ -122,7 +122,7 @@ async function startServer(opts: {
   };
 }
 
-describe("uploadViaSession (DA-2886)", () => {
+describe("uploadViaCdsMultipartSession (DA-2886)", () => {
   let filePath: string;
   let tmpDir: string;
 
@@ -139,7 +139,7 @@ describe("uploadViaSession (DA-2886)", () => {
   it("happy path: initiate → parallel part PUTs without unsigned headers → complete sorted, no abort", async () => {
     const srv = await startServer();
     try {
-      await uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
+      await uploadViaCdsMultipartSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
 
       const initiate = srv.calls.find((c) => c.url === "/initiate");
       expect(initiate).toBeDefined();
@@ -175,7 +175,7 @@ describe("uploadViaSession (DA-2886)", () => {
   it("retries a part failure then succeeds (fail-first-N scripting)", async () => {
     const srv = await startServer({ failPartsFirst: { 2: 1 } });
     try {
-      await uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
+      await uploadViaCdsMultipartSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] });
       expect(srv.partAttempt(2)).toBe(2);
       expect(srv.calls.some((c) => c.url === "/complete")).toBe(true);
       expect(srv.calls.some((c) => c.url === "/abort")).toBe(false);
@@ -188,7 +188,7 @@ describe("uploadViaSession (DA-2886)", () => {
     const srv = await startServer({ failPartsFirst: { 1: 999 } });
     try {
       await expect(
-        uploadViaSession(srv.descriptor(), filePath, {
+        uploadViaCdsMultipartSession(srv.descriptor(), filePath, {
           retryBackoffsMs: [1, 1],
           resumeAttempts: 1,
         }),
@@ -207,7 +207,7 @@ describe("uploadViaSession (DA-2886)", () => {
     const srv = await startServer({ failComplete: true });
     try {
       await expect(
-        uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] }),
+        uploadViaCdsMultipartSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] }),
       ).rejects.toThrow(/control-plane POST failed/);
       expect(srv.calls.some((c) => c.url === "/abort")).toBe(false);
     } finally {
@@ -219,7 +219,7 @@ describe("uploadViaSession (DA-2886)", () => {
     const srv = await startServer({ initiatePartUrls: 0 });
     try {
       await expect(
-        uploadViaSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] }),
+        uploadViaCdsMultipartSession(srv.descriptor(), filePath, { retryBackoffsMs: [1, 1] }),
       ).rejects.toThrow(/malformed initiate bundle/);
       expect(srv.calls.some((c) => new URL(c.url, "http://127.0.0.1").pathname === "/abort")).toBe(false);
     } finally {
@@ -232,8 +232,8 @@ describe("uploadViaSession (DA-2886)", () => {
     try {
       const descriptor = srv.descriptor("multipart-upload-capability");
       const options = { retryBackoffsMs: [1, 1] };
-      await uploadViaSession(descriptor, filePath, options);
-      await uploadViaSession(descriptor, filePath, options);
+      await uploadViaCdsMultipartSession(descriptor, filePath, options);
+      await uploadViaCdsMultipartSession(descriptor, filePath, options);
 
       const initiates = srv.calls.filter((c) => new URL(c.url, "http://127.0.0.1").pathname === "/initiate");
       expect(initiates).toHaveLength(2);
@@ -251,7 +251,7 @@ describe("uploadViaSession (DA-2886)", () => {
     const srv = await startServer({ failPartsFirst: { 1: 999 }, uploadedParts: [] });
     try {
       await expect(
-        uploadViaSession(srv.descriptor("multipart-upload-capability"), filePath, {
+        uploadViaCdsMultipartSession(srv.descriptor("multipart-upload-capability"), filePath, {
           retryBackoffsMs: [1, 1],
           resumeAttempts: 1,
         }),
@@ -275,7 +275,7 @@ describe("uploadViaSession (DA-2886)", () => {
       const srv = await startServer();
       try {
         const element = { index: 3, suffix: ".frag" };
-        await uploadViaSession(srv.descriptor(kind), filePath, {
+        await uploadViaCdsMultipartSession(srv.descriptor(kind), filePath, {
           retryBackoffsMs: [1, 1],
           element,
         });
@@ -313,7 +313,7 @@ describe("uploadViaSession (DA-2886)", () => {
       try {
         const element = { index: 3, suffix: ".frag" };
         await expect(
-          uploadViaSession(srv.descriptor(kind), filePath, {
+          uploadViaCdsMultipartSession(srv.descriptor(kind), filePath, {
             retryBackoffsMs: [1, 1],
             resumeAttempts: 1,
             element,

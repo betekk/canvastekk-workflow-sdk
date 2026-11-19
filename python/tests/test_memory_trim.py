@@ -7,14 +7,19 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest, create_node_app
-from canvastekk_workflow_sdk import app as app_module
+from canvastekk_workflow_sdk import (
+    NodeExecutionContext,
+    WorkflowNodeBase,
+    WorkflowNodeManifest,
+    create_workflow_node_app,
+)
+from canvastekk_workflow_sdk import workflow_node_app as app_module
 
 
-class EchoNode(BaseNode):
+class EchoNode(WorkflowNodeBase):
     """Minimal echo node (mirrors test_app.py)."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="echo-trim",
         version="1.0.0",
         name="EchoTrim",
@@ -29,14 +34,14 @@ class EchoNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         return {"message": inputs.get("message", "")}
 
 
-class FailingNode(BaseNode):
+class FailingNode(WorkflowNodeBase):
     """Node whose execute always raises."""
 
-    definition = WorkflowNodeManifest(
+    manifest = WorkflowNodeManifest(
         slug="fail-trim",
         version="1.0.0",
         name="FailTrim",
@@ -45,7 +50,7 @@ class FailingNode(BaseNode):
         output_schema={"type": "object"},
     )
 
-    def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+    def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
         raise RuntimeError("boom")
 
 
@@ -144,7 +149,7 @@ class TestExecuteTrimsExactlyOnce:
     """The finally wiring around the /execute execution section."""
 
     def _client(self) -> TestClient:
-        return TestClient(create_node_app(EchoNode()))
+        return TestClient(create_workflow_node_app(EchoNode()))
 
     def test_success_path_trims_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[int] = []
@@ -160,7 +165,7 @@ class TestExecuteTrimsExactlyOnce:
     def test_error_path_trims_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
         calls: list[int] = []
         monkeypatch.setattr(app_module, "_release_freed_heap", lambda: calls.append(1))
-        client = TestClient(create_node_app(FailingNode()), raise_server_exceptions=False)
+        client = TestClient(create_workflow_node_app(FailingNode()), raise_server_exceptions=False)
         response = client.post(
             "/execute",
             json={"run_id": "test-run", "node_id": "test-node", "inputs": {}},
@@ -175,8 +180,8 @@ class TestExecuteTrimsExactlyOnce:
         calls: list[int] = []
         monkeypatch.setattr(app_module, "_release_freed_heap", lambda: calls.append(1))
 
-        class SlowNode(BaseNode):
-            definition = WorkflowNodeManifest(
+        class SlowNode(WorkflowNodeBase):
+            manifest = WorkflowNodeManifest(
                 slug="slow-trim",
                 version="1.0.0",
                 name="SlowTrim",
@@ -186,13 +191,13 @@ class TestExecuteTrimsExactlyOnce:
                 timeout_seconds=1,
             )
 
-            def execute(self, inputs: dict[str, Any], context: ExecutionContext) -> dict[str, Any]:
+            def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:
                 import time
 
                 time.sleep(2.0)
                 return {}
 
-        client = TestClient(create_node_app(SlowNode()), raise_server_exceptions=False)
+        client = TestClient(create_workflow_node_app(SlowNode()), raise_server_exceptions=False)
         response = client.post(
             "/execute",
             json={"run_id": "test-run", "node_id": "test-node", "inputs": {}},

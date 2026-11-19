@@ -2,10 +2,10 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 /** Current contract version. */
-export const CONTRACT_VERSION = "1.0.0";
+export const NODE_IO_DATA_CONTRACT_VERSION = "1.0.0";
 
 /** Base data for all contract types. */
-export interface BaseContractData {
+export interface NodeIoDataContractData {
   contract_version: string;
   source_node?: string | null;
   source_file?: string | null;

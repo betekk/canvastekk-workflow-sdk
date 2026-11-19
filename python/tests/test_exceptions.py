@@ -167,11 +167,11 @@ class TestErrorTaxonomySdk161:
     def test_workflow_exceptions_classified(self) -> None:
         from canvastekk_workflow_sdk.exceptions import (
             NodeOutputValidationError,
-            WorkflowValidationError,
+            WorkflowDefinitionValidationError,
         )
 
         assert NodeOutputValidationError("x").category == "validation"
-        assert WorkflowValidationError(["bad"]).category == "validation"
+        assert WorkflowDefinitionValidationError(["bad"]).category == "validation"
 
 
 class TestErrorEnvelopeSdk161:

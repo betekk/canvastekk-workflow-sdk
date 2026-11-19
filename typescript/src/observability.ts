@@ -1,7 +1,7 @@
 /**
  * Metric data for a single node execution.
  */
-export interface ExecutionMetric {
+export interface NodeExecutionMetric {
   runId: string;
   nodeId: string;
   nodeName: string;
@@ -18,7 +18,7 @@ export interface ExecutionMetric {
  * @param opts - Metric data without timestamp
  * @returns Complete execution metric
  */
-export function createExecutionMetric(opts: Omit<ExecutionMetric, "timestamp">): ExecutionMetric {
+export function createNodeExecutionMetric(opts: Omit<NodeExecutionMetric, "timestamp">): NodeExecutionMetric {
   return { ...opts, timestamp: Date.now() / 1000 };
 }
 
@@ -27,7 +27,7 @@ export function createExecutionMetric(opts: Omit<ExecutionMetric, "timestamp">):
  * @param metric - Execution metric to convert
  * @returns Dictionary with snake_case keys
  */
-export function metricToDict(metric: ExecutionMetric): Record<string, unknown> {
+export function nodeExecutionMetricToDict(metric: NodeExecutionMetric): Record<string, unknown> {
   return {
     run_id: metric.runId,
     node_id: metric.nodeId,
@@ -44,8 +44,8 @@ export function metricToDict(metric: ExecutionMetric): Record<string, unknown> {
 /**
  * Collects and aggregates execution metrics.
  */
-export class MetricsCollector {
-  private _metrics: ExecutionMetric[] = [];
+export class NodeExecutionMetricsCollector {
+  private _metrics: NodeExecutionMetric[] = [];
   private _maxRecords: number;
 
   /**
@@ -60,7 +60,7 @@ export class MetricsCollector {
    * Records an execution metric.
    * @param metric - Execution metric to record
    */
-  record(metric: ExecutionMetric): void {
+  record(metric: NodeExecutionMetric): void {
     this._metrics.push(metric);
     if (this._metrics.length > this._maxRecords) {
       this._metrics = this._metrics.slice(-this._maxRecords);

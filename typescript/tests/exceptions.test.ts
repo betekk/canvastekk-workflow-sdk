@@ -6,9 +6,9 @@ import {
   NodeOutputValidationError,
   NodeIOError,
   NodeConfigurationError,
-  WorkflowExecutionError,
-  WorkflowValidationError,
-  RegistrationError,
+  WorkflowRunError,
+  WorkflowDefinitionValidationError,
+  WorkflowNodeRegistrationError,
   ERROR_CODE_TO_HTTP_STATUS,
   getHttpStatusForError,
   ERROR_CATEGORIES,
@@ -98,9 +98,9 @@ describe("NodeConfigurationError", () => {
   });
 });
 
-describe("WorkflowExecutionError", () => {
+describe("WorkflowRunError", () => {
   it("includes nodeId in details", () => {
-    const err = new WorkflowExecutionError("workflow failed", {
+    const err = new WorkflowRunError("workflow failed", {
       nodeId: "node-1",
     });
     expect(err.errorCode).toBe("WORKFLOW_EXECUTION_ERROR");
@@ -109,9 +109,9 @@ describe("WorkflowExecutionError", () => {
   });
 });
 
-describe("WorkflowValidationError", () => {
+describe("WorkflowDefinitionValidationError", () => {
   it("includes errors in toDict", () => {
-    const err = new WorkflowValidationError("bad workflow", {
+    const err = new WorkflowDefinitionValidationError("bad workflow", {
       errors: ["cycle detected"],
     });
     expect(err.errorCode).toBe("WORKFLOW_VALIDATION_ERROR");
@@ -120,16 +120,16 @@ describe("WorkflowValidationError", () => {
   });
 });
 
-describe("RegistrationError", () => {
+describe("WorkflowNodeRegistrationError", () => {
   it("extracts message from body", () => {
-    const err = new RegistrationError(400, { detail: "Already exists" });
+    const err = new WorkflowNodeRegistrationError(400, { detail: "Already exists" });
     expect(err.statusCode).toBe(400);
     expect(err.message).toBe("Already exists");
     expect(err.body).toEqual({ detail: "Already exists" });
   });
 
   it("falls back to generic message", () => {
-    const err = new RegistrationError(500, {});
+    const err = new WorkflowNodeRegistrationError(500, {});
     expect(err.message).toBe("Registration failed with status 500");
   });
 });
@@ -155,9 +155,9 @@ describe("getHttpStatusForError", () => {
     expect(getHttpStatusForError(new NodeValidationError("x"))).toBe(422);
     expect(getHttpStatusForError(new NodeIOError("x"))).toBe(500);
     expect(getHttpStatusForError(new NodeConfigurationError("x"))).toBe(500);
-    expect(getHttpStatusForError(new WorkflowValidationError("x"))).toBe(422);
+    expect(getHttpStatusForError(new WorkflowDefinitionValidationError("x"))).toBe(422);
     expect(getHttpStatusForError(new NodeOutputValidationError("x"))).toBe(422);
-    expect(getHttpStatusForError(new WorkflowExecutionError("x"))).toBe(500);
+    expect(getHttpStatusForError(new WorkflowRunError("x"))).toBe(500);
     expect(getHttpStatusForError(new NodeExecutionError("x"))).toBe(500);
   });
 
@@ -184,7 +184,7 @@ describe("error taxonomy (S.2, SDK#161)", () => {
     expect(new NodeIOError("x").category).toBe("transport");
     expect(new NodeConfigurationError("x").category).toBe("lifecycle");
     expect(new NodeOutputValidationError("x").category).toBe("validation");
-    expect(new WorkflowValidationError(["bad"]).category).toBe("validation");
+    expect(new WorkflowDefinitionValidationError(["bad"]).category).toBe("validation");
   });
 
   it("base defaults to domain", () => {

@@ -4,17 +4,17 @@ import httpx
 import pytest
 
 from canvastekk_workflow_sdk import (
-    BaseNode,
-    ExecutionContext,
     LocalFileServer,
+    NodeExecutionContext,
     NodeExecutionRequest,
+    WorkflowNodeBase,
     WorkflowNodeManifest,
     serve_files,
 )
 
 
-class _FileReaderNode(BaseNode):
-    definition = WorkflowNodeManifest(
+class _FileReaderNode(WorkflowNodeBase):
+    manifest = WorkflowNodeManifest(
         name="file-reader-test",
         version="1.0.0",
         title="File Reader Test",
@@ -37,7 +37,7 @@ class _FileReaderNode(BaseNode):
         },
     )
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         from pathlib import Path
 
         content = Path(inputs["input_file"]).read_text()

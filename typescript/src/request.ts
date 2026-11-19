@@ -1,41 +1,7 @@
-import { z } from "zod";
-import { UploadSessionDescriptorSchema } from "./uploads.js";
-
 /**
- * Slug charset for run_id/node_id — letters, digits, dot, underscore,
- * hyphen. NOTE: the charset alone still permits `..` and `.` segments;
- * the refinement rejects them (the ids flow into filesystem paths).
- */
-const slugField = z
-  .string()
-  .regex(/^[A-Za-z0-9._-]+$/, "must contain only letters, digits, '.', '_', '-'")
-  .refine((v) => !v.includes("..") && !/^\.$/.test(v) && !/^\.\.+$/.test(v), {
-    message: "must not contain dot segments",
-  });
-
-export const NodeExecutionRequestSchema = z.object({
-  run_id: slugField,
-  node_id: slugField,
-  execution_id: slugField.nullish(),
-  inputs: z.record(z.string(), z.unknown()).default({}),
-  callback_url: z.string().nullable().optional(),
-  output_upload_url: z
-    .union([z.record(z.string(), z.union([z.string(), UploadSessionDescriptorSchema])), z.null()])
-    .optional()
-    .default(null),
-  dry_run: z.boolean().default(false),
-  capability: z.string().nullable().optional(),
-});
-
-/**
- * Node execution request payload sent by the workflow engine.
+ * Deprecated alias module — renamed to ./node-execution-request.js (ADR 0001, #271).
+ * Every old module path keeps working; removed in 1.0.0 (#272).
  *
- * Fields use snake_case for wire-format compatibility with the Python engine.
- *
- * @property run_id - Unique identifier for the workflow run
- * @property node_id - Unique identifier for this node within the run
- * @property inputs - Node input values (may include presigned URLs for file fields)
- * @property callback_url - Optional URL to post completion status
- * @property output_upload_url - Optional presigned URL(s) for uploading output files
+ * @deprecated import from "./node-execution-request.js" instead
  */
-export type NodeExecutionRequest = z.infer<typeof NodeExecutionRequestSchema>;
+export * from "./node-execution-request.js";

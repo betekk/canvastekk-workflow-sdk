@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import express from "express";
-import { createAuthedApp, mountNode } from "../src/bootstrap.js";
-import { BaseNode } from "../src/base-node.js";
+import { createAuthedWorkflowNodeApp, mountWorkflowNode } from "../src/bootstrap.js";
+import { WorkflowNodeBase } from "../src/workflow-node-base.js";
 import type { WorkflowNodeManifest } from "../src/definition.js";
-import type { ExecutionContext } from "../src/context.js";
+import type { NodeExecutionContext } from "../src/node-execution-context.js";
 
-class TestNode extends BaseNode {
-  definition: WorkflowNodeManifest = {
+class TestNode extends WorkflowNodeBase {
+  manifest: WorkflowNodeManifest = {
     slug: "bootstrap-test-node",
     version: "1.0.0",
     name: "Bootstrap Test Node",
@@ -22,16 +22,16 @@ class TestNode extends BaseNode {
     },
   };
 
-  execute(inputs: Record<string, unknown>, _context: ExecutionContext): Record<string, unknown> {
+  execute(inputs: Record<string, unknown>, _context: NodeExecutionContext): Record<string, unknown> {
     return { result: `echo: ${inputs.message ?? ""}` };
   }
 }
 
-describe("createAuthedApp", () => {
+describe("createAuthedWorkflowNodeApp", () => {
   it("fails closed central-only by default (legacy key INERT)", async () => {
     process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
     delete process.env.CWE_API_BASE_URL;
-    const app = createAuthedApp(new TestNode());
+    const app = createAuthedWorkflowNodeApp(new TestNode());
     const res = await request(app)
       .post("/execute")
       .set("X-API-Key", "static-key-1")
@@ -43,7 +43,7 @@ describe("createAuthedApp", () => {
   it("keeps the legacy static-key leg live when legacyKeyEnvVar is set", async () => {
     process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
     delete process.env.CWE_API_BASE_URL;
-    const app = createAuthedApp(new TestNode(), { legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
+    const app = createAuthedWorkflowNodeApp(new TestNode(), { legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
     const res = await request(app)
       .post("/execute")
       .set("X-API-Key", "static-key-1")
@@ -55,7 +55,7 @@ describe("createAuthedApp", () => {
     process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
     delete process.env.CWE_API_BASE_URL;
     const seen: string[] = [];
-    const app = createAuthedApp(new TestNode(), {
+    const app = createAuthedWorkflowNodeApp(new TestNode(), {
       legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY",
       dependencies: [
         (_req, _res, next) => {
@@ -73,13 +73,13 @@ describe("createAuthedApp", () => {
   });
 
   it("rejects extraRoutes (mounted without the auth middleware)", () => {
-    expect(() => createAuthedApp(new TestNode(), { extraRoutes: [express.Router()] })).toThrow(
+    expect(() => createAuthedWorkflowNodeApp(new TestNode(), { extraRoutes: [express.Router()] })).toThrow(
       /extraRoutes/,
     );
   });
 });
 
-describe("mountNode", () => {
+describe("mountWorkflowNode", () => {
   it("dual-purpose: root routes open, node sub-app behind central auth", async () => {
     process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
     delete process.env.CWE_API_BASE_URL;
@@ -87,7 +87,7 @@ describe("mountNode", () => {
     root.get("/ping", (_req, res) => {
       res.json({ ping: "pong" });
     });
-    mountNode(root, new TestNode(), { legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
+    mountWorkflowNode(root, new TestNode(), { legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
 
     expect((await request(root).get("/ping")).status).toBe(200);
 
@@ -106,7 +106,7 @@ describe("mountNode", () => {
   it("honors a custom prefix", async () => {
     process.env.BOOTSTRAP_TEST_KEY = "static-key-1";
     const root = express();
-    mountNode(root, new TestNode(), { prefix: "/cw", legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
+    mountWorkflowNode(root, new TestNode(), { prefix: "/cw", legacyKeyEnvVar: "BOOTSTRAP_TEST_KEY" });
     const ok = await request(root)
       .post("/cw/execute")
       .set("X-API-Key", "static-key-1")
