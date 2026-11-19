@@ -97,6 +97,40 @@ export type DeprecationInfo = z.infer<typeof DeprecationInfoSchema>;
  * @param schema - JSON Schema object to validate
  * @throws {Error} If a field uses the deprecated 'binary' format or 'file' format without string type
  */
+function validateFileFieldFormats(
+  schema: Record<string, unknown>,
+): void {
+  const properties = (schema.properties ?? {}) as Record<
+    string,
+    Record<string, unknown>
+  >;
+  for (const [name, propSchema] of Object.entries(properties)) {
+    const fieldFormat = propSchema.format as string | undefined;
+    const fieldType = propSchema.type as string | undefined;
+
+    if (fieldFormat === "binary") {
+      throw new Error(
+        `Field '${name}' uses format 'binary' which is no longer supported. Use format 'file' instead. (See DA-894 migration guide.)`,
+      );
+    }
+
+    const items = propSchema.items as Record<string, unknown> | undefined;
+    if (fieldType === "array" && items?.format === "file") {
+      if (items.type !== undefined && items.type !== "string") {
+        throw new Error(
+          `Field '${name}' is an array whose items have format 'file' but items type is '${items.type}' (expected 'string').`,
+        );
+      }
+    }
+
+    if (fieldFormat === "file" && fieldType !== "string") {
+      throw new Error(
+        `Field '${name}' has format 'file' but type is '${fieldType}'. File fields must have type 'string'.`,
+      );
+    }
+  }
+}
+
 /**
  * Envelope-reserved output names (#257): the node protocol returns these on
  * the NodeExecutionResponse envelope, never inside `outputs` — an
@@ -133,40 +167,6 @@ export function validateOutputSchemaRequiredFields(
         "never in outputs; remove them from 'required' (optional properties are fine). " +
         "See docs/EXTERNAL-AUTHOR-GUIDE.md (#257)",
     );
-  }
-}
-
-function validateFileFieldFormats(
-  schema: Record<string, unknown>,
-): void {
-  const properties = (schema.properties ?? {}) as Record<
-    string,
-    Record<string, unknown>
-  >;
-  for (const [name, propSchema] of Object.entries(properties)) {
-    const fieldFormat = propSchema.format as string | undefined;
-    const fieldType = propSchema.type as string | undefined;
-
-    if (fieldFormat === "binary") {
-      throw new Error(
-        `Field '${name}' uses format 'binary' which is no longer supported. Use format 'file' instead. (See DA-894 migration guide.)`,
-      );
-    }
-
-    const items = propSchema.items as Record<string, unknown> | undefined;
-    if (fieldType === "array" && items?.format === "file") {
-      if (items.type !== undefined && items.type !== "string") {
-        throw new Error(
-          `Field '${name}' is an array whose items have format 'file' but items type is '${items.type}' (expected 'string').`,
-        );
-      }
-    }
-
-    if (fieldFormat === "file" && fieldType !== "string") {
-      throw new Error(
-        `Field '${name}' has format 'file' but type is '${fieldType}'. File fields must have type 'string'.`,
-      );
-    }
   }
 }
 
