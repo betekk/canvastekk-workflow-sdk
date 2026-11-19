@@ -62,7 +62,7 @@ Phases 2–4 each land **Python and TypeScript in the same commit** (ticket pari
     — **Consumers affected:** ts `index.ts`/`cli.ts`/`app.ts`/`base-node.ts`/`bootstrap.ts`; consumer repos via shims.
 - [ ] **2.3** Update affected test imports (both languages), create `python/tests/test_rename_aliases.py` + `typescript/tests/rename-aliases.test.ts` asserting old paths import and (py) warn; run both suites; commit `feat(naming): explicit manifest + registry names, deprecated aliases (py+ts)`
     — **Why:** AC-3 requires alias tests in both languages; the commit is the parity-rule unit.
-    — **Done when:** py + ts suites green; alias tests cover every renamed name in this cluster.
+    — **Done when:** py + ts suites green; alias tests cover every renamed name in this cluster; every `FREEZE` row in `python/tests/test_consumer_import_freeze.py` touching this cluster resolves through an alias (freeze suite green unmodified).
     — **Consumers affected:** CI.
 
 ### Phase 3: Node runtime + node execution cluster (py + ts, one commit)
@@ -120,6 +120,7 @@ Phases 2–4 each land **Python and TypeScript in the same commit** (ticket pari
 ## Technical Notes
 
 - Vocabulary law (epic #4301): "definition" only ever means a workflow definition; node-level things say "manifest"; every name names the object it belongs to.
+- **N1 version pinning (user directive, run record):** the N1 tickets pin exactly `v0.66.0`; CLS and IFC call the protocol helpers by their current names (`outcome_for_protocol` / `outcomeForProtocol`). Releasing 0.67.0 does NOT switch any N1 PR off v0.66.0 — published v0.66.0 is immutable and stays the pin. Old protocol names keep working as deprecated aliases for consumers that later upgrade; the move to new names happens in the migration tickets (CLS `#809`, IFC `#553`). The `sdk-released` dispatch is informational — the release must not force-upgrade any N1-pinned repo.
 - No wire change: manifest/registry/payload JSON keys unchanged — only Python/TS identifiers.
 - Alias mechanism: py shims carry `_deprecated_alias_of` marker (machine-checkable for guards/alias tests) + module-import `DeprecationWarning`; package-root old names via lazy `__getattr__` so new-name users never warn; TS shims + index re-exports carry `/** @deprecated */`.
 - `bump_versions.py` enumerates five version sources; version files are NEVER hand-bumped in this PR (release stamps at publish).
@@ -133,7 +134,8 @@ Phases 2–4 each land **Python and TypeScript in the same commit** (ticket pari
 
 ## Risks & Mitigation
 
-- **Consumer breakage via missed alias** → shims re-export the full old module surface; alias tests enumerate from the ADR map (map == test coverage, proven at 1.3/4.3).
+- **Consumer breakage via missed alias** → shims re-export the full old module surface; alias tests enumerate from the ADR map (map == test coverage, proven at 1.3/4.3); the frozen consumer-import inventory (`python/tests/test_consumer_import_freeze.py` — CWN/CLS/CWE rows) is the completeness oracle: every FREEZE row must resolve through an alias, and the alias tests assert that superset.
+- **N1 pinned consumers disturbed by the release** → v0.66.0 tag and published artifacts are immutable; N1 PRs keep the exact v0.66.0 pin (user directive); `sdk-released` dispatch is a rebuild signal to canvastekk-workflow-nodes only, never a pin bump; protocol-helper old names work via aliases when CLS (#809) / IFC (#553) migrate.
 - **Doc-example drift** (broken copy-paste examples) → symbol-scoped sweep verified against the map; LEARNINGS rules applied as greps.
 - **`except` semantics change on the `NodeValidationError` split** → subclass-preserving design (old name stays the base); explicit test.
 - **Test churn masking real failures** → suites must be green with *import updates only*; any logic edit during import sweeps is a finding.
