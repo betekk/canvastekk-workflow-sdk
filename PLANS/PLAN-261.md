@@ -118,3 +118,5 @@ LOG gate-escalation Phase 1: full tier — anchor: CI/workflow file touched + De
 LOG fix r1 (unit axis): pytest collection failed — ModuleNotFoundError fastapi; env created without extras. Root cause: canonical CI invocation is `poetry install -E fastapi` (ci-python.yml:118). Repaired env, re-ran full unit axis green. total_fixes=1.
 GATE 60ebec4 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG gate-escalation Phase 2: full tier — anchor: CI/workflow file touched (release.yml trigger + publish gate; publish lane is the dispatch-contract surface).
+GATE f174261 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG gate-escalation Phase 3: full tier — anchor: CI/workflow files touched (ci-python.yml, ci-typescript.yml trigger lists).
