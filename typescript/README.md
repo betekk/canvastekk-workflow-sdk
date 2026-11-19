@@ -118,7 +118,7 @@ export default app;
 The four requirements:
 
 1. **Extend `BaseNode`** — inherit from `canvastekk-workflow-sdk`'s `BaseNode`
-2. **Define `definition`** — a `WorkflowNodeManifest` with all required fields (`slug`, `version`, `name`, `description`, `input_schema`, `output_schema`). Note: `id` is auto-derived from `slug` + `version` and must NOT be provided manually.
+2. **Define `definition`** — a `WorkflowNodeManifest` with all required fields (`slug`, `version`, `name`, `description`, `input_schema`, `output_schema`). Note: `id` is auto-derived from `slug` + `version` and must NOT be provided manually. The schema parse rejects `output_schema` entries that list `error` / `error_type` / `error_code` in `required` — those are response-envelope fields, never outputs (#257).
 3. **Implement `execute(inputs, context)`** — return an object matching your `output_schema`
 4. **Call `.createApp()`** — get a ready-to-run Express application
 

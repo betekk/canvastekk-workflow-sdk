@@ -16,6 +16,7 @@ from canvastekk_workflow_sdk import (
     WorkflowNodeRole,
     WorkflowNodeStyles,
 )
+from canvastekk_workflow_sdk.contracts import build_check_output_schema
 from canvastekk_workflow_sdk.definition import export_definition
 
 
@@ -354,6 +355,65 @@ class TestWorkflowNodeManifest:
                 },
                 output_schema={"type": "object"},
             )
+
+    def test_rejects_each_envelope_field_required_in_output_schema(self) -> None:
+        """#257: error/error_type/error_code required in outputs never validate — envelope fields."""
+        for field in ("error", "error_type", "error_code"):
+            with pytest.raises(ValueError, match="envelope field"):
+                WorkflowNodeManifest(
+                    slug="bad",
+                    version="1.0.0",
+                    name="Bad",
+                    description="Requires envelope field in outputs",
+                    input_schema={"type": "object"},
+                    output_schema={
+                        "type": "object",
+                        "properties": {"error": {"type": "string"}},
+                        "required": [field],
+                    },
+                )
+
+    def test_allows_optional_error_property_in_output_schema(self) -> None:
+        """#257: optional nullable error stays legal (ErrorOutputNode error-append compat)."""
+        manifest = WorkflowNodeManifest(
+            slug="check",
+            version="1.0.0",
+            name="Check",
+            description="Optional error property",
+            input_schema={"type": "object"},
+            output_schema=build_check_output_schema(),
+        )
+        assert "error" in manifest.output_schema["properties"]
+        assert "error" not in manifest.output_schema["required"]
+
+    def test_allows_error_required_in_input_schema(self) -> None:
+        """#257: the guard scopes to outputs only — an input named error is not protocol-invalid."""
+        manifest = WorkflowNodeManifest(
+            slug="ok",
+            version="1.0.0",
+            name="Ok",
+            description="Input named error",
+            input_schema={
+                "type": "object",
+                "properties": {"error": {"type": "string"}},
+                "required": ["error"],
+            },
+            output_schema={"type": "object"},
+        )
+        assert manifest.input_schema["required"] == ["error"]
+
+    def test_missing_or_non_list_required_does_not_raise(self) -> None:
+        """#257: absent required, or a non-list required, must not trip the guard."""
+        for schema in ({"type": "object"}, {"type": "object", "required": "error"}):
+            manifest = WorkflowNodeManifest(
+                slug="ok",
+                version="1.0.0",
+                name="Ok",
+                description="No required list",
+                input_schema={"type": "object"},
+                output_schema=schema,
+            )
+            assert manifest.output_schema == schema
 
     def test_model_validator_rejects_file_with_wrong_type(self) -> None:
         """Test that WorkflowNodeManifest rejects format: file with non-string type."""

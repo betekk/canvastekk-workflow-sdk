@@ -43,6 +43,7 @@ gating a creation; each row is a hard failure, not a style note.
 - File fields: `"type": "string", "format": "file"` — NEVER `format: "binary"`, NEVER `type: "object"`/`"array"` (the SDK's validator rejects both).
 - Every file input carries `"x-accept": [".ext", …]` and `"x-maxSizeBytes": <int>` — the SDK auto-validates downloads against them.
 - `"description"` on every property; required inputs listed in `"required"`.
+- `output_schema` `"required"` must NEVER list `error` / `error_type` / `error_code` — those are response-envelope fields, never outputs; the SDK rejects the manifest at definition time (#257). Optional nullable `error` properties are fine (check-node contract).
 
 **Structure rules**
 
