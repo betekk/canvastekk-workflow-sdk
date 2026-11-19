@@ -22,6 +22,9 @@ on:
       new_version:
         description: Minted version without the tag prefix (bare semver, e.g. 1.2.3, 1.2.3-dev.4)
         value: ${{ jobs.release.outputs.new_version }}
+      is_release:
+        description: True when the pushed commit's merged PR carried the `release` label (release-PR merge); false on lookup failure — fail closed
+        value: ${{ jobs.release.outputs.is_release }}
 
 permissions:
   contents: write
@@ -91,6 +94,7 @@ jobs:
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
       new_version: ${{ steps.tag_version.outputs.new_version }}
+      is_release: ${{ steps.release_intent.outputs.is_release }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,21 +115,23 @@ jobs:
           esac
           echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "is_prod=$( [ "$BRANCH" = "prod" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          # Release intent no longer derives from branch name — it lives in
+          # the release_intent step below (merged-PR label lookup).
 
-      - name: Determine version bump type from PR label
-        id: bump_type
-        if: steps.prerelease.outputs.is_prod == 'true'
+      - name: Determine release intent and bump from merged PR labels
+        id: release_intent
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            // Find the merged PR for this commit and read its semver label.
-            // Falls back to "patch" when no label is present — and when the
-            // lookup itself fails (runner-pool proxy can 500 api.github.com
-            // with an empty body; release must not die on a best-effort
-            // label read. The merged promotion PR's label is the norm, so a
-            // fallback here only ever downgrades intent, never invents it).
+            // One lookup decides both WHETHER this push is a release merge
+            // and the bump size. Provenance: #172's resilient lookup pattern,
+            // semantics INVERTED — #172 could safely fall back to "patch" for
+            // bump SIZE, but release INTENT must FAIL CLOSED: a lookup
+            // failure or a PR-less push means "not a release", never a guess.
+            // An accidental release publishes unreviewed code; a missed
+            // release is a retry.
             let labels = [];
+            let lookupFailed = false;
             try {
               const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
                 owner: context.repo.owner,
@@ -134,27 +140,34 @@ jobs:
               });
               labels = result.data[0]?.labels?.map((l) => l.name) || [];
             } catch (e) {
-              core.warning(`PR label lookup failed (${e.message}); falling back to patch`);
+              lookupFailed = true;
+              core.warning(`Release-intent label lookup failed (${e.message}) — failing closed, no release this push`);
             }
-            core.info(`PR labels: ${JSON.stringify(labels)}`);
+            core.info(`Merged-PR labels: ${JSON.stringify(labels)}`);
+            const isRelease = !lookupFailed && labels.includes("release");
             let type = "patch";
             if (labels.includes("major")) type = "major";
             else if (labels.includes("minor")) type = "minor";
+            core.setOutput("is_release", isRelease);
             core.setOutput("type", type);
 
-      - name: Bump version and push tag
+      - name: Bump version and push tag (release merges only)
         id: tag_version
+        if: steps.release_intent.outputs.is_release == 'true'
         uses: mathieudutour/github-tag-action@af99e60ce8132224b8e6ebab5023449fe256ed46 # v7.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           fetch_all_tags: true
           # v6.2 renamed the inputs: `pre_release_suffix` no longer exists
-          release_branches: prod
+          # dev is the only lane; the step-level if means the action only
+          # ever runs on gated release-PR merges, so dev ∈ release_branches
+          # mints bare finals (ordinary pushes never reach this step).
+          release_branches: dev
           tag_prefix: ${{ inputs.tag_prefix }}
-          default_bump: ${{ steps.bump_type.outputs.type || 'patch' }}
+          default_bump: ${{ steps.release_intent.outputs.type || 'patch' }}
 
-      - name: Generate changelog (prod only)
-        if: steps.prerelease.outputs.is_prod == 'true' && steps.tag_version.outputs.new_tag != ''
+      - name: Generate changelog (release merges only)
+        if: steps.release_intent.outputs.is_release == 'true' && steps.tag_version.outputs.new_tag != ''
         id: changelog
         uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
         with:
@@ -163,8 +176,8 @@ jobs:
         env:
           OUTPUT: cliff-changelog.md
 
-      - name: Create GitHub Release (prod only)
-        if: steps.prerelease.outputs.is_prod == 'true' && steps.tag_version.outputs.new_tag != ''
+      - name: Create GitHub Release (release merges only)
+        if: steps.release_intent.outputs.is_release == 'true' && steps.tag_version.outputs.new_tag != ''
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           tag: ${{ steps.tag_version.outputs.new_tag }}
