@@ -1116,17 +1116,6 @@ Exported TypeScript interfaces renamed their fields from camelCase to snake_case
 
 > **Note:** The `WorkflowBuilder.connect()` method API is unchanged — it still accepts camelCase parameters (`fromOutput`, `toInput`, `edgeType`). Only the resulting wire-format objects use snake_case.
 
----
-
-Old names are preserved as type aliases and continue to work:
-
-| Old Name | Current Name |
-|----------|-------------|
-| `WorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowWorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowNode` | `WorkflowDefinitionNode` |
-| `WorkflowEdge` | `WorkflowEdgeDefinition` |
-| `WorkflowSpec` | `WorkflowDefinitionSpec` |
 
 ### New Fields on `WorkflowDefinitionNode`
 

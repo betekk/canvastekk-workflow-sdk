@@ -216,17 +216,6 @@ SDK and engine types follow a parent→child naming pattern:
 | `WorkflowEdgeDefinition` | `WorkflowDefinition` | Edge instance connecting two nodes in a workflow definition |
 | `WorkflowDefinitionSpec` | `WorkflowDefinition` | Complete workflow spec containing nodes, edges, and metadata |
 
-### Backward-Compatibility Aliases
-
-Old type names remain available as aliases for migration compatibility:
-
-| Old Name | Current Name |
-|----------|-------------|
-| `WorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowWorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowNode` | `WorkflowDefinitionNode` |
-| `WorkflowEdge` | `WorkflowEdgeDefinition` |
-| `WorkflowSpec` | `WorkflowDefinitionSpec` |
 
 ### File Inputs
 
