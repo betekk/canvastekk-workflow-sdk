@@ -89,22 +89,26 @@ Kept by design (recorded so reviewers can challenge): `NodeValidationError` stay
 
 ### Phase 3: Surface sweep — docs, examples, bundled skills, CI filter, changelog entry
 
-- [ ] **3.1** Update every teaching surface to the post-removal state: `examples/echo_node/handler.py` (retarget `BaseNode`→`WorkflowNodeBase`, `ExecutionContext`→`NodeExecutionContext`), migration sections in `python/README.md` + `typescript/README.md` + `docs/EXTERNAL-AUTHOR-GUIDE.md` + `docs/COMPATIBILITY-v0.64.0.md` ("deprecated but works" → "removed in 1.0.0; see ADR 0001 map"), bundled skill copies `.agents/skills/canvastekk-node-patterns/SKILL.md`, `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md` and their `python/canvastekk_workflow_sdk/data/skills/` mirrors (byte-identical pairs stay identical)
+- [x] **3.1** Update every teaching surface to the post-removal state: `examples/echo_node/handler.py` (retarget `BaseNode`→`WorkflowNodeBase`, `ExecutionContext`→`NodeExecutionContext`), migration sections in `python/README.md` + `typescript/README.md` + `docs/EXTERNAL-AUTHOR-GUIDE.md` + `docs/COMPATIBILITY-v0.64.0.md` ("deprecated but works" → "removed in 1.0.0; see ADR 0001 map"), bundled skill copies `.agents/skills/canvastekk-node-patterns/SKILL.md`, `.agents/skills/canvastekk-workflow-sdk-assistant/SKILL.md` and their `python/canvastekk_workflow_sdk/data/skills/` mirrors (byte-identical pairs stay identical)
     — **Why:** LEARNINGS `py-ts-sdk-changes-sweep-root-readme` + `incomplete-deprecation-sweep-in-docs`: a doc that still teaches an old name after 1.0.0 ships dead code to every new author; the mirrors drift if swept unequally.
     — **Done when:** repo-wide grep for old names over `README.md docs/ examples/ .agents/ python/canvastekk_workflow_sdk/data/` returns only historical/ADR-map mentions (tables explicitly documenting old→new) and zero runnable code samples using old names; mirror pairs `diff` clean.
     — **Consumers affected:** external node authors; the SDK-assistant skill's shipped guidance.
-- [ ] **3.2** Update `docs/adr/0001-explicit-node-naming.md` Consequences: record the 1.0.0 removal as executed (shims/aliases/`definition` dual-support gone, guards inverted, `NodeValidationError` + wire names kept by design)
+    — **Done:** handler.py retargeted (WorkflowNodeBase/NodeExecutionContext, module var + CLI arg definition→manifest, examples README ×2); typescript/README NodeAuth→TekkNodeAuth (5 refs, py NodeAuth mentions kept — distinct kept class); example tests repaired (mock httpx.stream not httpx.get — old mock never fired, pre-existing red on origin/dev; name assertion 'Echo'); skills verified clean + mirrors byte-identical; DELIBERATE SKIP: docs/COMPATIBILITY-v0.64.0.md = point-in-time v0.64.0 record (editing falsifies history); README 'Backward-Compatible Aliases' tables document a pre-#271 alias family with no code behind them — pre-existing doc rot noted for the PR body, not rewritten in this ticket; files: examples/echo_node/*, typescript/README.md; fixes: example test mock + name drift
+- [x] **3.2** Update `docs/adr/0001-explicit-node-naming.md` Consequences: record the 1.0.0 removal as executed (shims/aliases/`definition` dual-support gone, guards inverted, `NodeValidationError` + wire names kept by design)
     — **Why:** the ADR is the rename law; its "removed in 1.0.0 (#272)" promises need a closing record or the doc reads as perpetually pending.
     — **Done when:** ADR committed with the removal record; kept-by-design note present.
     — **Consumers affected:** future readers; Step 7 reviewers.
-- [ ] **3.3** Remove the dead `python/canvastekk_workflow_sdk/definition.py` row from the `.github/workflows/ci-python.yml` paths-filter (the other rows already point at renamed modules)
+    — **Done:** Removal record section appended to ADR 0001 (executed deletions, inverted guards, consumer precondition, kept-by-design rows); files: docs/adr/0001-explicit-node-naming.md; fixes: none
+- [x] **3.3** Remove the dead `python/canvastekk_workflow_sdk/definition.py` row from the `.github/workflows/ci-python.yml` paths-filter (the other rows already point at renamed modules)
     — **Why:** the filter row references a file deleted in Phase 2; leaving it is a dead trigger path.
     — **Done when:** `grep -n "definition.py" .github/workflows/ci-python.yml` empty; YAML still parses.
     — **Consumers affected:** CI job gating (schema-stability leg).
-- [ ] **3.4** Add the `## [1.0.0] - 2026-11-20` breaking-change entry to `CHANGELOG.md`: removal summary, migration note pointing at the ADR 0001 old→new tables and the explicit upgrade rule (0.67.0 aliases → 1.0.0 explicit names), kept-by-design note for `NodeValidationError` and wire strings
+    — **Done:** definition.py + workflow/models.py rows dropped from the ci-python.yml schema_files filter with comment; YAML parses; files: .github/workflows/ci-python.yml; fixes: none
+- [x] **3.4** Add the `## [1.0.0] - 2026-11-20` breaking-change entry to `CHANGELOG.md`: removal summary, migration note pointing at the ADR 0001 old→new tables and the explicit upgrade rule (0.67.0 aliases → 1.0.0 explicit names), kept-by-design note for `NodeValidationError` and wire strings
     — **Why:** AC-3 demands the migration note in the changelog; the in-repo `CHANGELOG.md` is the only file of that name and the cliff-generated GitHub Release body renders commit subjects only — the durable note must be committed.
     — **Done when:** entry committed at the top of `CHANGELOG.md` with the migration note.
     — **Consumers affected:** upgrading consumers; release-notes readers.
+    — **Done:** ## [1.0.0] - 2026-11-20 breaking-change entry with full migration note (module map, name highlights, manifest attribute rule, kept-by-design, ADR link); files: CHANGELOG.md; fixes: none
 
 ### Phase 4: Exit gate + release staging
 
@@ -146,4 +150,6 @@ GATE (phase 1, evidence-only — zero repo files changed) tier=light lint=n.a ty
 LOG CWN residue fix: canvastekk-workflow-nodes#708 merged (279ab971) before Phase 2 deletions — AC-1 precondition closed.
 LOG Phase 2 full escalation: public-API removal with cross-module consumers (Consumer Map rows 2-8) — critical-area anchor.
 GATE (phase 2) tier=full lint=t typecheck=t build=t unit=t e2e=n.a — ruff ✓ · eslint ✓ · tsc ×2 ✓ · poetry build ✓ · tsup ✓ · pack-test ✓ · pytest 1117 ✓ · vitest 513 ✓; e2e n.a. (backend-only, no Playwright configured)
+GATE (phase 3) tier=light lint=t typecheck=t build=- unit=t e2e=n.a — scoped ruff on example files ✓ · YAML parse ✓ · affected tests = example suite 7/7 ✓ (SDK packages untouched this phase)
+LOG Phase 3 fix-on-fail: example tests were pre-existing red on origin/dev (httpx.get mock vs httpx.stream download; name drift) — repaired with the retarget.
 LOG Phase 2 fix-on-fail: round 1 — fastapi extra missing from gate venv (poetry install --extras fastapi), ruff F401×2+F841×1 (autofixed), py tests' own .definition uses (test_app/test_file_download/test_middleware), test_contracts app/base parametrization; round 2 — ts tests NodeAuth imports (auth.test/app.test), type-only asserts in non-regression guard.

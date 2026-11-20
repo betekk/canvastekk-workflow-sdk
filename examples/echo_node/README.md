@@ -23,10 +23,10 @@ pip install -e "../../../python/"  # install SDK from local source
 
 ```bash
 # Human-readable
-python -m canvastekk_workflow_sdk validate handler:definition
+python -m canvastekk_workflow_sdk validate handler:manifest
 
 # JSON for CI
-python -m canvastekk_workflow_sdk validate handler:definition --json
+python -m canvastekk_workflow_sdk validate handler:manifest --json
 ```
 
 ## Run locally

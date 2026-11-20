@@ -1183,24 +1183,24 @@ The SDK provides three authentication middleware layers:
 ### API Key
 
 ```typescript
-import { NodeAuth } from "canvastekk-workflow-sdk";
+import { TekkNodeAuth } from "canvastekk-workflow-sdk";
 
 const app = node.createApp({
-  dependencies: [NodeAuth.apiKey()],
+  dependencies: [TekkNodeAuth.apiKey()],
 });
 ```
 
 The middleware reads the key from the `CANVASTEKK_API_KEY` environment variable. Set `CANVASTEKK_DEV_MODE=true` to bypass auth during development.
 
 During a rotation window, `CANVASTEKK_API_KEY_NEXT` is accepted alongside the
-current key (empty = ignored). Python `NodeAuth.apiKey()` behaves identically
+current key (empty = ignored). Python `NodeAuth.api_key()` behaves identically
 via `<key_env_var>_NEXT`.
 
 ### JWT
 
 ```typescript
 const app = node.createApp({
-  auth: NodeAuth.jwt({ secret: "your-jwt-secret" }),
+  auth: TekkNodeAuth.jwt({ secret: "your-jwt-secret" }),
 });
 ```
 
@@ -1212,7 +1212,7 @@ Uses RS256 JWT validation with JWKS key fetching. When a token's `kid` header do
 
 ```typescript
 const app = node.createApp({
-  auth: NodeAuth.keycloak({ serverUrl: "https://keycloak.example.com", realm: "my-realm" }),
+  auth: TekkNodeAuth.keycloak({ serverUrl: "https://keycloak.example.com", realm: "my-realm" }),
 });
 ```
 

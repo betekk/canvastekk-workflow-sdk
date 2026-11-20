@@ -6,14 +6,14 @@ Demonstrates:
   - Downloading from presigned URLs with httpx
   - Runtime validation with validate_file_input()
   - Writing output files via context.output_path()
-  - CLI manifest validation: python -m canvastekk_workflow_sdk validate handler:definition
+  - CLI manifest validation: python -m canvastekk_workflow_sdk validate handler:manifest
 """
 
 from pathlib import Path
 
-from canvastekk_workflow_sdk import BaseNode, ExecutionContext, WorkflowNodeManifest
+from canvastekk_workflow_sdk import NodeExecutionContext, WorkflowNodeBase, WorkflowNodeManifest
 
-definition = WorkflowNodeManifest(
+manifest = WorkflowNodeManifest(
     slug="echo",
     version="1.0.0",  # semantic version — engine enforces immutability; bump for schema changes
     name="Echo",
@@ -46,10 +46,10 @@ definition = WorkflowNodeManifest(
 )
 
 
-class EchoNode(BaseNode):
-    definition = definition
+class EchoNode(WorkflowNodeBase):
+    manifest = manifest
 
-    def execute(self, inputs: dict, context: ExecutionContext) -> dict:
+    def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
         # The SDK's auto-download pipeline has already fetched the file-input
         # URL and replaced the value with a LOCAL path — consume it directly
         # (the old manual httpx download double-downloaded and contradicted
@@ -57,7 +57,7 @@ class EchoNode(BaseNode):
         local_path = Path(inputs["input_file"])
 
         context.report_progress(0.5, "Validating input file")
-        definition.validate_file_input("input_file", local_path)
+        manifest.validate_file_input("input_file", local_path)
 
         context.report_progress(0.7, "Writing output")
         output_path = context.output_path("echo_output.txt")

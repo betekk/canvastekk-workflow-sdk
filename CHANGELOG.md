@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-11-20
+
+### Breaking Changes
+
+- **naming**: Deprecated name aliases removed — the explicit names are the only API (#272)
+
+### Migration note (0.67.x → 1.0.0)
+
+Every deprecated module path, public name, and the legacy `definition` class
+attribute from the 0.67.0 compatibility layer (ADR 0001, #271) is **gone**:
+
+- **Old module paths no longer import.** Use the explicit modules:
+  `definition` → `workflow_node_manifest`, `diff` → `workflow_node_manifest_diff`,
+  `registry` → `workflow_node_registry`, `base` → `workflow_node_base`,
+  `app` → `workflow_node_app`, `router` → `multi_node_router`,
+  `request`/`response`/`context` → `node_execution_{request,response,context}`,
+  `protocol` → `node_call_protocol`, `uploads` → `node_output_uploads`,
+  `multipart` → `cds_multipart_upload`, `contracts` → `node_io_data_contracts`,
+  `workflow.models` → `workflow.workflow_definition`,
+  `workflow.executor` → `workflow.node_executor` (TypeScript twins identical:
+  kebab-case of the same names).
+- **Old public names no longer resolve** from the package root, the express
+  subpath, or their old home modules. The complete old → new table is
+  [`docs/adr/0001-explicit-node-naming.md`](./docs/adr/0001-explicit-node-naming.md)
+  (module map + renamed-symbol clusters). Highlights: `BaseNode` →
+  `WorkflowNodeBase`, `ExecutionContext` → `NodeExecutionContext`,
+  `RetryConfig` → `WorkflowNodeRetryConfig`, `register_node` →
+  `register_workflow_node`, `create_node_app` → `create_workflow_node_app`,
+  `export_definition` → `export_workflow_node_manifest`,
+  `NodeExecutionStatus` → `WorkflowNodeCallOutcome`, TS `NodeAuth` →
+  `TekkNodeAuth`.
+- **Node classes must name their manifest `manifest`.** The legacy
+  `definition` class attribute (descriptor/getter) is removed — a class
+  declaring only `definition` fails loudly instead of migrating silently.
+- **Kept by design:** `NodeValidationError` stays the public base class of
+  `WorkflowNodeManifestValidationError` / `NodeInputValidationError`, and the
+  wire `error_type` strings keep their historical values — no wire or
+  behavior change rides this release.
+
+Guard tests fail if any removed alias returns. Consumers were verified
+migrated before removal (evidence on #272).
+
 ## [0.54.0] - 2026-10-17
 
 ### Features

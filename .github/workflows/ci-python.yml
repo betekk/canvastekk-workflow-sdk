@@ -146,14 +146,13 @@ jobs:
         with:
           filters: |
             schema_files:
-              # ADR 0001 (#271): schema-bearing modules renamed; old paths are
-              # deprecation shims (kept so shim edits still trigger the check).
+              # ADR 0001 (#271): schema-bearing modules renamed. The old shim
+              # paths were removed in 1.0.0 (#272) and dropped from this
+              # filter with them.
               - 'python/canvastekk_workflow_sdk/workflow_node_manifest.py'
               - 'python/canvastekk_workflow_sdk/workflow/workflow_definition.py'
               - 'python/canvastekk_workflow_sdk/workflow/__init__.py'
               - 'python/canvastekk_workflow_sdk/__init__.py'
-              - 'python/canvastekk_workflow_sdk/definition.py'
-              - 'python/canvastekk_workflow_sdk/workflow/models.py'
 
       - name: Skip (no schema files changed)
         if: steps.filter.outputs.schema_files != 'true'
