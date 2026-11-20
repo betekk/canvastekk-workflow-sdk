@@ -385,7 +385,7 @@ def result_file_declaration_errors(properties: Mapping[str, Any], *, schema_name
             ):
                 problems.append(
                     f"Output '{RESULT_FILE_OUTPUT_FIELD}' is reserved for the result file: declare it with "
-                    "result_file_output_schema() (type string, format file, contentMediaType application/json, "
+                    "result_file_output_schema() / resultFileOutputSchema() (type string, format file, contentMediaType application/json, "
                     f"'{RESULT_FILE_MARKER}': true). See docs/RESULT-FILE.md."
                 )
         elif marked:

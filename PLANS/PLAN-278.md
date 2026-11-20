@@ -64,11 +64,11 @@
     — **Consumers affected:** public surface
 
 ### Phase 3: TypeScript twin
-- [ ] **3.1** Add `typescript/src/result-file.ts` (embedded schemas checked against canonical files, `validateResultFileHeader`, `buildResultFileHeader`, `writeResultFile`, `resultFileOutputSchema`) and export from `index.ts`
+- [x] **3.1** Add `typescript/src/result-file.ts` (embedded schemas checked against canonical files, `validateResultFileHeader`, `buildResultFileHeader`, `writeResultFile`, `resultFileOutputSchema`) and export from `index.ts`
     — **Why:** TS nodes get the same writer
     — **Done when:** vitest suite for the same cases as 2.1
     — **Consumers affected:** TS node authors
-- [ ] **3.2** Extend `validateFileFieldFormats` with the same `result_file` declaration rule
+- [x] **3.2** Extend `validateFileFieldFormats` with the same `result_file` declaration rule
     — **Why:** manifest parity with 2.3
     — **Done when:** manifest tests green
     — **Consumers affected:** every TS node manifest (narrow trigger)

@@ -166,3 +166,28 @@ export type {
 
 import { warnSupportHorizon } from "./support-horizon.js";
 warnSupportHorizon();
+export {
+  RESULT_FILE_VERSION,
+  SUPPORTED_RESULT_FILE_VERSIONS,
+  RESULT_FILE_OUTPUT_FIELD,
+  RESULT_FILE_MARKER,
+  RESULT_FILE_CONTENT_TYPE,
+  RESULT_FILE_DEFAULT_NAME,
+  RESULT_FILE_SUMMARY_MAX_BYTES,
+  RESULT_FILE_HEADER_KEYS,
+  RESULT_FILE_SCHEMA_1_0_0,
+  RESULT_FILE_END_VALUE_SCHEMA_1_0_0,
+  ResultFileFormatError,
+  validateResultFileHeader,
+  buildResultFileHeader,
+  serializeResultFileHeaderPrefix,
+  writeResultFile,
+  resultFileOutputSchema,
+  resultFileDeclarationErrors,
+} from "./result-file.js";
+export type {
+  ResultFileHeader,
+  ResultFileHeaderOptions,
+  ResultFileSummaryValue,
+  WriteResultFileOptions,
+} from "./result-file.js";
