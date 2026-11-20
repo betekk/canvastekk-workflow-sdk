@@ -112,10 +112,11 @@ Kept by design (recorded so reviewers can challenge): `NodeValidationError` stay
 
 ### Phase 4: Exit gate + release staging
 
-- [ ] **4.1** Run the full-tier exit gate over both stacks (ruff, pytest, poetry build, tsc, eslint, vitest, tsup, pack-test per `verification-loop-skill`) and append the `GATE <short-sha> tier=full` memo to this PLAN's Trace
+- [x] **4.1** Run the full-tier exit gate over both stacks (ruff, pytest, poetry build, tsc, eslint, vitest, tsup, pack-test per `verification-loop-skill`) and append the `GATE <short-sha> tier=full` memo to this PLAN's Trace
     — **Why:** the ticket exit gate is full by pipeline rule; Step 10a's PR creation cites this memo.
     — **Done when:** all legs green; memo line present with the final implementation SHA.
     — **Consumers affected:** PR gate citation; merge watcher decision.
+    — **Done:** full-tier exit gate green on the final tree: ruff ✓ · pytest 1117 ✓ · poetry build ✓ · eslint ✓ · tsc ×2 ✓ · tsup ✓ · vitest 513 (29 files) ✓ · pack-test ✓ · e2e n.a. (backend-only, no Playwright); files: none (gate-only); fixes: none
 - [ ] **4.2** Release staging (recorded, executed post-merge): PR carries labels `release` + `major` so the merged squash mints `v1.0.0` from `v0.67.0`; after the merge notification lands, append the migration note to the `v1.0.0` GitHub Release body (`gh release edit`) since cliff-generated notes carry commit subjects only
     — **Why:** AC-3; version files are never hand-bumped (release pipeline stamps all five sources tag-derived — verified in `release.yml`/`bump_versions.py`), so the label pair is the only in-PR release action.
     — **Done when:** PR created with both labels; post-merge steps recorded here and executed at the merge notification (tick only after the release body carries the note).
@@ -151,5 +152,7 @@ LOG CWN residue fix: canvastekk-workflow-nodes#708 merged (279ab971) before Phas
 LOG Phase 2 full escalation: public-API removal with cross-module consumers (Consumer Map rows 2-8) — critical-area anchor.
 GATE (phase 2) tier=full lint=t typecheck=t build=t unit=t e2e=n.a — ruff ✓ · eslint ✓ · tsc ×2 ✓ · poetry build ✓ · tsup ✓ · pack-test ✓ · pytest 1117 ✓ · vitest 513 ✓; e2e n.a. (backend-only, no Playwright configured)
 GATE (phase 3) tier=light lint=t typecheck=t build=- unit=t e2e=n.a — scoped ruff on example files ✓ · YAML parse ✓ · affected tests = example suite 7/7 ✓ (SDK packages untouched this phase)
+LOG Phase 4 ticket-exit full escalation: exit gate runs full unconditionally (ticket's last gate before PR).
+GATE (phase 4, exit) tier=full lint=t typecheck=t build=t unit=t e2e=n.a — final tree @ 6df241f+PLAN: ruff ✓ · pytest 1117 ✓ · poetry build ✓ · eslint ✓ · tsc ×2 ✓ · tsup ✓ · vitest 513 ✓ · pack-test ✓
 LOG Phase 3 fix-on-fail: example tests were pre-existing red on origin/dev (httpx.get mock vs httpx.stream download; name drift) — repaired with the retarget.
 LOG Phase 2 fix-on-fail: round 1 — fastapi extra missing from gate venv (poetry install --extras fastapi), ruff F401×2+F841×1 (autofixed), py tests' own .definition uses (test_app/test_file_download/test_middleware), test_contracts app/base parametrization; round 2 — ts tests NodeAuth imports (auth.test/app.test), type-only asserts in non-regression guard.
