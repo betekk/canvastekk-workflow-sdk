@@ -305,24 +305,3 @@ def _bfs_multi(starts: set[str], adj: dict[str, list[str]]) -> set[str]:
                 visited.add(neighbor)
                 queue.append(neighbor)
     return visited
-
-
-# Deprecated public names (ADR 0001, #271): old names -> renamed symbols.
-_DEPRECATED_ALIASES = {
-    "validate": "validate_workflow_definition",
-    "ValidationResult": "WorkflowDefinitionValidationResult",
-}
-
-
-def __getattr__(name: str):  # PEP 562
-    if name in _DEPRECATED_ALIASES:
-        import warnings
-
-        warnings.warn(
-            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
-            " (ADR 0001; removal in 1.0.0).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return globals()[_DEPRECATED_ALIASES[name]]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

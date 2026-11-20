@@ -12,7 +12,6 @@ import os
 import threading
 import time
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -47,7 +46,6 @@ from canvastekk_workflow_sdk.node_execution_context import NodeExecutionContext,
 from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
 from canvastekk_workflow_sdk.node_execution_response import NodeExecutionResponse
 from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecutionMetricsCollector
-from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifest
 
 logger = logging.getLogger(__name__)
 
@@ -85,35 +83,18 @@ def _download_deadline(timeout_seconds: int | None, started: float | None = None
     return start + budget
 
 
-class _DeprecatedManifestAlias:
-    """Descriptor: legacy `definition` attribute -> `manifest` (ADR 0001, #271)."""
-
-    def __get__(self, obj: WorkflowNodeBase | None, objtype: type | None = None) -> WorkflowNodeManifest:
-        warnings.warn(
-            "The 'definition' attribute is deprecated; use 'manifest'"
-            " (ADR 0001; removal in 1.0.0).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if obj is None:
-            assert objtype is not None
-            return objtype.manifest  # type: ignore[attr-defined]
-        return obj.manifest
-
-
 class WorkflowNodeBase(ABC):
     """
     Abstract base class for all nodes.
 
     Subclasses must:
     1. Define a `manifest` class attribute with WorkflowNodeManifest
-       (legacy `definition` attribute names still resolve, with a deprecation
-       warning — ADR 0001, #271)
+       (the legacy `definition` attribute alias was removed in 1.0.0, #272)
     2. Implement the `execute()` method
 
     Example:
         class EchoNode(WorkflowNodeBase):
-            definition = WorkflowNodeManifest(
+            manifest = WorkflowNodeManifest(
                 name="echo",
                 version="1.0.0",
                 title="Echo",
@@ -125,8 +106,6 @@ class WorkflowNodeBase(ABC):
             def execute(self, inputs: dict, context: NodeExecutionContext) -> dict:
                 return {"message": inputs.get("message", "")}
     """
-
-    definition: WorkflowNodeManifest
 
     def __init__(self) -> None:
         """Initialize the base node with default middleware and metrics collector."""
@@ -164,22 +143,8 @@ class WorkflowNodeBase(ABC):
             return
         manifest = getattr(cls, "manifest", None)
         if manifest is None:
-            legacy = getattr(cls, "definition", None)
-            if legacy is None:
-                raise TypeError(f"{cls.__name__} must define a 'manifest' class attribute")
-            warnings.warn(
-                f"{cls.__name__}.definition is deprecated; name the manifest"
-                " class attribute 'manifest' (ADR 0001; removal in 1.0.0).",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            cls.manifest = legacy
+            raise TypeError(f"{cls.__name__} must define a 'manifest' class attribute")
 
-
-    # Deprecated class/instance attribute alias (ADR 0001, #271). A
-    # descriptor, not a property, so `NodeClass.definition` keeps working at
-    # class level (property objects are only bound on instances).
-    definition = _DeprecatedManifestAlias()
 
     @abstractmethod
     def execute(self, inputs: dict[str, Any], context: NodeExecutionContext) -> dict[str, Any]:

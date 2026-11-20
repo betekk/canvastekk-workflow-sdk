@@ -347,7 +347,7 @@ class TestValidateVerdictFields:
 class TestImportGraph:
     """DA-3359: contracts is opt-in — core modules never import it."""
 
-    @pytest.mark.parametrize("module_name", ["app", "base"])
+    @pytest.mark.parametrize("module_name", ["workflow_node_app", "workflow_node_base"])
     def test_core_modules_do_not_import_contracts(self, module_name: str) -> None:
         import ast
         import importlib.util

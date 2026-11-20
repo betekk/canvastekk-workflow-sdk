@@ -18,9 +18,9 @@ vi.mock("../src/logging.js", () => ({
 }));
 
 import { WorkflowNodeBase } from "../src/workflow-node-base.js";
-import { WorkflowNodeManifestSchema } from "../src/definition.js";
-import { buildWorkflowNodeRegistryPayload } from "../src/registry.js";
-import type { WorkflowNodeManifest, WorkflowNodeDeprecationInfo } from "../src/definition.js";
+import { WorkflowNodeManifestSchema } from "../src/workflow-node-manifest.js";
+import { buildWorkflowNodeRegistryPayload } from "../src/workflow-node-registry.js";
+import type { WorkflowNodeManifest, WorkflowNodeDeprecationInfo } from "../src/workflow-node-manifest.js";
 
 const fullDeprecation: WorkflowNodeDeprecationInfo = {
   deprecated_at: "2026-09-03",

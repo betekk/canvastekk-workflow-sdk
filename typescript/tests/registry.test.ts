@@ -9,14 +9,14 @@ import {
   fetchPublishedWorkflowNodeManifest,
   invalidCtkReason,
   diffAgainstPublishedWorkflowNodeManifest,
-} from "../src/registry.js";
+} from "../src/workflow-node-registry.js";
 import { WorkflowNodeRegistrationError } from "../src/exceptions.js";
 import { VERSION } from "../src/version.js";
-import { exportWorkflowNodeManifest } from "../src/registry.js";
+import { exportWorkflowNodeManifest } from "../src/workflow-node-registry.js";
 import { readFileSync, rmSync } from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { WorkflowNodeManifest } from "../src/definition.js";
+import type { WorkflowNodeManifest } from "../src/workflow-node-manifest.js";
 
 const testDef: WorkflowNodeManifest = {
   slug: "echo",

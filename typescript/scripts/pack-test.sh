@@ -22,8 +22,7 @@ PKG="$WORK/node_modules/@betekk/canvastekk-workflow-sdk"
 
 node --input-type=module -e "
 const root = await import('$PKG/dist/index.js');
-if (typeof root.BaseNode !== 'function') { throw new Error('root import missing BaseNode'); }
-if (typeof root.NodeAuth !== 'function') { throw new Error('root import missing NodeAuth'); }
+if (typeof root.WorkflowNodeBase !== 'function') { throw new Error('root import missing WorkflowNodeBase'); }
 if (typeof root.TekkNodeAuth !== 'function') { throw new Error('root import missing TekkNodeAuth'); }
 console.log('root import OK without express');
 "

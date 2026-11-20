@@ -470,7 +470,5 @@ export class TekkNodeAuth {
 
 /**
  * Canonical name (ADR 0001, #271) — the SDK's multi-auth recognition prefix.
- * `NodeAuth` remains below as a deprecated alias (removal in 1.0.0, #272).
+ * The deprecated `NodeAuth` alias was removed in 1.0.0 (#272).
  */
-/** @deprecated use TekkNodeAuth (ADR 0001, #271; removal in 1.0.0, #272) */
-export const NodeAuth = TekkNodeAuth;

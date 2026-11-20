@@ -9,9 +9,9 @@ import {
   getFileOutputFields,
   validateFileInput,
   effectiveRuntimeSeconds,
-} from "../src/definition.js";
+} from "../src/workflow-node-manifest.js";
 import { NodeValidationError } from "../src/exceptions.js";
-import { diffWorkflowNodeManifests } from "../src/diff.js";
+import { diffWorkflowNodeManifests } from "../src/workflow-node-manifest-diff.js";
 
 const validDefinition = {
   slug: "my-node",
@@ -346,14 +346,14 @@ describe("WorkflowNodeRoleSchema", () => {
 
 describe("WorkflowNodeStylesSchema", () => {
   it("parses styles", async () => {
-    const { WorkflowNodeStylesSchema } = await import("../src/definition.js");
+    const { WorkflowNodeStylesSchema } = await import("../src/workflow-node-manifest.js");
     const styles = WorkflowNodeStylesSchema.parse({ icon: "Brain", color: "emerald" });
     expect(styles.icon).toBe("Brain");
     expect(styles.color).toBe("emerald");
   });
 
   it("parses roles", async () => {
-    const { WorkflowNodeRoleSchema } = await import("../src/definition.js");
+    const { WorkflowNodeRoleSchema } = await import("../src/workflow-node-manifest.js");
     expect(WorkflowNodeRoleSchema.parse("start")).toBe("start");
     expect(WorkflowNodeRoleSchema.parse(undefined)).toBe("operation");
   });

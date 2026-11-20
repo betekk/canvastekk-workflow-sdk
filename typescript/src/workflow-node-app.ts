@@ -33,7 +33,7 @@ export interface CreateNodeAppOptions {
  * @param opts - Optional configuration for dependencies and extra routes
  * @returns Configured Express application
  */
-/** True when any dependency middleware was produced by NodeAuth (DA-1955). */
+/** True when any dependency middleware was produced by TekkNodeAuth (DA-1955). */
 function hasAuthDependency(
   dependencies?: Array<(req: Request, res: Response, next: NextFunction) => void>,
 ): boolean {

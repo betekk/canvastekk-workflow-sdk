@@ -1105,4 +1105,4 @@ class TestArrayFileInputsSdk161:
 
     def test_manifest_accepts_array_of_file(self):
         # type: array + items.format: file (S.1)
-        assert "parts" in ArrayFileInputNode().definition.file_input_fields
+        assert "parts" in ArrayFileInputNode().manifest.file_input_fields

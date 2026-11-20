@@ -160,7 +160,7 @@ function formatAjvErrors(errors: import("ajv").ErrorObject[]): Record<string, un
  *
  * Subclasses must:
  * 1. Define a `manifest` class attribute with a valid WorkflowNodeManifest
- *    (legacy `definition` fields still resolve, deprecated — ADR 0001, #271)
+ *    (the legacy `definition` attribute alias was removed in 1.0.0, #272)
  * 2. Implement the `execute()` method
  *
  * The SDK validates the manifest at construction time and auto-downloads
@@ -170,7 +170,7 @@ function formatAjvErrors(errors: import("ajv").ErrorObject[]): Record<string, un
  * @example
  * ```typescript
  * class EchoNode extends WorkflowNodeBase {
- *   definition = {
+ *   manifest = {
  *     slug: "echo",
  *     version: "1.0.0",
  *     name: "Echo Node",
@@ -187,9 +187,8 @@ function formatAjvErrors(errors: import("ajv").ErrorObject[]): Record<string, un
  */
 export abstract class WorkflowNodeBase {
   // Manifest attribute contract (ADR 0001, #271): subclasses declare a
-  // `manifest` class field (legacy `definition` still resolves). Presence is
-  // enforced at runtime by getWorkflowNodeManifest's schema parse — TS
-  // cannot express "either attribute name" as an abstract member.
+  // `manifest` class field. Presence is enforced at runtime by
+  // getWorkflowNodeManifest's schema parse.
 
   private _middleware: NodeMiddleware[] = [new LoggingMiddleware()];
   private _metricsCollector: NodeExecutionMetricsCollector = new NodeExecutionMetricsCollector();
@@ -209,26 +208,10 @@ export abstract class WorkflowNodeBase {
   }
 
   /**
-   * @deprecated use getWorkflowNodeManifest (ADR 0001, #271; removal in 1.0.0, #272)
-   */
-  protected getDefinition(): WorkflowNodeManifest {
-    return this.getWorkflowNodeManifest();
-  }
-
-  /**
    * The node's workflow node manifest (ADR 0001, #271). Canonical name for
-   * the class attribute; legacy `definition` fields still resolve here.
+   * the class attribute.
    */
   get manifest(): WorkflowNodeManifest {
-    return this.getWorkflowNodeManifest();
-  }
-
-  /**
-   * @deprecated legacy attribute name — use `manifest` (ADR 0001, #271;
-   * removal in 1.0.0, #272). Subclasses declaring their own `definition`
-   * field shadow this getter, which is exactly the legacy pattern.
-   */
-  get definition(): WorkflowNodeManifest {
     return this.getWorkflowNodeManifest();
   }
 
@@ -237,18 +220,18 @@ export abstract class WorkflowNodeBase {
   }
 
   /**
-   * Gets the validated node definition.
-   * Caches the validated definition after first call.
+   * Gets the validated node manifest.
+   * Caches the validated manifest after first call.
    * @returns Validated workflow node manifest
    */
   protected getWorkflowNodeManifest(): WorkflowNodeManifest {
     if (!this._validatedDefinition) {
-      // ADR 0001 (#271): prefer the canonical own `manifest` field; fall back
-      // to the legacy own `definition` field. Own-property reads only — the
-      // prototype `manifest` getter routes back here (recursion guard).
+      // ADR 0001 (#271): read the canonical own `manifest` field.
+      // Own-property read only — the prototype `manifest` getter routes back
+      // here (recursion guard).
       const self = this as unknown as Record<string, unknown>;
       const hasOwn = Object.prototype.hasOwnProperty.call(this, "manifest");
-      const rawManifest = (hasOwn ? self.manifest : undefined) ?? self.definition;
+      const rawManifest = hasOwn ? self.manifest : undefined;
       this._validatedDefinition = WorkflowNodeManifestSchema.parse(rawManifest);
     }
     return this._validatedDefinition;

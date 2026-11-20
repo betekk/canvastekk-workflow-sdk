@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { buildEngineRequest, probeManifest, cliMain, applyRegistryDiff } from "../src/cli.js";
-import { WorkflowNodeManifestSchema } from "../src/definition.js";
+import { WorkflowNodeManifestSchema } from "../src/workflow-node-manifest.js";
 
 /** Well-formed registry credential (DA-1948 shape: ctk_ + 43). */
 const CTK = "ctk_" + "x".repeat(43);

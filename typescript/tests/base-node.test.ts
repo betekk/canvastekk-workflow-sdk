@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WorkflowNodeBase, downloadDeadline } from "../src/workflow-node-base.js";
-import { effectiveRuntimeSeconds } from "../src/definition.js";
-import type { WorkflowNodeManifest } from "../src/definition.js";
+import { effectiveRuntimeSeconds } from "../src/workflow-node-manifest.js";
+import type { WorkflowNodeManifest } from "../src/workflow-node-manifest.js";
 import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import { TimingMiddleware } from "../src/middleware.js";
 

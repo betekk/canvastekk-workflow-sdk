@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NODE_TOKEN_PREFIX, isNodeToken } from "../src/node-token.js";
-import { NodeAuth, TekkNodeAuth } from "../src/auth.js";
+import { TekkNodeAuth } from "../src/auth.js";
 import type { AuthRequest, AuthMiddleware } from "../src/auth.js";
 
 function makeReq(key?: string): AuthRequest {
@@ -189,7 +189,7 @@ describe("TekkNodeAuth.central", () => {
   });
 });
 
-describe("NodeAuth.apiKey (regression)", () => {
+describe("TekkNodeAuth.apiKey (regression)", () => {
   beforeEach(() => {
     delete process.env.CANVASTEKK_DEV_MODE;
     process.env.CANVASTEKK_API_KEY = "static-key";
@@ -200,21 +200,20 @@ describe("NodeAuth.apiKey (regression)", () => {
   });
 
   it("still accepts the configured static key", async () => {
-    const middleware = NodeAuth.apiKey();
+    const middleware = TekkNodeAuth.apiKey();
     const res = await run(middleware, makeReq("static-key"));
     expect(res.statusCode).toBe(0);
   });
 
   it("still rejects a wrong key with 401", async () => {
-    const middleware = NodeAuth.apiKey();
+    const middleware = TekkNodeAuth.apiKey();
     const res = await run(middleware, makeReq("wrong"));
     expect(res.statusCode).toBe(401);
   });
 });
 
-describe("TekkNodeAuth alias (#225)", () => {
-  it("is the same object as NodeAuth with the same factories", () => {
-    expect(TekkNodeAuth).toBe(NodeAuth);
+describe("TekkNodeAuth factories (#225; NodeAuth alias removed in 1.0.0, #272)", () => {
+  it("keeps the auth factories", () => {
     expect(typeof TekkNodeAuth.apiKey).toBe("function");
     expect(typeof TekkNodeAuth.central).toBe("function");
     expect(typeof TekkNodeAuth.jwt).toBe("function");

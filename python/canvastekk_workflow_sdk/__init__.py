@@ -225,70 +225,8 @@ _LAZY_SERVER_EXPORTS = {
     "create_workflow_node_lambda_handler": "canvastekk_workflow_sdk.bootstrap",
 }
 
-# Deprecated public-name aliases (ADR 0001, #271): old name -> (module, new
-# name). Resolved lazily so new-name users never see a DeprecationWarning.
-_DEPRECATED_NAME_ALIASES = {
-    "export_definition": ("canvastekk_workflow_sdk.workflow_node_manifest", "export_workflow_node_manifest"),
-    "NodeContract": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeManifestContract"),
-    "ContractCapabilities": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeContractCapabilities"),
-    "RetryConfig": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeRetryConfig"),
-    "ColorPreset": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeColorPreset"),
-    "DeprecationInfo": ("canvastekk_workflow_sdk.workflow_node_manifest", "WorkflowNodeDeprecationInfo"),
-    "SDK_SERVED_CONTRACT_ROUTES": ("canvastekk_workflow_sdk.workflow_node_manifest", "WORKFLOW_NODE_MANIFEST_CONTRACT_ROUTES"),
-    "RegisterNodeResult": ("canvastekk_workflow_sdk.workflow_node_registry", "WorkflowNodeRegistrationResult"),
-    "RegistrationError": ("canvastekk_workflow_sdk.workflow_node_registry", "WorkflowNodeRegistrationError"),
-    "register_node": ("canvastekk_workflow_sdk.workflow_node_registry", "register_workflow_node"),
-    "build_registry_payload": ("canvastekk_workflow_sdk.workflow_node_registry", "build_workflow_node_registry_payload"),
-    # Phase 3 (ADR 0001): node runtime + execution cluster
-    "BaseNode": ("canvastekk_workflow_sdk.workflow_node_base", "WorkflowNodeBase"),
-    "ExecutionContext": ("canvastekk_workflow_sdk.node_execution_context", "NodeExecutionContext"),
-    "ExecutionMetric": ("canvastekk_workflow_sdk.observability", "NodeExecutionMetric"),
-    "MetricsCollector": ("canvastekk_workflow_sdk.observability", "NodeExecutionMetricsCollector"),
-    "HealthResponse": ("canvastekk_workflow_sdk.node_execution_response", "WorkflowNodeHealthResponse"),
-    "NodeExecutionStatus": ("canvastekk_workflow_sdk.node_io_data_contracts", "WorkflowNodeCallOutcome"),
-    "parse_node_execution_status": ("canvastekk_workflow_sdk.node_io_data_contracts", "parse_workflow_node_call_outcome"),
-    "OutputUploader": ("canvastekk_workflow_sdk.node_output_uploads", "NodeOutputUploader"),
-    "S3PresignedUploader": ("canvastekk_workflow_sdk.node_output_uploads", "NodeOutputS3PresignedUploader"),
-    "UploadSession": ("canvastekk_workflow_sdk.node_output_uploads", "NodeOutputUploadSession"),
-    "UploadTarget": ("canvastekk_workflow_sdk.node_output_uploads", "NodeOutputUploadTarget"),
-    "get_default_uploader": ("canvastekk_workflow_sdk.node_output_uploads", "get_default_node_output_uploader"),
-    "BaseContract": ("canvastekk_workflow_sdk.node_io_data_contracts", "NodeIoDataContract"),
-    # FastAPI-backed server entry points (were in _LAZY_SERVER_EXPORTS; importing
-    # the module without the fastapi extra raises ImportError, as before).
-    "create_node_app": ("canvastekk_workflow_sdk.workflow_node_app", "create_workflow_node_app"),
-    "create_multi_node_app": ("canvastekk_workflow_sdk.multi_node_router", "create_multi_workflow_node_app"),
-    "mount_node": ("canvastekk_workflow_sdk.bootstrap", "mount_workflow_node"),
-    "create_authed_app": ("canvastekk_workflow_sdk.bootstrap", "create_authed_workflow_node_app"),
-    "create_lambda_handler": ("canvastekk_workflow_sdk.bootstrap", "create_workflow_node_lambda_handler"),
-    # Phase 4 (ADR 0001): workflow definition + run cluster
-    "validate": ("canvastekk_workflow_sdk.workflow.validation", "validate_workflow_definition"),
-    "ValidationResult": ("canvastekk_workflow_sdk.workflow.validation", "WorkflowDefinitionValidationResult"),
-    "NodeResult": ("canvastekk_workflow_sdk.workflow.runner", "WorkflowRunNodeResult"),
-    "NodeExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "WorkflowRunNodeExecutor"),
-    "InProcessExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "InProcessNodeExecutor"),
-    "HttpExecutor": ("canvastekk_workflow_sdk.workflow.node_executor", "HttpNodeExecutor"),
-    "WorkflowExecutionError": ("canvastekk_workflow_sdk.exceptions", "WorkflowRunError"),
-    "WorkflowValidationError": ("canvastekk_workflow_sdk.exceptions", "WorkflowDefinitionValidationError"),
-}
-
 
 def __getattr__(name: str):
-    alias = _DEPRECATED_NAME_ALIASES.get(name)
-    if alias is not None:
-        import importlib
-        import warnings
-
-        module_path, new_name = alias
-        warnings.warn(
-            f"{name!r} is deprecated; use {new_name!r} from {module_path} "
-            "(ADR 0001; removal in 1.0.0).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        value = getattr(importlib.import_module(module_path), new_name)
-        # Deliberately NOT cached into globals(): old names must warn on every
-        # access (ADR 0001) — caching would silence the signal after first use.
-        return value
     if name in _LAZY_SERVER_EXPORTS:
         try:
             import fastapi  # noqa: F401

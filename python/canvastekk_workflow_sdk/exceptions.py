@@ -342,24 +342,3 @@ def get_http_status_for_error(exc: NodeExecutionError) -> int:
         Integer HTTP status code (defaults to 500 for unknown error codes).
     """
     return ERROR_CODE_TO_HTTP_STATUS.get(exc.error_code, 500)
-
-
-# Deprecated public names (ADR 0001, #271): old exception names -> renamed.
-_DEPRECATED_ALIASES = {
-    "WorkflowExecutionError": "WorkflowRunError",
-    "WorkflowValidationError": "WorkflowDefinitionValidationError",
-}
-
-
-def __getattr__(name: str):  # PEP 562
-    if name in _DEPRECATED_ALIASES:
-        import warnings
-
-        warnings.warn(
-            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
-            " (ADR 0001; removal in 1.0.0).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return globals()[_DEPRECATED_ALIASES[name]]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

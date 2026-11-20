@@ -1,135 +1,140 @@
 /**
- * Deprecated-alias tests (ADR 0001, #271).
+ * Removed-alias guard tests (ADR 0001, #271 removal; 1.0.0, #272).
  *
- * Old module paths keep resolving and old index names keep re-exporting
- * (compile-time `@deprecated` markers are the TypeScript warning surface).
- * Phase-scoped: grows with each rename phase.
+ * The old module paths, deprecated index names, and the legacy `definition`
+ * class attribute were removed in 1.0.0. These guards FAIL if any of them
+ * returns: every old path must reject on import and every old index name
+ * must be absent from the index namespace.
  */
 import { describe, expect, it } from "vitest";
 
-// Old module paths must still resolve (shim files re-export the new modules).
-import * as oldDefinition from "../src/definition.js";
-import * as oldDiff from "../src/diff.js";
-import * as oldRegistry from "../src/registry.js";
+import * as sdk from "../src/index.js";
 import * as newManifest from "../src/workflow-node-manifest.js";
 import * as newManifestDiff from "../src/workflow-node-manifest-diff.js";
 import * as newRegistry from "../src/workflow-node-registry.js";
-import {
-  ColorPreset,
-  ContractCapabilities,
-  DeprecationInfo,
-  ManifestDiff,
-  NodeContract,
-  RetryConfig,
-  buildRegistryPayload,
-  diffManifests,
-  exportDefinition,
-  getNodeId,
-  registerNode,
-  RegisterNodeResult,
-  RegistrationError,
-} from "../src/index.js";
-
-describe("deprecated module paths (ADR 0001)", () => {
-  it("definition.js re-exports workflow-node-manifest.js", () => {
-    expect(oldDefinition.getWorkflowNodeManifestId).toBe(newManifest.getWorkflowNodeManifestId);
-    expect(oldDefinition.exportWorkflowNodeManifest).toBe(newManifest.exportWorkflowNodeManifest);
-  });
-
-  it("diff.js re-exports workflow-node-manifest-diff.js", () => {
-    expect(oldDiff.diffWorkflowNodeManifests).toBe(newManifestDiff.diffWorkflowNodeManifests);
-  });
-
-  it("registry.js re-exports workflow-node-registry.js", () => {
-    expect(oldRegistry.registerWorkflowNode).toBe(newRegistry.registerWorkflowNode);
-    expect(oldRegistry.buildWorkflowNodeRegistryPayload).toBe(
-      newRegistry.buildWorkflowNodeRegistryPayload,
-    );
-  });
-});
-
-describe("deprecated index names (ADR 0001)", () => {
-  it("manifest-cluster old names point at the new symbols", () => {
-    expect(getNodeId).toBe(newManifest.getWorkflowNodeManifestId);
-    expect(exportDefinition).toBe(newRegistry.exportWorkflowNodeManifest);
-    expect(diffManifests).toBe(newManifestDiff.diffWorkflowNodeManifests);
-    expect(registerNode).toBe(newRegistry.registerWorkflowNode);
-    expect(buildRegistryPayload).toBe(newRegistry.buildWorkflowNodeRegistryPayload);
-    expect(RegistrationError?.name ?? "present").toBeTruthy();
-  });
-
-  it("type-only old names still typecheck as the new symbols", () => {
-    // Compile-time alias proof: assigning the deprecated type name to the
-    // new name's shape must typecheck (types are erased at runtime).
-    const retry: RetryConfig | undefined = undefined;
-    const preset: ColorPreset | undefined = undefined;
-    const deprecation: DeprecationInfo | undefined = undefined;
-    const contract: NodeContract | undefined = undefined;
-    const capabilities: ContractCapabilities | undefined = undefined;
-    const diffKind: ManifestDiff | undefined = undefined;
-    const registration: RegisterNodeResult | undefined = undefined;
-    expect([retry, preset, deprecation, contract, capabilities, diffKind, registration]).toEqual(
-      Array(7).fill(undefined),
-    );
-  });
-});
-
-// --- Phase 4 (workflow definition + run cluster) ---
-import * as oldModels from "../src/workflow/models.js";
-import * as oldExecutor from "../src/workflow/executor.js";
-import * as newWorkflowDefinition from "../src/workflow/workflow-definition.js";
 import * as newNodeExecutor from "../src/workflow/node-executor.js";
-import {
-  validate,
-  ValidationResult,
-  NodeResult,
-  ErrorPolicy,
-  NodeExecutor,
-  InProcessExecutor,
-  HttpExecutor,
-  WorkflowExecutionError,
-  WorkflowValidationError,
-} from "../src/index.js";
-import * as newValidation from "../src/workflow/validation.js";
-import { WorkflowRunError, WorkflowDefinitionValidationError } from "../src/exceptions.js";
 
-describe("deprecated paths + names, phase 4 (ADR 0001)", () => {
-  it("workflow/models.js re-exports workflow-definition.js", () => {
-    expect(oldModels.WorkflowDefinitionSpec).toBe(newWorkflowDefinition.WorkflowDefinitionSpec);
-  });
+const REMOVED_PATHS = [
+  "../src/definition.js",
+  "../src/diff.js",
+  "../src/registry.js",
+  "../src/base-node.js",
+  "../src/app.js",
+  "../src/request.js",
+  "../src/response.js",
+  "../src/context.js",
+  "../src/protocol.js",
+  "../src/uploads.js",
+  "../src/multipart.js",
+  "../src/workflow/models.js",
+  "../src/workflow/executor.js",
+] as const;
 
-  it("workflow/executor.js re-exports node-executor.js with old class names", () => {
-    expect(oldExecutor.NodeExecutor).toBe(newNodeExecutor.WorkflowRunNodeExecutor);
-    expect(oldExecutor.InProcessExecutor).toBe(newNodeExecutor.InProcessNodeExecutor);
-    expect(oldExecutor.HttpExecutor).toBe(newNodeExecutor.HttpNodeExecutor);
-  });
+const REMOVED_INDEX_NAMES = [
+  "BaseNode",
+  "ExecutionContext",
+  "HealthResponse",
+  "HealthResponseSchema",
+  "NodeExecutionStatus",
+  "NodeExecutionStatusSchema",
+  "parseNodeExecutionStatus",
+  "NODE_PROTOCOL_HEADER",
+  "NODE_PROTOCOL_VERSION",
+  "PROTOCOL_2_OUTCOMES",
+  "outcomeForProtocol",
+  "readOutcome",
+  "requestedProtocol",
+  "MetricsCollector",
+  "createExecutionMetric",
+  "metricToDict",
+  "ExecutionMetric",
+  "S3PresignedUploader",
+  "getDefaultUploader",
+  "UploadSessionDescriptorSchema",
+  "OutputUploader",
+  "UploadTarget",
+  "UploadSessionDescriptor",
+  "uploadViaSession",
+  "CONTRACT_VERSION",
+  "BaseContractData",
+  "validate",
+  "ValidationResult",
+  "NodeResult",
+  "ErrorPolicy",
+  "NodeExecutor",
+  "InProcessExecutor",
+  "HttpExecutor",
+  "WorkflowExecutionError",
+  "WorkflowValidationError",
+  "ColorPreset",
+  "ColorPresetSchema",
+  "RetryConfig",
+  "RetryConfigSchema",
+  "DeprecationInfo",
+  "DeprecationInfoSchema",
+  "NodeContract",
+  "ContractCapabilities",
+  "getNodeId",
+  "diffManifests",
+  "ManifestDiff",
+  "registerNode",
+  "RegisterNodeResult",
+  "RegistrationError",
+  "buildRegistryPayload",
+  "exportDefinition",
+  "NodeAuth",
+] as const;
 
-  it("index old names point at the new symbols", () => {
-    expect(validate).toBe(newValidation.validateWorkflowDefinition);
-    expect(WorkflowExecutionError).toBe(WorkflowRunError);
-    expect(WorkflowValidationError).toBe(WorkflowDefinitionValidationError);
-  });
-
-  it("type-only old names typecheck", () => {
-    const r: ValidationResult | undefined = undefined;
-    const n: NodeResult | undefined = undefined;
-    const p: ErrorPolicy | undefined = undefined;
-    const e: NodeExecutor | undefined = undefined;
-    const i: InProcessExecutor | undefined = undefined;
-    const h: HttpExecutor | undefined = undefined;
-    expect([r, n, p, e, i, h]).toEqual(Array(6).fill(undefined));
+describe("removed module paths (1.0.0, #272)", () => {
+  it.each(REMOVED_PATHS)("old path %s rejects on import", async (path) => {
+    await expect(import(/* @vite-ignore */ path as string)).rejects.toBeTruthy();
   });
 });
 
-describe("legacy `definition` class attribute (ADR 0001)", () => {
-  it("still resolves the manifest when `manifest` is absent", async () => {
+describe("removed index names (1.0.0, #272)", () => {
+  it("none of the old names resolve from the index", () => {
+    const present = REMOVED_INDEX_NAMES.filter((n) => n in sdk);
+    expect(present, `old names still exported: ${present.join(", ")}`).toEqual([]);
+  });
+
+  it("canonical names still resolve (non-regression)", () => {
+    expect(newManifest.getWorkflowNodeManifestId).toBeTruthy();
+    expect(newRegistry.exportWorkflowNodeManifest).toBeTruthy();
+    expect(newManifestDiff.diffWorkflowNodeManifests).toBeTruthy();
+    expect(newNodeExecutor.InProcessNodeExecutor).toBeTruthy();
+    expect(newNodeExecutor.HttpNodeExecutor).toBeTruthy();
+  });
+});
+
+describe("removed legacy `definition` attribute (1.0.0, #272)", () => {
+  it("nodes carry the manifest only through `manifest`", async () => {
+    const { WorkflowNodeBase, WorkflowNodeManifestSchema } = await import("../src/index.js");
+    class CanonicalNode extends WorkflowNodeBase {
+      manifest = {
+        slug: "canonical-only",
+        version: "1.0.0",
+        name: "Canonical Only",
+        description: "manifest attribute only",
+        input_schema: { type: "object" },
+        output_schema: { type: "object" },
+      };
+      execute(): Record<string, unknown> {
+        return {};
+      }
+    }
+    const node = new CanonicalNode();
+    expect(WorkflowNodeManifestSchema.parse((node as unknown as { manifest: unknown }).manifest)).toBeTruthy();
+    expect((node as unknown as { definition?: unknown }).definition).toBeUndefined();
+  });
+
+  it("a legacy `definition`-only class no longer resolves a manifest", async () => {
     const { WorkflowNodeBase, WorkflowNodeManifestSchema } = await import("../src/index.js");
     class LegacyAttrNode extends WorkflowNodeBase {
       definition = {
         slug: "legacy-attr",
         version: "1.0.0",
         name: "Legacy Attr",
-        description: "legacy attribute alias test",
+        description: "legacy attribute must be inert in 1.0.0",
         input_schema: { type: "object" },
         output_schema: { type: "object" },
       };
@@ -138,6 +143,9 @@ describe("legacy `definition` class attribute (ADR 0001)", () => {
       }
     }
     const node = new LegacyAttrNode();
-    expect(WorkflowNodeManifestSchema.parse((node as unknown as { manifest: unknown }).manifest)).toBeTruthy();
+    const self = node as unknown as Record<string, unknown>;
+    expect(() =>
+      WorkflowNodeManifestSchema.parse(self.manifest),
+    ).toThrow();
   });
 });
