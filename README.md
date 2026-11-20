@@ -628,6 +628,10 @@ execution slug=ifc-consolidate-lambda status=pass duration_ms=1420
 - If your host application configures its own logging handlers, the SDK
   leaves them untouched.
 
+## Result Files
+
+One standard JSON result file per run, written by the producing node through the SDK writer (Python `write_result_file`, TypeScript `writeResultFile`). Layout, manifest convention and header reader: [`docs/RESULT-FILE.md`](./docs/RESULT-FILE.md).
+
 ## External Author Guide
 
 Building and deploying a node for the first time? See the **[EXTERNAL AUTHOR GUIDE](./docs/EXTERNAL-AUTHOR-GUIDE.md)** for a step-by-step walkthrough covering:

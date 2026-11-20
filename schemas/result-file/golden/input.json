@@ -1,0 +1,21 @@
+{
+  "result_schema": "model_check.rule",
+  "result_schema_version": "0.1.0",
+  "workflow_run_id": "run-3f2a9c1e-0000-4000-8000-000000000001",
+  "generated_at": "2026-11-20T10:00:00.123Z",
+  "summary": {
+    "verdict": "FAIL",
+    "fail_count": 14,
+    "pass_count": 9,
+    "coverage_ratio": 0.5,
+    "evaluable": true,
+    "note": "Größe \"quoted\" / tab\tline\nend ✓",
+    "missing": null
+  },
+  "body": {
+    "verdict": "FAIL",
+    "verdict_counts": {"PASS": 9, "FAIL": 14, "NOT_EVALUABLE": 0},
+    "requirement_verdicts": [{"id": "R1", "verdict": "FAIL", "measured": -12, "threshold": 1.25}],
+    "result": {"text": "日本語 and emoji 🚪", "empty": [], "nothing": {}}
+  }
+}

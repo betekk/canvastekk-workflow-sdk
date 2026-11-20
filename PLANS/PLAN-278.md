@@ -74,11 +74,11 @@
     — **Consumers affected:** every TS node manifest (narrow trigger)
 
 ### Phase 4: Golden parity and docs
-- [ ] **4.1** Add `schemas/result-file/golden/` (input + expected bytes) and assert both writers reproduce it exactly
+- [x] **4.1** Add `schemas/result-file/golden/` (input + expected bytes) and assert both writers reproduce it exactly
     — **Why:** AC "byte-identical headers"
     — **Done when:** both suites compare against the golden bytes
     — **Consumers affected:** none
-- [ ] **4.2** Add `docs/RESULT-FILE.md` (layout, ownership split, writer usage, manifest convention with an example node, header reader, end-value schema), a GLOSSARY entry and README pointers
+- [x] **4.2** Add `docs/RESULT-FILE.md` (layout, ownership split, writer usage, manifest convention with an example node, header reader, end-value schema), a GLOSSARY entry and README pointers
     — **Why:** AC "manifest convention documented with an example node"
     — **Done when:** docs merged; links resolve
     — **Consumers affected:** node authors
