@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:canvastekk:result-file:1.0.0",
+  "title": "CanvasTEKK workflow run result file, layout 1.0.0",
+  "description": "Platform-owned layout of a workflow run result file. Header keys come first, in this order: result_file_version, result_schema, result_schema_version, workflow_run_id, generated_at, summary (optional); body comes last. body is owned by the producing app and is never validated by the platform. summary must also be at most 2048 bytes as compact UTF-8 JSON (checked in code; JSON Schema cannot express it).",
+  "type": "object",
+  "required": [
+    "result_file_version",
+    "result_schema",
+    "result_schema_version",
+    "workflow_run_id",
+    "generated_at",
+    "body"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "result_file_version": {
+      "description": "Version of this platform layout.",
+      "const": "1.0.0"
+    },
+    "result_schema": {
+      "description": "App-chosen label naming the shape of body: app.kind, snake_case parts (e.g. model_check.rule).",
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "result_schema_version": {
+      "description": "App-chosen semver of that shape (X.Y.Z).",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "workflow_run_id": {
+      "description": "Run id from the node execution request.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "generated_at": {
+      "description": "UTC timestamp, ISO 8601 with a Z suffix.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$"
+    },
+    "summary": {
+      "description": "Optional flat key-value pairs, app-defined keys, scalar values only, at most 2048 bytes.",
+      "type": "object",
+      "propertyNames": {
+        "maxLength": 64,
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      }
+    },
+    "body": {
+      "description": "App-owned content. Any JSON value."
+    }
+  }
+}
