@@ -221,7 +221,7 @@ export interface ResultFileHeaderOptions {
   /** Semver of that shape, e.g. `0.1.0`. */
   resultSchemaVersion: string;
   /** Optional flat key-value pairs (≤2 KB). */
-  summary?: Record<string, ResultFileSummaryValue>;
+  summary?: Record<string, ResultFileSummaryValue> | null;
   /** Timestamp; defaults to now. Written as UTC with milliseconds and `Z`. */
   generatedAt?: Date;
 }
@@ -246,7 +246,7 @@ export function buildResultFileHeader(opts: ResultFileHeaderOptions, workflowRun
     workflow_run_id: workflowRunId,
     generated_at: generatedAt.toISOString(),
   };
-  if (opts.summary !== undefined) header.summary = opts.summary;
+  if (opts.summary !== undefined && opts.summary !== null) header.summary = opts.summary;
   return validateResultFileHeader(header);
 }
 

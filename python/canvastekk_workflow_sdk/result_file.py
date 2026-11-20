@@ -41,7 +41,6 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from functools import cache
 from importlib import resources
-from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
 from jsonschema import Draft7Validator
@@ -71,7 +70,7 @@ RESULT_FILE_SUMMARY_MAX_BYTES = 2048
 """Upper bound for ``summary`` as compact UTF-8 JSON."""
 
 RESULT_FILE_HEADER_MAX_BYTES = 65536
-"""Upper bound for the header (everything before ``body``) when reading."""
+"""Upper bound for the header (everything before ``body``) when reading, in decoded characters."""
 
 RESULT_FILE_HEADER_KEYS: tuple[str, ...] = (
     "result_file_version",
@@ -406,7 +405,7 @@ def read_result_file_header(
 
     Args:
         stream: Binary (UTF-8) or text stream positioned at the start.
-        max_header_bytes: Give up if the header is longer than this.
+        max_header_bytes: Give up if the header is longer than this many decoded characters.
 
     Returns:
         The validated header dict (no ``body``).
@@ -525,11 +524,6 @@ class _IncrementalReader:
             return value
 
 
-def result_file_schema_path(version: str = RESULT_FILE_VERSION) -> Path:
-    """Return a filesystem path to the packaged layout schema (for tools/tests)."""
-    return Path(str(resources.files("canvastekk_workflow_sdk").joinpath(*_SCHEMA_DIR, f"{version}.json")))
-
-
 __all__ = [
     "RESULT_FILE_CONTENT_TYPE",
     "RESULT_FILE_DEFAULT_NAME",
@@ -547,7 +541,6 @@ __all__ = [
     "read_result_file_header",
     "result_file_declaration_errors",
     "result_file_output_schema",
-    "result_file_schema_path",
     "serialize_result_file_header_prefix",
     "validate_result_file_header",
     "write_result_file",

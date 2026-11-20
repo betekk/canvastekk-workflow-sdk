@@ -193,3 +193,10 @@ describe("golden parity with the Python writer", () => {
     expect(readFileSync(out.result_file).toString("utf8")).toBe(expected);
   });
 });
+
+describe("summary null", () => {
+  it("is treated as no summary, like Python None", () => {
+    const out = write({ summary: null });
+    expect(JSON.parse(readFileSync(out.result_file, "utf8"))).not.toHaveProperty("summary");
+  });
+});
