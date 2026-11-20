@@ -599,6 +599,10 @@ curl -X POST http://localhost:8001/execute \
 
 ---
 
+### Result files (#278)
+
+Write a run's result as one standard JSON file with `write_result_file(...)` and declare the output with `result_file_output_schema()`. The writer validates the header and `summary` before saving. Full guide: [`docs/RESULT-FILE.md`](../docs/RESULT-FILE.md).
+
 ## Template Variable Substitution
 
 The workflow engine automatically resolves `{{variable}}` placeholders in string node inputs after edge resolution. Your `execute()` method receives fully resolved strings — you do not handle `{{}}` syntax in your node code.

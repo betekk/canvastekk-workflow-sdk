@@ -15,6 +15,7 @@ the object it belongs to.**
 | Workflow run | One execution of a workflow definition |
 | Node execution / node call | One call to a node (request, response, context, call outcome, protocol) |
 | Node I/O data | Shared payload types (Point3D, Plane, ...) |
+| Workflow run result file | One JSON file per run in the platform layout (`result_file_version`, labels, `summary`, `body`), written by the producing node through the SDK writer; see [`RESULT-FILE.md`](./RESULT-FILE.md). Not called a "manifest" |
 
 Renaming rollout: SDK renames modules and public names in Python and
 TypeScript, keeps the old names as deprecated aliases, releases **0.67.0**

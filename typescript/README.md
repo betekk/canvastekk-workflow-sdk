@@ -484,6 +484,10 @@ export default app;
 
 ---
 
+### Result files (#278)
+
+Write a run's result as one standard JSON file with `writeResultFile(context, ...)` and declare the output with `resultFileOutputSchema()`. The writer validates the header and `summary` before saving. Full guide: [`docs/RESULT-FILE.md`](../docs/RESULT-FILE.md).
+
 ## SDK Components
 
 ### WorkflowNodeManifest

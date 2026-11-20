@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { VERSION } from "./version.js";
 import { WorkflowNodeManifestValidationError } from "./exceptions.js";
+import { resultFileDeclarationErrors } from "./result-file.js";
 
 const SLUG_PATTERN = /^[a-z]([a-z0-9-]*[a-z0-9])?$/;
 const AMBIGUOUS_NAME_SENTINEL = "__ambiguous_name__";
@@ -99,6 +100,7 @@ export type WorkflowNodeDeprecationInfo = z.infer<typeof WorkflowNodeDeprecation
  */
 function validateFileFieldFormats(
   schema: Record<string, unknown>,
+  schemaName: "input_schema" | "output_schema",
 ): void {
   const properties = (schema.properties ?? {}) as Record<
     string,
@@ -128,6 +130,13 @@ function validateFileFieldFormats(
         `Field '${name}' has format 'file' but type is '${fieldType}'. File fields must have type 'string'.`,
       );
     }
+  }
+
+  // Result-file convention (#278): `result_file` is a reserved single JSON
+  // file output carrying the x-result-file marker.
+  const problems = resultFileDeclarationErrors(properties, schemaName);
+  if (problems.length > 0) {
+    throw new Error(problems.join(" "));
   }
 }
 
@@ -313,8 +322,8 @@ const WorkflowNodeManifestObjectSchema = z
     const { id: _id, ...rest } = data;
 
     try {
-      validateFileFieldFormats(rest.input_schema as Record<string, unknown>);
-      validateFileFieldFormats(rest.output_schema as Record<string, unknown>);
+      validateFileFieldFormats(rest.input_schema as Record<string, unknown>, "input_schema");
+      validateFileFieldFormats(rest.output_schema as Record<string, unknown>, "output_schema");
       validateOutputSchemaRequiredFields(rest.output_schema as Record<string, unknown>);
     } catch (e) {
       ctx.addIssue({

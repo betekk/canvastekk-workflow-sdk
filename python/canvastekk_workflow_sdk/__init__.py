@@ -89,6 +89,15 @@ from canvastekk_workflow_sdk.node_output_uploads import (
     get_default_node_output_uploader,
 )
 from canvastekk_workflow_sdk.observability import NodeExecutionMetric, NodeExecutionMetricsCollector
+from canvastekk_workflow_sdk.result_file import (
+    RESULT_FILE_OUTPUT_FIELD,
+    RESULT_FILE_VERSION,
+    ResultFileFormatError,
+    read_result_file_header,
+    result_file_output_schema,
+    validate_result_file_header,
+    write_result_file,
+)
 from canvastekk_workflow_sdk.testing import LocalFileServer, serve_files
 from canvastekk_workflow_sdk.workflow import (
     EdgeType,
@@ -125,6 +134,13 @@ from canvastekk_workflow_sdk.workflow_node_registry import (
 )
 
 __all__ = [
+    "RESULT_FILE_OUTPUT_FIELD",
+    "RESULT_FILE_VERSION",
+    "ResultFileFormatError",
+    "read_result_file_header",
+    "result_file_output_schema",
+    "validate_result_file_header",
+    "write_result_file",
     "NodeIoDataContract",
     "WorkflowNodeBase",
     "BoundingBox3D",

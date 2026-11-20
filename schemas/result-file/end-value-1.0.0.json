@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:canvastekk:result-file:end-value:1.0.0",
+  "title": "Value of the reserved __end__.result_file key",
+  "description": "The storage pointer the engine stamps on a node's result_file file output and wires into __end__.result_file. Internal: never returned to users.",
+  "type": "string",
+  "minLength": 6,
+  "pattern": "^s3://"
+}
