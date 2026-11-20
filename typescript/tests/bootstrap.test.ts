@@ -3,7 +3,7 @@ import request from "supertest";
 import express from "express";
 import { createAuthedWorkflowNodeApp, mountWorkflowNode } from "../src/bootstrap.js";
 import { WorkflowNodeBase } from "../src/workflow-node-base.js";
-import type { WorkflowNodeManifest } from "../src/definition.js";
+import type { WorkflowNodeManifest } from "../src/workflow-node-manifest.js";
 import type { NodeExecutionContext } from "../src/node-execution-context.js";
 
 class TestNode extends WorkflowNodeBase {

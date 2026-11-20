@@ -224,7 +224,7 @@ class TestNodeSlugHeader:
 
         client = TestClient(create_workflow_node_app(EchoNode()))
         response = client.get("/health")
-        assert response.headers["x-canvastekk-node-slug"] == EchoNode().definition.slug
+        assert response.headers["x-canvastekk-node-slug"] == EchoNode().manifest.slug
 
     def test_exactly_one_version_header(self) -> None:
         from starlette.testclient import TestClient

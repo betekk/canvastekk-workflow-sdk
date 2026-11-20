@@ -109,24 +109,3 @@ class NodeExecutionMetricsCollector:
         """Remove all collected metrics."""
         with self._lock:
             self._metrics.clear()
-
-
-# Deprecated public names (ADR 0001, #271): old class names -> renamed classes.
-_DEPRECATED_ALIASES = {
-    "ExecutionMetric": "NodeExecutionMetric",
-    "MetricsCollector": "NodeExecutionMetricsCollector",
-}
-
-
-def __getattr__(name: str):  # PEP 562
-    if name in _DEPRECATED_ALIASES:
-        import warnings
-
-        warnings.warn(
-            f"{name!r} is deprecated; use {_DEPRECATED_ALIASES[name]!r} instead"
-            " (ADR 0001; removal in 1.0.0).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return globals()[_DEPRECATED_ALIASES[name]]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

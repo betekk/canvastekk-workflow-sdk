@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import request from "supertest";
 import { createWorkflowNodeApp } from "../src/workflow-node-app.js";
 import { WorkflowNodeBase } from "../src/workflow-node-base.js";
-import type { WorkflowNodeManifest } from "../src/definition.js";
+import type { WorkflowNodeManifest } from "../src/workflow-node-manifest.js";
 import type { NodeExecutionContext } from "../src/node-execution-context.js";
 import {
   NODE_CALL_PROTOCOL_HEADER,

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { diffWorkflowNodeManifests } from "../src/diff.js";
+import { diffWorkflowNodeManifests } from "../src/workflow-node-manifest-diff.js";
 
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

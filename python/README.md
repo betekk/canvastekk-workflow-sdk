@@ -1190,17 +1190,6 @@ The SDK's `workflow` module provides a local equivalent: `WorkflowBuilder` creat
 | Edge in DAG | `WorkflowEdgeDefinition` | `WorkflowDefinition` |
 | Full spec | `WorkflowDefinitionSpec` | `WorkflowDefinition` |
 
-### Backward-Compatible Aliases
-
-Old names still work as aliases and will not be removed:
-
-| Old Name | Current Name |
-|----------|-------------|
-| `WorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowWorkflowNodeManifest` | `WorkflowNodeManifest` |
-| `WorkflowNode` | `WorkflowDefinitionNode` |
-| `WorkflowEdge` | `WorkflowEdgeDefinition` |
-| `WorkflowSpec` | `WorkflowDefinitionSpec` |
 
 ### Versioning
 

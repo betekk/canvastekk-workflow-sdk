@@ -304,3 +304,27 @@ re-pins this invariant permanently.
   Python/TS identifiers move.
 - Guard tests pin py↔ts name parity and the no-node-level-"definition"
   invariant permanently (shim-aware via `_deprecated_alias_of` markers).
+
+## Removal record (1.0.0, #272 — executed 2026-11-20)
+
+- All 17 Python shim modules and 13 TypeScript shim files deleted; the
+  package-root `_DEPRECATED_NAME_ALIASES` map, the PEP 562 blocks
+  (`exceptions`, `bootstrap`, `observability`, `workflow.validation`,
+  `workflow.runner`), the `index.ts`/`express.ts` deprecated re-export
+  blocks, and the TS `NodeAuth` const are gone.
+- The legacy `definition` class attribute (py descriptor +
+  `__init_subclass__` migration, ts getter + internal fallback) is removed —
+  `manifest` is the only attribute name; a legacy-declared class now fails
+  loudly (py `TypeError`).
+- Guard tests inverted: old paths raise `ModuleNotFoundError`, old names
+  raise `AttributeError` (both stacks) — any returning alias fails the suite.
+- Consumer precondition verified before deletion: zero unclassified old-name
+  usages across all eight dependent repos' `origin/dev` (evidence on #272);
+  the one residue (CWN `scripts/manifest-diff.sh`, missed by #697's
+  apps/python-scoped sweep) was fixed in canvastekk-workflow-nodes#708 first.
+- **Kept by design:** `NodeValidationError` remains a public class — it is
+  the runtime base of `WorkflowNodeManifestValidationError` and
+  `NodeInputValidationError`, not an alias — and the wire `error_type`
+  strings keep their historical values (`"NodeValidationError"`,
+  `"WorkflowExecutionError"`, `"WorkflowValidationError"`) per the
+  no-wire-change law above.

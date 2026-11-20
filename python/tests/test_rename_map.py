@@ -1,12 +1,12 @@
-"""Rename-map guard tests (ADR 0001, #271).
+"""Rename-map guard tests (ADR 0001, #271; alias removal executed in 1.0.0, #272).
 
 Two invariants, pinned permanently:
 (a) py/ts name parity — every renamed symbol from the ADR map exists under
     its new name on BOTH sides (snake_case ↔ camelCase twins);
 (b) the epic #4301 law — no node-level module or public name contains
     "definition" (workflow-level names are the only allowed users of the
-    word; deprecated shims are exempt: they exist precisely to carry old
-    names until 1.0.0, #272).
+    word; the deprecated shims that carried old names were removed in
+    1.0.0, #272).
 """
 
 from __future__ import annotations
@@ -147,9 +147,6 @@ def test_no_node_level_definition_in_py_module_names() -> None:
     for path in PY.glob("*.py"):
         if path.name == "__init__.py":
             continue
-        src = path.read_text()
-        if "_deprecated_alias_of" in src:
-            continue  # deprecated shim: exists to carry the old name
         assert "definition" not in path.stem, f"node-level module name contains 'definition': {path.name}"
 
 
@@ -166,9 +163,6 @@ def test_workflow_definition_allowlist_names_still_exported() -> None:
 
 def test_no_node_level_definition_in_ts_modules_or_exports() -> None:
     for path in TS.glob("*.ts"):
-        src = path.read_text()
-        if "@deprecated" in "\n".join(src.split("\n")[:10]) and "export * from" in src:
-            continue  # deprecated shim file
         assert "definition" not in path.stem, f"node-level TS module contains 'definition': {path.name}"
     offenders = [
         n

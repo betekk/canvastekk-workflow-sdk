@@ -3,9 +3,9 @@ import request from "supertest";
 import { createWorkflowNodeApp } from "../src/workflow-node-app.js";
 import { writeFileSync } from "node:fs";
 import { WorkflowNodeBase } from "../src/workflow-node-base.js";
-import type { WorkflowNodeManifest } from "../src/definition.js";
+import type { WorkflowNodeManifest } from "../src/workflow-node-manifest.js";
 import type { NodeExecutionContext } from "../src/node-execution-context.js";
-import { NodeAuth } from "../src/auth.js";
+import { TekkNodeAuth } from "../src/auth.js";
 
 class TestNode extends WorkflowNodeBase {
   manifest: WorkflowNodeManifest = {
@@ -203,7 +203,7 @@ describe("Auth middleware", () => {
     const node = new TestNode();
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     delete process.env.CANVASTEKK_DEV_MODE;
-    const auth = NodeAuth.apiKey();
+    const auth = TekkNodeAuth.apiKey();
     const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
@@ -217,7 +217,7 @@ describe("Auth middleware", () => {
     const node = new TestNode();
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     delete process.env.CANVASTEKK_DEV_MODE;
-    const auth = NodeAuth.apiKey();
+    const auth = TekkNodeAuth.apiKey();
     const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
@@ -233,7 +233,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY = "current-key";
     process.env.CANVASTEKK_API_KEY_NEXT = "new-key";
     delete process.env.CANVASTEKK_DEV_MODE;
-    const auth = NodeAuth.apiKey();
+    const auth = TekkNodeAuth.apiKey();
     const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
@@ -250,7 +250,7 @@ describe("Auth middleware", () => {
     process.env.CANVASTEKK_API_KEY = "current-key";
     process.env.CANVASTEKK_API_KEY_NEXT = "";
     delete process.env.CANVASTEKK_DEV_MODE;
-    const auth = NodeAuth.apiKey();
+    const auth = TekkNodeAuth.apiKey();
     const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
@@ -266,7 +266,7 @@ describe("Auth middleware", () => {
     const node = new TestNode();
     process.env.CANVASTEKK_API_KEY = "test-secret-key";
     process.env.CANVASTEKK_DEV_MODE = "true";
-    const auth = NodeAuth.apiKey();
+    const auth = TekkNodeAuth.apiKey();
     const app = createWorkflowNodeApp(node, { dependencies: [auth] });
 
     const resp = await request(app)
@@ -368,9 +368,9 @@ describe("GET /manifest null-key stripping (DA-1955)", () => {
 });
 
 describe("auth middleware detection (DA-1955 review fix)", () => {
-  it("tags NodeAuth middleware with the detection marker", async () => {
+  it("tags TekkNodeAuth middleware with the detection marker", async () => {
     const { CANVASTEKK_AUTH_MARKER } = await import("../src/auth.js");
-    const mw = NodeAuth.apiKey() as unknown as Record<string, unknown>;
+    const mw = TekkNodeAuth.apiKey() as unknown as Record<string, unknown>;
     expect(mw[CANVASTEKK_AUTH_MARKER]).toBe(true);
   });
 

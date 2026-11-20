@@ -118,9 +118,9 @@ jobs:
           "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
-              RetryConfig, BaseNode, ExecutionContext,
+              WorkflowNodeRetryConfig, WorkflowNodeBase, NodeExecutionContext,
           )
-          from canvastekk_workflow_sdk.workflow.models import (
+          from canvastekk_workflow_sdk.workflow.workflow_definition import (
               WorkflowDefinitionNode, WorkflowEdgeDefinition, WorkflowDefinitionSpec,
           )
           print('Pre-publish smoke test passed: wheel installs and imports correctly')
@@ -167,9 +167,9 @@ jobs:
           "$VENV/bin/python" -c "
           from canvastekk_workflow_sdk import (
               WorkflowNodeManifest, WorkflowNodeStyles, WorkflowNodeRole,
-              RetryConfig, BaseNode, ExecutionContext,
+              WorkflowNodeRetryConfig, WorkflowNodeBase, NodeExecutionContext,
           )
-          from canvastekk_workflow_sdk.workflow.models import (
+          from canvastekk_workflow_sdk.workflow.workflow_definition import (
               WorkflowDefinitionNode, WorkflowEdgeDefinition, WorkflowDefinitionSpec,
           )
           print('Post-publish verification passed: all canonical names resolve correctly')

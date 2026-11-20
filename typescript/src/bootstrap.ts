@@ -60,9 +60,3 @@ export function mountWorkflowNode(rootApp: Application, node: WorkflowNodeBase, 
   rootApp.use(prefix, createAuthedWorkflowNodeApp(node, rest));
   return rootApp;
 }
-
-// Deprecated public names (ADR 0001, #271) — old name -> renamed symbol.
-/** @deprecated use mountWorkflowNode (ADR 0001, #271; removal in 1.0.0, #272) */
-export const mountNode: typeof mountWorkflowNode = mountWorkflowNode;
-/** @deprecated use createAuthedWorkflowNodeApp (ADR 0001, #271; removal in 1.0.0, #272) */
-export const createAuthedApp: typeof createAuthedWorkflowNodeApp = createAuthedWorkflowNodeApp;

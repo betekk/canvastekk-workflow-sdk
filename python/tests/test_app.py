@@ -1366,7 +1366,7 @@ class TestManifestContract:
         from canvastekk_workflow_sdk.workflow_node_manifest import WorkflowNodeManifestContract
 
         node = EchoNode()
-        node.definition.contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"])
+        node.manifest.contract = WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest"])
         client = TestClient(create_workflow_node_app(node))
         data = client.get("/manifest").json()
         assert data["contract"]["routes"] == ["/execute", "/health", "/manifest"]
@@ -1382,9 +1382,9 @@ class TestDryRunExecution:
 
     def _declaring_client(self) -> TestClient:
         class DryEchoNode(EchoNode):
-            manifest = EchoNode.definition.model_copy(deep=True)
+            manifest = EchoNode.manifest.model_copy(deep=True)
 
-        DryEchoNode.definition.contract = WorkflowNodeManifestContract(
+        DryEchoNode.manifest.contract = WorkflowNodeManifestContract(
             routes=["/execute", "/health", "/manifest"],
             capabilities=WorkflowNodeContractCapabilities(dry_run=True),
         )
@@ -1454,7 +1454,7 @@ class TestDryRunExecution:
 class HookedEchoNode(EchoNode):
     """EchoNode that overrides hook() — the webhook contract is real."""
 
-    manifest = EchoNode.definition.model_copy()
+    manifest = EchoNode.manifest.model_copy()
 
     def hook(self, payload: dict[str, Any]) -> dict[str, Any]:
         return {"received": True}
@@ -1463,7 +1463,7 @@ class HookedEchoNode(EchoNode):
 class DeclaredHookNode(EchoNode):
     """Author-declared contract including /hook, WITHOUT a hook override."""
 
-    manifest = EchoNode.definition.model_copy(
+    manifest = EchoNode.manifest.model_copy(
         update={"contract": WorkflowNodeManifestContract(routes=["/execute", "/health", "/manifest", "/hook"])}
     )
 
