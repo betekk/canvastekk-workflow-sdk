@@ -36,29 +36,29 @@
     — **Consumers affected:** <who depends on this; none if N/A>
 
 ### Phase 1: Canonical schemas
-- [ ] **1.1** Add `schemas/result-file/1.0.0.json` (draft-07 layout: header keys, `summary` scalar map with `snake_case` names, `body` any) and `schemas/result-file/end-value-1.0.0.json` (the `__end__.result_file` value) plus `schemas/result-file/README.md`
+- [x] **1.1** Add `schemas/result-file/1.0.0.json` (draft-07 layout: header keys, `summary` scalar map with `snake_case` names, `body` any) and `schemas/result-file/end-value-1.0.0.json` (the `__end__.result_file` value) plus `schemas/result-file/README.md`
     — **Why:** single source of truth both runtimes and non-SDK producers read; CWE#1378 generates its contract from the end-value schema
     — **Done when:** both files parse and pass `Draft7Validator.check_schema`
     — **Consumers affected:** Python/TS embedded copies, CWE#1378, FE fixtures
-- [ ] **1.2** Ship the packaged copy under `python/canvastekk_workflow_sdk/data/schemas/result-file/` with a test asserting byte equality to the canonical files
+- [x] **1.2** Ship the packaged copy under `python/canvastekk_workflow_sdk/data/schemas/result-file/` with a test asserting byte equality to the canonical files
     — **Why:** the wheel must carry the schema (CWE imports it); the equality test stops drift
     — **Done when:** equality test green
     — **Consumers affected:** wheel consumers
 
 ### Phase 2: Python writer, header reader, manifest convention
-- [ ] **2.1** Add `result_file.py`: constants, `ResultFileFormatError`, `validate_result_file_header`, `build_result_file_header`, `write_result_file` (validate → temp file → atomic rename; header keys before `body`; streamed body encode)
+- [x] **2.1** Add `result_file.py`: constants, `ResultFileFormatError`, `validate_result_file_header`, `build_result_file_header`, `write_result_file` (validate → temp file → atomic rename; header keys before `body`; streamed body encode)
     — **Why:** the only supported writer; enforces the standard before saving
     — **Done when:** unit tests for valid write, every rejection case (no file left behind), key order
     — **Consumers affected:** node authors
-- [ ] **2.2** Add `read_result_file_header` (incremental top-level decode that stops at `body`, bounded header bytes) to `result_file.py`
+- [x] **2.2** Add `read_result_file_header` (incremental top-level decode that stops at `body`, bounded header bytes) to `result_file.py`
     — **Why:** CWE#1379 checks the header without loading the body
     — **Done when:** tests for valid header, misordered keys, truncated input, oversize header, and a 50 MB file read with flat memory (tracemalloc peak < 1 MB)
     — **Consumers affected:** CWE#1379
-- [ ] **2.3** Add `result_file_output_schema()` and the manifest validator (a `result_file` output must be `type: string`, `format: file`, `x-result-file: true`; the marker is only legal on that output)
+- [x] **2.3** Add `result_file_output_schema()` and the manifest validator (a `result_file` output must be `type: string`, `format: file`, `x-result-file: true`; the marker is only legal on that output)
     — **Why:** lets CWE#1378 confirm the producer at save time
     — **Done when:** manifest tests for valid/invalid declarations; full suite green
     — **Consumers affected:** every Python node manifest (narrow trigger)
-- [ ] **2.4** Export the public names from `canvastekk_workflow_sdk/__init__.py`
+- [x] **2.4** Export the public names from `canvastekk_workflow_sdk/__init__.py`
     — **Why:** public surface for node authors and CWE
     — **Done when:** import test green
     — **Consumers affected:** public surface

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_valida
 
 from canvastekk_workflow_sdk._version import __version__ as _sdk_version_stamp
 from canvastekk_workflow_sdk.exceptions import WorkflowNodeManifestValidationError
+from canvastekk_workflow_sdk.result_file import result_file_declaration_errors
 
 
 def _stamped_sdk_version() -> str:
@@ -595,6 +596,12 @@ class WorkflowNodeManifest(BaseModel):
                         f"Field '{name}' has format 'file' but type is '{field_type}'. "
                         f"File fields must have type 'string'."
                     )
+
+            # Result-file convention (#278): `result_file` is a reserved single
+            # JSON file output carrying the x-result-file marker.
+            problems = result_file_declaration_errors(properties, schema_name=schema_name)
+            if problems:
+                raise ValueError(" ".join(problems))
 
         return self
 
