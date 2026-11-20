@@ -98,3 +98,7 @@ Parent: betekk/canvastekk-tracker#4309. Unblocks CWE#1378, CWE#1379.
 - **Strict manifest validator breaks an existing node**: mitigated by the cross-repo grep (no `result_file` outputs today) and the narrow trigger.
 
 ## Trace
+- GATE 0449427 tier=light phase 3 — vitest 541 passed; tsc, lint, build OK
+- GATE c851a63 tier=full exit — ruff OK; pytest 1169 passed; tsc + tests tsc + eslint OK; vitest 541 passed; tsup build OK
+- REVIEW c851a63 inline code review — 0 Critical, 0 Major, 3 Minor (unused helper, limit wording, TS null summary); all fixed in b6c0e6e
+- GATE b6c0e6e tier=full post-review — ruff OK; pytest 1169 passed; tsc + tests tsc + eslint OK; vitest 542 passed; tsup build OK
