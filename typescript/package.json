@@ -57,7 +57,7 @@
     "@types/jsonwebtoken": "^9",
     "@types/node": "^24",
     "@types/supertest": "^7",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^10",
     "express": "^5.3",
     "supertest": "^7",
