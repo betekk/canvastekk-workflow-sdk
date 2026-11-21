@@ -20,6 +20,7 @@ from canvastekk_workflow_sdk.logging import get_node_logger
 
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
+    from canvastekk_workflow_sdk.run_context import RunContext
 
 logger = logging.getLogger(__name__)
 

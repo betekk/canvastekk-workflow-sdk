@@ -146,4 +146,5 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ## Trace
 
+LOG correction: the Phase 1 commit aeedb2e pushed claiming lint=t before the F821 (missing TYPE_CHECKING import of RunContext) was caught — fixed immediately after; full python suite then green under the CI-shaped env (poetry-style venv + fastapi extra, 1176 passed). The earlier "7 errors" were an environment artifact (uv run resolved a user-global pytest without the fastapi extra), not code.
 GATE cdec727 tier=light lint=t typecheck=n.a build=- unit=t(py) e2e=n.a
