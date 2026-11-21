@@ -60,6 +60,7 @@ behaves exactly as today, and old SDKs ignore the new body key
   — **Why:** the context is the single surface nodes read identity from.
   — **Done when:** AC1 Python half green.
   — **Consumers affected:** node bodies; writer.
+— **Done:** schema + getter green in tests
 - [x] **1.3** `result_file.py:300`:
   `workflow_run_id=context.run_context.workflow_run_id if context.run_context else context.run_id`.
   — **Why:** AC2 — the header must carry the workflow run id once the
@@ -77,7 +78,7 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ### Phase 2: TypeScript leg (parity)
 
-- [ ] **2.1** New `typescript/src/run-context.ts`: zod schema
+- [x] **2.1** New `typescript/src/run-context.ts`: zod schema
   (`run_context_version`, `workflow_run_id` required; definition fields,
   `account_id`, `started_at` optional) + inferred type + JSDoc mirroring
   the Python model; export from `index.ts` per the existing export
@@ -86,19 +87,21 @@ behaves exactly as today, and old SDKs ignore the new body key
   — **Done when:** schema parses the same v1 sample; rejects missing
   `workflow_run_id`.
   — **Consumers affected:** request schema, context.
-- [ ] **2.2** `NodeExecutionRequestSchema` gains
+— **Done:** run-context.ts (schema+type, snake_case wire, JSDoc) exported from index.ts; schema field run_context optional; runContext getter mirrors runId pattern; writer prefers runContext?.workflow_run_id ?? runId; 8 tests; files: run-context.ts, node-execution-request.ts, node-execution-context.ts, result-file.ts, index.ts, tests/run-context.test.ts; fixes: no TS-side header reader exists (reader is CWE-side) — test parses the written file directly
+- [x] **2.2** `NodeExecutionRequestSchema` gains
   `run_context: RunContextSchema.nullish()`; context gets a
   `get runContext()` following the `runId` getter pattern (request first,
   null otherwise).
   — **Why:** AC1 TS half.
   — **Done when:** AC1 TS half green.
   — **Consumers affected:** node bodies; writer.
-- [ ] **2.3** `result-file.ts:296`:
+- [x] **2.3** `result-file.ts:296`:
   `context.runContext?.workflow_run_id ?? context.runId`; tests in
   `typescript/tests/run-context.test.ts` (parse ±, header both ways).
   — **Why:** AC2 TS half.
   — **Done when:** AC2 TS half green.
   — **Consumers affected:** result-file readers.
+— **Done:** covered by the same test file (header both ways)
 
 ### Phase 3: docs + release label
 
@@ -147,4 +150,5 @@ behaves exactly as today, and old SDKs ignore the new body key
 ## Trace
 
 LOG correction: the Phase 1 commit aeedb2e pushed claiming lint=t before the F821 (missing TYPE_CHECKING import of RunContext) was caught — fixed immediately after; full python suite then green under the CI-shaped env (poetry-style venv + fastapi extra, 1176 passed). The earlier "7 errors" were an environment artifact (uv run resolved a user-global pytest without the fastapi extra), not code.
+GATE ff16b30 tier=light lint=t typecheck=t build=- unit=t(py+ts) e2e=n.a
 GATE cdec727 tier=light lint=t typecheck=n.a build=- unit=t(py) e2e=n.a

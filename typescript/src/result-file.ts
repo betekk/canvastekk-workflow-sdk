@@ -293,7 +293,7 @@ export function writeResultFile(
   context: NodeExecutionContext,
   opts: WriteResultFileOptions,
 ): { result_file: string } {
-  const header = buildResultFileHeader(opts, context.runId);
+  const header = buildResultFileHeader(opts, context.runContext?.workflow_run_id ?? context.runId);
   const target = context.outputPath(opts.filename ?? RESULT_FILE_DEFAULT_NAME);
   let text: string;
   try {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NodeOutputUploadSessionDescriptorSchema } from "./node-output-uploads.js";
+import { RunContextSchema } from "./run-context.js";
 
 /**
  * Slug charset for run_id/node_id — letters, digits, dot, underscore,
@@ -25,6 +26,7 @@ export const NodeExecutionRequestSchema = z.object({
     .default(null),
   dry_run: z.boolean().default(false),
   capability: z.string().nullable().optional(),
+  run_context: RunContextSchema.optional(),
 });
 
 /**

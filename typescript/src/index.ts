@@ -56,6 +56,7 @@ export {
   NodeExecutionRequestSchema,
   type NodeExecutionRequest,
 } from "./node-execution-request.js";
+export { RunContextSchema, type RunContext } from "./run-context.js";
 export {
   NodeExecutionResponseSchema,
   WorkflowNodeCallOutcomeSchema,
