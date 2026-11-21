@@ -41,7 +41,7 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ### Phase 1: Python leg
 
-- [ ] **1.1** New `python/canvastekk_workflow_sdk/run_context.py`:
+- [x] **1.1** New `python/canvastekk_workflow_sdk/run_context.py`:
   `RunContext(BaseModel)` with `run_context_version: str`,
   `workflow_run_id: str` (required); `workflow_definition_id`,
   `workflow_definition_slug`, `workflow_definition_version`,
@@ -53,26 +53,27 @@ behaves exactly as today, and old SDKs ignore the new body key
   — **Done when:** model imports, validates the v1 sample from the epic,
   rejects missing `workflow_run_id`.
   — **Consumers affected:** request model, context, writer.
-- [ ] **1.2** `NodeExecutionRequest.run_context: RunContext | None = None`
+- [x] **1.2** `NodeExecutionRequest.run_context: RunContext | None = None`
   (after `account_id`); `NodeExecutionContext.run_context` property
   delegating to `self._request.run_context` (None without a request),
   docstring noting the engine sender and None-when-absent.
   — **Why:** the context is the single surface nodes read identity from.
   — **Done when:** AC1 Python half green.
   — **Consumers affected:** node bodies; writer.
-- [ ] **1.3** `result_file.py:300`:
+- [x] **1.3** `result_file.py:300`:
   `workflow_run_id=context.run_context.workflow_run_id if context.run_context else context.run_id`.
   — **Why:** AC2 — the header must carry the workflow run id once the
   engine sends the context; identical behavior until then.
   — **Done when:** AC2 Python half green (header equals run_context id
   when present, run_id otherwise).
   — **Consumers affected:** result-file readers (CWE run-end check, FE).
-- [ ] **1.4** Tests `python/tests/test_run_context.py`: request with/without
+- [x] **1.4** Tests `python/tests/test_run_context.py`: request with/without
   `run_context` (parse + context property), writer header both ways
   (extend the existing result-file test pattern).
   — **Why:** AC1/AC2 are checkable only at these seams.
   — **Done when:** pytest green.
   — **Consumers affected:** none (tests).
+— **Done:** run_context.py model (v1 sample parses, missing workflow_run_id rejected, optionals default None); request field + context property (request-backed, None local/absent); writer prefers run_context.workflow_run_id; 8 tests green with existing suites; files: run_context.py, node_execution_request.py, node_execution_context.py, result_file.py, tests/test_run_context.py; fixes: header reader takes a stream not bytes (test fixed to open the file)
 
 ### Phase 2: TypeScript leg (parity)
 
@@ -145,4 +146,4 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ## Trace
 
-(populated by execution; final line must be `GATE <short-sha> tier=full` for the pushed SHA)
+GATE cdec727 tier=light lint=t typecheck=n.a build=- unit=t(py) e2e=n.a

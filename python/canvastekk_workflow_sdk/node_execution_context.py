@@ -125,6 +125,17 @@ class NodeExecutionContext:
         return self._execution_id
 
     @property
+    def run_context(self) -> RunContext | None:
+        """Versioned run identity from the engine (#281, CWE#1443).
+
+        ``None`` for locally constructed contexts and pre-#1443 engines —
+        identity then comes from :attr:`run_id`.
+        """
+        if self._request is not None:
+            return self._request.run_context
+        return None
+
+    @property
     def run_id(self) -> str:
         """Workflow run identifier."""
         if self._request is not None:
