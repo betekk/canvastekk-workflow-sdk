@@ -297,7 +297,7 @@ def write_result_file(
     header = build_result_file_header(
         result_schema=result_schema,
         result_schema_version=result_schema_version,
-        workflow_run_id=context.run_id,
+        workflow_run_id=context.run_context.workflow_run_id if context.run_context else context.run_id,
         summary=summary,
         generated_at=generated_at,
     )

@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from canvastekk_workflow_sdk.node_output_uploads import NodeOutputUploadSession
+from canvastekk_workflow_sdk.run_context import RunContext
 
 
 class NodeExecutionRequest(BaseModel):
@@ -87,6 +88,15 @@ class NodeExecutionRequest(BaseModel):
             "X-Node-Capability header — body-supplied values are stripped. "
             "The SDK transports it, never parses it (CDS-side verification "
             "is canvastekk-auth-library's). None for local runs."
+        ),
+    )
+    run_context: RunContext | None = Field(
+        default=None,
+        description=(
+            "Versioned run identity sent by the engine with every /execute "
+            "(#281, sender CWE#1443): workflow run id, definition ids, "
+            "account, started_at. None when the engine sends none (local "
+            "runs, pre-#1443 engines) — identity then comes from run_id."
         ),
     )
     callback_url: str | None = Field(

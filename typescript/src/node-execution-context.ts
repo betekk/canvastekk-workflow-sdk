@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { AsyncLocalStorage } from "async_hooks";
 import type { NodeExecutionRequest } from "./node-execution-request.js";
+import type { RunContext } from "./run-context.js";
 import { getNodeLogger, type SdkLogger } from "./logging.js";
 
 /** Max characters of a progress-ping message (engine payload cap, #495). */
@@ -115,6 +116,16 @@ export class NodeExecutionContext {
   get nodeId(): string {
     if (this._request) return this._request.node_id;
     return this._outputDir.split("/").pop() ?? "unknown";
+  }
+
+  /**
+   * Versioned run identity from the engine (#281, sender CWE#1443).
+   * `null` for locally constructed contexts and pre-#1443 engines —
+   * identity then comes from {@link runId}.
+   */
+  get runContext(): RunContext | null {
+    if (this._request) return this._request.run_context ?? null;
+    return null;
   }
 
   /**

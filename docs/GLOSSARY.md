@@ -13,6 +13,8 @@ the object it belongs to.**
 | Workflow node manifest | What a deployable node publishes about itself (slug, version, schemas, contract) |
 | Workflow node | The serving runtime (base class, app, registry, conformance) |
 | Workflow run | One execution of a workflow definition |
+| Workflow run id | The run's one identifier (`workflow_runs.id` in CWE; also the Temporal workflow id since CWE#1440). Nodes receive it as the wire `run_id` and, once CWE#1443 ships, inside the versioned `run_context` object |
+| Run context (`run_context`) | Versioned run identity the engine sends with every `/execute` (#281, CWE#1443): `run_context_version`, `workflow_run_id`, definition id/slug/version, `account_id`, `started_at`. Exposed on the node execution context (`ctx.run_context` / `ctx.runContext`); `None`/`null` when the engine sends none. Additive keys bump the minor |
 | Node execution / node call | One call to a node (request, response, context, call outcome, protocol) |
 | Node I/O data | Shared payload types (Point3D, Plane, ...) |
 | Workflow run result file | One JSON file per run in the platform layout (`result_file_version`, labels, `summary`, `body`), written by the producing node through the SDK writer; see [`RESULT-FILE.md`](./RESULT-FILE.md). Not called a "manifest" |

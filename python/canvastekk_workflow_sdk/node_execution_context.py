@@ -20,6 +20,7 @@ from canvastekk_workflow_sdk.logging import get_node_logger
 
 if TYPE_CHECKING:
     from canvastekk_workflow_sdk.node_execution_request import NodeExecutionRequest
+    from canvastekk_workflow_sdk.run_context import RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,17 @@ class NodeExecutionContext:
         ``None`` for locally constructed contexts (no run).
         """
         return self._execution_id
+
+    @property
+    def run_context(self) -> RunContext | None:
+        """Versioned run identity from the engine (#281, CWE#1443).
+
+        ``None`` for locally constructed contexts and pre-#1443 engines —
+        identity then comes from :attr:`run_id`.
+        """
+        if self._request is not None:
+            return self._request.run_context
+        return None
 
     @property
     def run_id(self) -> str:
