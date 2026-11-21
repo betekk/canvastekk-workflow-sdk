@@ -14,13 +14,13 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ## Acceptance Criteria
 
-- [ ] AC1 `ctx.run_context` populated from a request carrying
+- [x] AC1 `ctx.run_context` populated from a request carrying
   `run_context`, None without it (Python and TypeScript tests).
-- [ ] AC2 Result-file header uses `run_context.workflow_run_id` when
+- [x] AC2 Result-file header uses `run_context.workflow_run_id` when
   present and `context.run_id` otherwise (tests for both, both legs).
-- [ ] AC3 Docs updated (`docs/RESULT-FILE.md`, `docs/GLOSSARY.md`);
+- [x] AC3 Docs updated (`docs/RESULT-FILE.md`, `docs/GLOSSARY.md`);
   minor release published (label-driven by release.yml on merge).
-- [ ] AC4 No forced node change: node services adopt when they next bump
+- [x] AC4 No forced node change: node services adopt when they next bump
   the SDK (no breaking API change — additive field + additive property).
 
 ## Dependency & Consumer Map
@@ -105,7 +105,7 @@ behaves exactly as today, and old SDKs ignore the new body key
 
 ### Phase 3: docs + release label
 
-- [ ] **3.1** `docs/RESULT-FILE.md`: header `workflow_run_id` is the
+- [x] **3.1** `docs/RESULT-FILE.md`: header `workflow_run_id` is the
   workflow run id; the writer prefers `run_context.workflow_run_id` and
   falls back to the wire `run_id`; note the wire `run_id` equals the
   workflow run id once CWE#1440 is live. `docs/GLOSSARY.md`: entries for
@@ -113,13 +113,15 @@ behaves exactly as today, and old SDKs ignore the new body key
   — **Why:** AC3 — node authors must know which id lands in the header.
   — **Done when:** both docs mention the rule and the versioning rule.
   — **Consumers affected:** node authors.
-- [ ] **3.2** Exit gate (full tier): python pytest + ruff/mypy if
+— **Done:** RESULT-FILE.md workflow_run_id row states the preference + fallback + the CWE#1440 wire note; GLOSSARY.md gains workflow run id + run_context entries with the versioning rule
+- [x] **3.2** Exit gate (full tier): python pytest + ruff/mypy if
   configured + `npm test` (typescript) per repo manifests; `minor` label
   on the PR (release.yml bumps versions on merge to dev).
   — **Why:** AC3's release half is label-driven; the gate is the PR's
   citation.
   — **Done when:** gates green, `GATE <sha> tier=full` memo appended.
   — **Consumers affected:** PR creation.
+— **Done:** exit gate full tier green — ruff (CI scope) t, python 1176 passed, TS 550 passed, eslint + tsc src/tests clean; minor label applied at PR creation
 
 ## Technical Notes
 
@@ -148,6 +150,8 @@ behaves exactly as today, and old SDKs ignore the new body key
   zod strip), so engine additions stay non-breaking.
 
 ## Trace
+
+GATE 074f25c tier=full lint=t typecheck=t build=- unit=t(py1176+ts550) e2e=n.a
 
 LOG correction: the Phase 1 commit aeedb2e pushed claiming lint=t before the F821 (missing TYPE_CHECKING import of RunContext) was caught — fixed immediately after; full python suite then green under the CI-shaped env (poetry-style venv + fastapi extra, 1176 passed). The earlier "7 errors" were an environment artifact (uv run resolved a user-global pytest without the fastapi extra), not code.
 GATE ff16b30 tier=light lint=t typecheck=t build=- unit=t(py+ts) e2e=n.a

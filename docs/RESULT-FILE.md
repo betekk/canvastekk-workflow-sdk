@@ -37,7 +37,7 @@ Header keys first, in this order, then `body`:
 | `result_file_version` | `"1.0.0"` (written by the SDK) |
 | `result_schema` | `app.kind`, lowercase `snake_case` parts, at least one dot, ≤128 chars |
 | `result_schema_version` | `X.Y.Z` (no pre-release), ≤64 chars |
-| `workflow_run_id` | The node request's run id (written by the SDK) |
+| `workflow_run_id` | The workflow run id. The writer prefers `run_context.workflow_run_id` when the engine sent a run context (#281) and falls back to the node request's `run_id` — which is the same workflow run id once CWE#1440 is live (before that deploy, pre-existing runs may still carry the engine's legacy `run-<uuid>` form) |
 | `generated_at` | UTC, ISO 8601, milliseconds, `Z` (written by the SDK) |
 | `summary` | Optional. Flat object; keys `^[a-z][a-z0-9_]*$` (≤64 chars); values string, number, boolean or null; ≤2048 bytes as compact UTF-8 JSON |
 | `body` | Any JSON value |
