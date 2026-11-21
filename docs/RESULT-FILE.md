@@ -23,7 +23,7 @@ Header keys first, in this order, then `body`:
 ```json
 {
   "result_file_version": "1.0.0",
-  "result_schema": "model_check.rule",
+  "result_schema": "model_check.check",
   "result_schema_version": "0.1.0",
   "workflow_run_id": "3f2a…",
   "generated_at": "2026-11-20T10:00:00.123Z",
@@ -77,7 +77,7 @@ class DoorGapCheck(WorkflowNodeBase):
             "type": "object",
             "properties": {
                 "verdict": {"type": "string"},
-                "result_file": result_file_output_schema("The check result (model_check.rule 0.1.0)."),
+                "result_file": result_file_output_schema("The check result (model_check.check 0.1.0)."),
             },
         },
     )
@@ -88,7 +88,7 @@ class DoorGapCheck(WorkflowNodeBase):
         outputs.update(
             write_result_file(
                 context,
-                result_schema="model_check.rule",
+                result_schema="model_check.check",
                 result_schema_version="0.1.0",
                 summary={"verdict": result["verdict"], "fail_count": result["fail_count"]},
                 body=result,
@@ -109,7 +109,7 @@ import { resultFileOutputSchema, writeResultFile } from "@betekk/canvastekk-work
 return {
   verdict: result.verdict,
   ...writeResultFile(context, {
-    resultSchema: "model_check.rule",
+    resultSchema: "model_check.check",
     resultSchemaVersion: "0.1.0",
     summary: { verdict: result.verdict, fail_count: result.failCount },
     body: result,
@@ -154,7 +154,7 @@ header validation. CWE uses it for the run-end check.
 ```python
 with open(path, "rb") as handle:
     header = read_result_file_header(handle)
-assert header["result_schema"] == "model_check.rule"
+assert header["result_schema"] == "model_check.check"
 ```
 
 ## Versioning
