@@ -190,7 +190,6 @@ export {
   RESULT_FILE_HEADER_KEYS_BY_VERSION,
   RESULT_FILE_OPTIONAL_HEADER_KEYS,
   RESULT_FILE_SCHEMA_1_1_0,
-  workflowDefinitionFromRunContext,
 } from "./result-file.js";
 export {
   VERDICT_MARK,
@@ -208,7 +207,6 @@ export {
 } from "./check-verdict.js";
 export type { TekkCheckRole, TekkCheckOperator, TekkWorkflowRunVerdict, CheckSpec } from "./check-verdict.js";
 export type {
-  ResultFileWorkflowDefinition,
   ResultFileHeader,
   ResultFileHeaderOptions,
   ResultFileSummaryValue,
