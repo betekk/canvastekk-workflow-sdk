@@ -393,6 +393,9 @@ def build_workflow_node_registry_payload(
         payload["constraints"] = resolved_constraints
     if definition.deprecation is not None:
         payload["deprecation"] = definition.deprecation.model_dump(mode="json")
+    if definition.checks:
+        # #283: stored as node_registry.checks by the engine (accepted from CWE VS2 on).
+        payload["checks"] = {key: spec.model_dump(mode="json", exclude_none=True) for key, spec in definition.checks.items()}
 
     return payload
 

@@ -121,6 +121,7 @@ _ENGINE_REQUEST_ALLOWED = frozenset(
         "token_cost",
         "timeout_seconds",
         "deprecation",
+        "checks",
     }
 )
 _ENGINE_REQUEST_REQUIRED = ("name", "version", "label", "description", "input_schema", "output_schema")
