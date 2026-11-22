@@ -104,6 +104,7 @@ calculation first and its file format later.
 | `Reading.predicate(check, subject_id=, actual=)` | A yes/no or text finding compared with the check's limit |
 | `Reading.fail_by_name(check, subject_id=, reason_code=)` | FAIL with a named reason and no value |
 | `Reading.not_evaluable(check, subject_id=, reason_code=)` | NOT_EVALUABLE (absent, or identity in doubt) |
+| `Reading.cross_reference(check, measured_by=, reason_code=)` | The whole check is measured by another check (D90): NOT_EVALUABLE with the reason, `cross_reference` on its `checks[]` entry, and left out of the run verdict and run counts. A check takes one such reading and no judged readings |
 | `Reading.observation(...)`, `Reading.scope(...)` | Shown, never judged or counted |
 
 Rules: a broken `LIMIT` → FAIL; else a broken `WARNING_LIMIT` → WARNING; else
@@ -119,17 +120,25 @@ name their side (`BELOW` / `ABOVE`). An app can restrict readings with a
 Counts are per **subject** (`subject_id`), never per row: a subject's verdict
 is the roll-up of its rows. Roll-up everywhere is
 **FAIL > NOT_EVALUABLE > WARNING > PASS**; a check with no subjects is
-NOT_EVALUABLE (`NO_SUBJECTS_IN_SCOPE`). The header `summary` is
+NOT_EVALUABLE (`NO_SUBJECTS_IN_SCOPE`). A cross-referenced check counts
+nowhere: the run verdict and counts come from the other checks. The header `summary` is
 `verdict`, `pass_count`, `warning_count`, `fail_count`, `not_evaluable_count`.
 
 ## The body (`model_check.check` 1.0.0)
 
 Schema: [`schemas/result-body/model_check.check/1.0.0.json`](../schemas/result-body/model_check.check/1.0.0.json).
 `checks[]`: `check`, `verdict`, `verdict_counts`, `limits_used[{input, role,
-operator, value, tolerance}]`, `filters_used[{input, value}]`.
+operator, value, tolerance}]`, `filters_used[{input, value}]`, optional
+`not_evaluated_reason{code, message}` and `cross_reference` (the owning check).
 `measurements[]`: `check`, `subject_id`, `kind`, `verdict`, `failed_limits[{input,
 side}]`, `actual` (rounded) and `actual_raw`, `element_name`, `file_id`,
 `global_ids`, `reason`, `verdict_caveat`, `extra` (viewer fields).
+
+Optional top-level `extra`: the check's viewer evidence, returned by
+`CheckNodeBase.body_extra(judged, inputs, context)` (default `None`, no
+`extra`). It never decides a verdict. The frontend reads it as the 0.x
+`result`, so put `measurements` (the measurement sets) and `instances` inside
+it, not beside it.
 
 ## TypeScript
 

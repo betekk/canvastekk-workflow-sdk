@@ -14,3 +14,9 @@ Copies: the Python wheel ships them under
 `python/canvastekk_workflow_sdk/data/schemas/result-body/`; the TypeScript
 package embeds them in `typescript/src/check-verdict.ts`. Tests fail when a
 copy drifts. Never edit a released schema in place; add a new version file.
+
+`model_check.check` 1.0.0 also carries two optional parts the schema already
+allows (SDK 1.3.0, #285): a top-level `extra` object holding the check's
+viewer evidence (`CheckNodeBase.body_extra`), and `checks[].cross_reference`
+naming the check that measures a cross-referenced one, which then counts
+nowhere in the run verdict or counts.
