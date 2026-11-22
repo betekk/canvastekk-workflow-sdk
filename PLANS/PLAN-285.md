@@ -6,9 +6,9 @@
 **Epic**: betekk/canvastekk-tracker#4332 (VS1b). Source plan: canvastekk-frontend-nextjs `PLANS/PLAN-model-checker-v2.md` (D90, D92). Reader contract: canvastekk-frontend-nextjs `src/lib/actions-v2/model-checker/check-result-body-v1.ts` (FE#3383, merged).
 
 ## Acceptance Criteria
-- [ ] A `CheckNodeBase` returning `body_extra` writes it as `body.extra`; the body still validates.
-- [ ] A cross-referenced check reports NOT_EVALUABLE with its reason, carries `cross_reference` in `checks[]`, and does not change the run verdict or run counts (test: one PASS check + one cross-referenced check → run PASS).
-- [ ] Python tests cover both; schema-stability reports additive only.
+- [x] A `CheckNodeBase` returning `body_extra` writes it as `body.extra`; the body still validates.
+- [x] A cross-referenced check reports NOT_EVALUABLE with its reason, carries `cross_reference` in `checks[]`, and does not change the run verdict or run counts (test: one PASS check + one cross-referenced check → run PASS).
+- [x] Python tests cover both; schema-stability reports additive only.
 
 ## Deviations from the ticket text (compatibility with what already shipped)
 - **`cross_reference` stays a string** (the owning check key, `measured_by`). The published body schema `model_check.check/1.0.0.json` already types `checks[].cross_reference` as `string`, and the merged FE reader parses `z.string().min(1)`. An object would break both. The reason code goes in the existing `checks[].not_evaluated_reason {code, message}`.
@@ -28,16 +28,24 @@ Consumers inspected: `judge()` is called only by `CheckNodeBase.judge_readings` 
 ## Implementation Phases
 
 ### Phase 1: Cross-referenced checks
-- [ ] **1.1** Add `Reading.cross_reference` and make `judge()` give such a check NOT_EVALUABLE with its reason and `cross_reference`, leaving it out of the run verdict and run counts.
+- [x] **1.1** Add `Reading.cross_reference` and make `judge()` give such a check NOT_EVALUABLE with its reason and `cross_reference`, leaving it out of the run verdict and run counts.
     — **Why:** CISA check 08-style nodes must report PASS where they do today (D90).
     — **Done when:** one PASS check + one cross-referenced check → run PASS, counts from the PASS check only; the body validates.
     — **Consumers affected:** CISA nodes (VS5).
 
 ### Phase 2: Body extra
-- [ ] **2.1** Add `CheckNodeBase.body_extra(judged, inputs, context)`; a dict is written as `body.extra`.
+- [x] **2.1** Add `CheckNodeBase.body_extra(judged, inputs, context)`; a dict is written as `body.extra`.
     — **Why:** screens draw the check's evidence from `extra` (FE#3383 contract).
     — **Done when:** a node returning `body_extra` writes `body.extra` and the body validates; returning `None` writes no `extra`; a non-dict is refused.
     — **Consumers affected:** CISA nodes (VS5).
-- [ ] **2.2** Document both in `docs/CHECK-VERDICT.md` and `schemas/result-body/README.md`.
+- [x] **2.2** Document both in `docs/CHECK-VERDICT.md` and `schemas/result-body/README.md`.
 
 ## Trace
+
+- AC 1 proof: `test_body_extra_is_written_as_body_extra_and_validates` (node writes `body.extra`, body validates against 1.0.0), `test_without_body_extra_the_body_has_no_extra`, `test_non_object_body_extra_is_refused`.
+- AC 2 proof: `test_cross_referenced_check_counts_nowhere_in_the_run` — one PASS check + one cross-referenced check → run PASS, subject counts from the PASS check only, `checks[]` entry carries `cross_reference` + `not_evaluated_reason`, body validates.
+- AC 3: schema-stability dump diff dev vs branch: "No schema changes detected" (no Pydantic model touched).
+- Bug found by tests: mixed readings were judged before the cross-reference was seen (wrong error); `judge()` now collects cross-references in a first pass so ordering does not matter.
+- Code review (inline): 0 Critical, 0 Major; `write_legacy_result` path unchanged (legacy nodes write their own file).
+- GATE 59c8a60 tier=full: ruff check 0; pytest 1307 passed; schema-stability 0 changes; skill mirror in sync. TypeScript untouched.
+
