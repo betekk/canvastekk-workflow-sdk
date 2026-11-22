@@ -4,7 +4,9 @@ A result file is one plain JSON document per run, written by the node that
 produces the run's result. The SDK owns the **layout**; what goes inside
 ``body`` belongs to the producing app and is never validated here.
 
-Layout 1.0.0, header keys first and in this order::
+Layout 1.0.0, header keys first and in this order (layout 1.1.0 adds the
+optional ``workflow_definition`` and ``inputs`` after ``workflow_run_id`` and
+``verdict`` after ``generated_at``; see :data:`RESULT_FILE_HEADER_KEYS_BY_VERSION`)::
 
     {
       "result_file_version": "1.0.0",
@@ -53,8 +55,11 @@ if TYPE_CHECKING:
 RESULT_FILE_VERSION = "1.0.0"
 """Version of the platform layout written by this SDK."""
 
-SUPPORTED_RESULT_FILE_VERSIONS: tuple[str, ...] = ("1.0.0",)
-"""Layout versions :func:`read_result_file_header` accepts."""
+SUPPORTED_RESULT_FILE_VERSIONS: tuple[str, ...] = ("1.0.0", "1.1.0")
+"""Layout versions :func:`read_result_file_header` accepts and the writer can produce."""
+
+RESULT_FILE_VERSION_1_1_0 = "1.1.0"
+"""Layout that adds ``workflow_definition``, ``inputs`` and ``verdict`` (#283)."""
 
 RESULT_FILE_OUTPUT_FIELD = "result_file"
 """Name of the node output (and of the reserved ``__end__`` key) that carries the file."""
@@ -69,6 +74,9 @@ RESULT_FILE_DEFAULT_NAME = "result.json"
 RESULT_FILE_SUMMARY_MAX_BYTES = 2048
 """Upper bound for ``summary`` as compact UTF-8 JSON."""
 
+RESULT_FILE_INPUTS_MAX_BYTES = 16384
+"""Upper bound for the 1.1.0 ``inputs`` header value as compact UTF-8 JSON."""
+
 RESULT_FILE_HEADER_MAX_BYTES = 65536
 """Upper bound for the header (everything before ``body``) when reading, in decoded characters."""
 
@@ -80,7 +88,26 @@ RESULT_FILE_HEADER_KEYS: tuple[str, ...] = (
     "generated_at",
     "summary",
 )
-"""Header keys in their required order (``summary`` is optional)."""
+"""Layout 1.0.0 header keys in their required order (``summary`` is optional)."""
+
+RESULT_FILE_HEADER_KEYS_BY_VERSION: dict[str, tuple[str, ...]] = {
+    "1.0.0": RESULT_FILE_HEADER_KEYS,
+    "1.1.0": (
+        "result_file_version",
+        "result_schema",
+        "result_schema_version",
+        "workflow_run_id",
+        "workflow_definition",
+        "inputs",
+        "generated_at",
+        "verdict",
+        "summary",
+    ),
+}
+"""Header keys in their required order, per layout version."""
+
+RESULT_FILE_OPTIONAL_HEADER_KEYS: frozenset[str] = frozenset({"summary", "workflow_definition", "inputs", "verdict"})
+"""Header keys a file may leave out."""
 
 _SCHEMA_DIR = ("data", "schemas", "result-file")
 _READ_CHUNK = 8192
@@ -181,26 +208,26 @@ def validate_result_file_header(header: Mapping[str, Any]) -> dict[str, Any]:
         {"path": "/".join(str(p) for p in err.absolute_path) or "(root)", "message": err.message}
         for err in sorted(_header_validator(version).iter_errors(data), key=lambda e: list(e.absolute_path))
     ]
-    summary = data.get("summary")
-    if isinstance(summary, dict) and not errors:
-        try:
-            size = len(_compact(summary).encode("utf-8"))
-        except ValueError as exc:
-            errors.append({"path": "summary", "message": f"summary is not valid JSON: {exc}"})
-        else:
-            if size > RESULT_FILE_SUMMARY_MAX_BYTES:
-                errors.append(
-                    {
-                        "path": "summary",
-                        "message": f"summary is {size} bytes; the limit is {RESULT_FILE_SUMMARY_MAX_BYTES}",
-                    }
-                )
+    for key, limit in (("summary", RESULT_FILE_SUMMARY_MAX_BYTES), ("inputs", RESULT_FILE_INPUTS_MAX_BYTES)):
+        _check_byte_limit(data, key, limit, errors)
     if errors:
         raise ResultFileFormatError(
             "Result file header is invalid: " + "; ".join(f"{e['path']}: {e['message']}" for e in errors),
             errors=errors,
         )
     return data
+
+
+def _check_byte_limit(data: Mapping[str, Any], key: str, limit: int, errors: list[dict[str, str]]) -> None:
+    value = data.get(key)
+    if isinstance(value, dict) and not errors:
+        try:
+            size = len(_compact(value).encode("utf-8"))
+        except ValueError as exc:
+            errors.append({"path": key, "message": f"{key} is not valid JSON: {exc}"})
+        else:
+            if size > limit:
+                errors.append({"path": key, "message": f"{key} is {size} bytes; the limit is {limit}"})
 
 
 def build_result_file_header(
@@ -210,6 +237,10 @@ def build_result_file_header(
     workflow_run_id: str,
     summary: Mapping[str, Any] | None = None,
     generated_at: datetime | None = None,
+    result_file_version: str = RESULT_FILE_VERSION,
+    workflow_definition: Mapping[str, Any] | None = None,
+    inputs: Mapping[str, Any] | None = None,
+    verdict: str | None = None,
 ) -> dict[str, Any]:
     """Build and validate a header in the required key order.
 
@@ -219,20 +250,38 @@ def build_result_file_header(
         workflow_run_id: The run id (``context.run_id``).
         summary: Optional flat key-value pairs.
         generated_at: Timezone-aware timestamp; defaults to now (UTC).
+        result_file_version: Layout to write; ``"1.0.0"`` (default) or ``"1.1.0"``.
+        workflow_definition: 1.1.0 only: ``{id, slug, version}`` of the executing definition.
+        inputs: 1.1.0 only: the verdict inputs as the node received them (≤16 KB).
+        verdict: 1.1.0 only: the overall verdict (``PASS``, ``WARNING``, ``FAIL``, ``NOT_EVALUABLE``).
 
     Returns:
         The validated header dict (no ``body``).
 
     Raises:
-        ResultFileFormatError: If any header value breaks the layout.
+        ResultFileFormatError: If any header value breaks the layout, or a
+            1.1.0 key is given for layout 1.0.0.
     """
+    if result_file_version not in SUPPORTED_RESULT_FILE_VERSIONS:
+        raise ResultFileFormatError(f"Unsupported result_file_version {result_file_version!r}")
+    extras = {"workflow_definition": workflow_definition, "inputs": inputs, "verdict": verdict}
+    if result_file_version == "1.0.0":
+        given = sorted(key for key, value in extras.items() if value is not None)
+        if given:
+            raise ResultFileFormatError(f"{given} need result_file_version '1.1.0'; layout 1.0.0 has no such keys")
     header: dict[str, Any] = {
-        "result_file_version": RESULT_FILE_VERSION,
+        "result_file_version": result_file_version,
         "result_schema": result_schema,
         "result_schema_version": result_schema_version,
         "workflow_run_id": workflow_run_id,
-        "generated_at": _format_generated_at(generated_at),
     }
+    if workflow_definition is not None:
+        header["workflow_definition"] = dict(workflow_definition)
+    if inputs is not None:
+        header["inputs"] = dict(inputs) if isinstance(inputs, Mapping) else inputs
+    header["generated_at"] = _format_generated_at(generated_at)
+    if verdict is not None:
+        header["verdict"] = verdict
     if summary is not None:
         header["summary"] = dict(summary) if isinstance(summary, Mapping) else summary
     return validate_result_file_header(header)
@@ -249,7 +298,8 @@ def serialize_result_file_header_prefix(header: Mapping[str, Any]) -> str:
     Returns:
         ``{"result_file_version":...,"body":`` with keys in layout order.
     """
-    parts = [f"{_compact(key)}:{_compact(header[key])}" for key in RESULT_FILE_HEADER_KEYS if key in header]
+    keys = RESULT_FILE_HEADER_KEYS_BY_VERSION.get(str(header.get("result_file_version")), RESULT_FILE_HEADER_KEYS)
+    parts = [f"{_compact(key)}:{_compact(header[key])}" for key in keys if key in header]
     return "{" + ",".join(parts) + ',"body":'
 
 
@@ -262,6 +312,10 @@ def write_result_file(
     summary: Mapping[str, Any] | None = None,
     filename: str = RESULT_FILE_DEFAULT_NAME,
     generated_at: datetime | None = None,
+    result_file_version: str = RESULT_FILE_VERSION,
+    inputs: Mapping[str, Any] | None = None,
+    verdict: str | None = None,
+    workflow_definition: Mapping[str, Any] | None = None,
 ) -> dict[str, str]:
     """Write the run's result file and return it as the ``result_file`` output.
 
@@ -287,6 +341,11 @@ def write_result_file(
         summary: Optional flat key-value pairs (≤2 KB).
         filename: File name inside the context's output folder.
         generated_at: Timezone-aware timestamp; defaults to now (UTC).
+        result_file_version: Layout to write; default ``"1.0.0"``.
+        inputs: 1.1.0 only: the verdict inputs as received (≤16 KB).
+        verdict: 1.1.0 only: the overall verdict.
+        workflow_definition: 1.1.0 only; defaults to the run context's
+            definition id, slug and version when all three are known.
 
     Returns:
         ``{"result_file": "<local path>"}``; the SDK uploads it after ``execute``.
@@ -294,12 +353,19 @@ def write_result_file(
     Raises:
         ResultFileFormatError: Invalid header, ``summary`` or non-JSON ``body``.
     """
+    run_context = context.run_context
+    if workflow_definition is None and result_file_version != "1.0.0":
+        workflow_definition = workflow_definition_from_run_context(run_context)
     header = build_result_file_header(
         result_schema=result_schema,
         result_schema_version=result_schema_version,
-        workflow_run_id=context.run_context.workflow_run_id if context.run_context else context.run_id,
+        workflow_run_id=run_context.workflow_run_id if run_context else context.run_id,
         summary=summary,
         generated_at=generated_at,
+        result_file_version=result_file_version,
+        workflow_definition=workflow_definition,
+        inputs=inputs,
+        verdict=verdict,
     )
     target = context.output_path(filename)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -319,6 +385,27 @@ def write_result_file(
         _remove_quietly(tmp_name)
         raise
     return {RESULT_FILE_OUTPUT_FIELD: str(target)}
+
+
+def workflow_definition_from_run_context(run_context: Any) -> dict[str, str] | None:
+    """Return ``{id, slug, version}`` from a run context, or None when any is unknown.
+
+    Args:
+        run_context: A :class:`~canvastekk_workflow_sdk.run_context.RunContext` or None.
+
+    Returns:
+        The 1.1.0 ``workflow_definition`` header value, or None.
+    """
+    if run_context is None:
+        return None
+    values = (
+        run_context.workflow_definition_id,
+        run_context.workflow_definition_slug,
+        run_context.workflow_definition_version,
+    )
+    if not all(values):
+        return None
+    return {"id": values[0], "slug": values[1], "version": values[2]}
 
 
 def _remove_quietly(path: str) -> None:
@@ -436,13 +523,14 @@ def read_result_file_header(
             raise ResultFileFormatError("Result file has no body")
         if separator != ",":
             raise ResultFileFormatError("Result file is not valid JSON (',' expected)")
-    missing = [k for k in RESULT_FILE_HEADER_KEYS if k != "summary" and k not in header]
+    keys = RESULT_FILE_HEADER_KEYS_BY_VERSION.get(str(header.get("result_file_version")), RESULT_FILE_HEADER_KEYS)
+    missing = [k for k in keys if k not in RESULT_FILE_OPTIONAL_HEADER_KEYS and k not in header]
     if missing:
         raise ResultFileFormatError(
             f"Result file header is invalid: header keys must come before body; missing {missing}"
         )
-    order = [k for k in header if k in RESULT_FILE_HEADER_KEYS]
-    if order != [k for k in RESULT_FILE_HEADER_KEYS if k in header]:
+    order = [k for k in header if k in keys]
+    if order != [k for k in keys if k in header]:
         raise ResultFileFormatError(f"Result file header keys are out of order: {order}")
     return validate_result_file_header(header)
 
@@ -528,11 +616,15 @@ __all__ = [
     "RESULT_FILE_CONTENT_TYPE",
     "RESULT_FILE_DEFAULT_NAME",
     "RESULT_FILE_HEADER_KEYS",
+    "RESULT_FILE_HEADER_KEYS_BY_VERSION",
     "RESULT_FILE_HEADER_MAX_BYTES",
+    "RESULT_FILE_INPUTS_MAX_BYTES",
     "RESULT_FILE_MARKER",
     "RESULT_FILE_OUTPUT_FIELD",
     "RESULT_FILE_SUMMARY_MAX_BYTES",
+    "RESULT_FILE_OPTIONAL_HEADER_KEYS",
     "RESULT_FILE_VERSION",
+    "RESULT_FILE_VERSION_1_1_0",
     "SUPPORTED_RESULT_FILE_VERSIONS",
     "ResultFileFormatError",
     "build_result_file_header",
@@ -543,5 +635,6 @@ __all__ = [
     "result_file_output_schema",
     "serialize_result_file_header_prefix",
     "validate_result_file_header",
+    "workflow_definition_from_run_context",
     "write_result_file",
 ]

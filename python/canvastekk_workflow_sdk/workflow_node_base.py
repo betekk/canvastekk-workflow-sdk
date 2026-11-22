@@ -29,6 +29,7 @@ from canvastekk_workflow_sdk._url import (
     UrlPolicyError,
     validate_external_url,
 )
+from canvastekk_workflow_sdk.check_verdict import VERDICT_MARK, marked_inputs
 from canvastekk_workflow_sdk.exceptions import (
     IO_SUBCODE_DOWNLOAD_FAILED,
     IO_SUBCODE_SIZE_EXCEEDED,
@@ -144,6 +145,12 @@ class WorkflowNodeBase(ABC):
         manifest = getattr(cls, "manifest", None)
         if manifest is None:
             raise TypeError(f"{cls.__name__} must define a 'manifest' class attribute")
+        # #283 (D91): a node that marks verdict inputs must use the SDK verdict step.
+        if not getattr(cls, "_is_check_node", False) and marked_inputs(getattr(manifest, "input_schema", {}) or {}):
+            raise TypeError(
+                f"{cls.__name__} marks inputs with {VERDICT_MARK} but does not subclass CheckNodeBase; "
+                "check nodes implement measure() and let the SDK judge (docs/CHECK-VERDICT.md)."
+            )
 
 
     @abstractmethod

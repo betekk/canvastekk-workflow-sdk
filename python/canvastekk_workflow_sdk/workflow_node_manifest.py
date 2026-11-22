@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, field_validator, model_serializer, model_validator
 
 from canvastekk_workflow_sdk._version import __version__ as _sdk_version_stamp
+from canvastekk_workflow_sdk.check_verdict import CheckSpec, marked_inputs, verdict_mark_errors
 from canvastekk_workflow_sdk.exceptions import WorkflowNodeManifestValidationError
 from canvastekk_workflow_sdk.result_file import result_file_declaration_errors
 
@@ -347,6 +348,13 @@ class WorkflowNodeManifest(BaseModel):
         "stays active until retired).",
     )
 
+    checks: dict[str, CheckSpec] | None = Field(
+        default=None,
+        description="Check nodes only (#283): one entry per check key the node judges — label, unit, "
+        "resolution and optional statement templates. Inputs marked with x-verdict name these keys. "
+        "Omitted entirely when unset (legacy-identical serialization).",
+    )
+
     _sdk_version: str = PrivateAttr(default_factory=lambda: _stamped_sdk_version())
 
     @computed_field  # type: ignore[prop-decorator]
@@ -418,6 +426,7 @@ class WorkflowNodeManifest(BaseModel):
             "docs_url",
             "changelog_url",
             "contract",
+            "checks",
         ):
             if data.get(optional_key) is None:
                 data.pop(optional_key, None)
@@ -603,6 +612,23 @@ class WorkflowNodeManifest(BaseModel):
             if problems:
                 raise ValueError(" ".join(problems))
 
+        return self
+
+    @model_validator(mode="after")
+    def _validate_verdict_marks(self) -> WorkflowNodeManifest:
+        """Validate ``x-verdict`` marks against the ``checks`` map (#283, D85/D88).
+
+        Fires only when a mark or a ``checks`` map exists, so existing
+        manifests are untouched.
+
+        Raises:
+            ValueError: One message listing every problem.
+        """
+        if not self.checks and not marked_inputs(self.input_schema):
+            return self
+        problems = verdict_mark_errors(self.input_schema, self.checks)
+        if problems:
+            raise ValueError("Invalid verdict marks: " + " ".join(problems) + " See docs/CHECK-VERDICT.md.")
         return self
 
     @model_validator(mode="after")

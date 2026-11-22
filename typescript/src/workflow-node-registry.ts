@@ -167,6 +167,10 @@ export function buildWorkflowNodeRegistryPayload(
   if (definition.deprecation != null) {
     payload.deprecation = WorkflowNodeDeprecationInfoSchema.parse(definition.deprecation);
   }
+  if (definition.checks != null && Object.keys(definition.checks).length > 0) {
+    // #283: stored as node_registry.checks by the engine (accepted from CWE VS2 on).
+    payload.checks = definition.checks;
+  }
 
   return payload;
 }

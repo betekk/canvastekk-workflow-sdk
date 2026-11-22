@@ -47,6 +47,30 @@ and the `__end__.result_file` value
 [`schemas/result-file/end-value-1.0.0.json`](../schemas/result-file/end-value-1.0.0.json).
 Files are plain JSON (`application/json`), not compressed.
 
+## Layout 1.1.0 (#283)
+
+Layout 1.1.0 is 1.0.0 plus three optional header keys, in this order:
+
+```text
+result_file_version, result_schema, result_schema_version, workflow_run_id,
+workflow_definition, inputs, generated_at, verdict, summary, body
+```
+
+| Key | Rule |
+|---|---|
+| `workflow_definition` | `{ id, slug, version }` of the executing definition. The writer fills it from the run context (#281) when all three are known, otherwise leaves it out |
+| `inputs` | The verdict inputs only (inputs marked `x-verdict`), as the node received them; ≤16384 bytes as compact UTF-8 JSON. Never every run input: those stay on the run |
+| `verdict` | `PASS`, `WARNING`, `FAIL` or `NOT_EVALUABLE` |
+
+The writer still defaults to 1.0.0, so existing nodes write the same bytes.
+Pass `result_file_version="1.1.0"` / `resultFileVersion: "1.1.0"` to write
+1.1.0; `CheckNodeBase` does so for every check node
+([`CHECK-VERDICT.md`](CHECK-VERDICT.md)). The header reader accepts both
+layouts and checks key order per layout. Schema:
+[`schemas/result-file/1.1.0.json`](../schemas/result-file/1.1.0.json); golden:
+`schemas/result-file/golden/input-1.1.0.json` → `expected-1.1.0.json`
+(both runtimes reproduce it byte for byte).
+
 ## Writing a result file
 
 Always use the writer. It validates the header and `summary` **before**

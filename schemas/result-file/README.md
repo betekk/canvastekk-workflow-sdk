@@ -7,7 +7,8 @@ Canonical, published JSON Schemas (draft-07) for workflow run result files
 |---|---|
 | `1.0.0.json` | The file layout 1.0.0 (header keys, `summary` rules, `body`) |
 | `end-value-1.0.0.json` | The value of the reserved `__end__.result_file` key (engine storage pointer) |
-| `golden/` | Shared input and expected bytes; the Python and TypeScript writers must reproduce `expected.json` exactly |
+| `1.1.0.json` | Layout 1.1.0: 1.0.0 plus optional `workflow_definition`, `inputs` and `verdict` (#283) |
+| `golden/` | Shared input and expected bytes; the Python and TypeScript writers must reproduce `expected.json` and `expected-1.1.0.json` exactly |
 
 Copies: the Python wheel ships these under
 `python/canvastekk_workflow_sdk/data/schemas/result-file/`, and the TypeScript

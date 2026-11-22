@@ -61,3 +61,4 @@
 ## solutions
 - [gh-token-env-with-persist-credentials-false](solutions/gh-token-env-with-persist-credentials-false.md) — gh CLI 401s after persist-credentials:false checkouts; every gh step needs explicit GH_TOKEN env
 - [solutions/context-run-id-kwarg-ignored-with-output-dir.md](solutions/context-run-id-kwarg-ignored-with-output-dir.md) — request-less context takes run_id from the output folder name (#278)
+- [solutions/integral-float-breaks-cross-runtime-golden.md](solutions/integral-float-breaks-cross-runtime-golden.md) — Python writes 5.0, JS writes 5: keep input number types and no integral floats in shared goldens (#283)

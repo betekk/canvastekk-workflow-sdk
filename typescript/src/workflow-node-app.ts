@@ -232,6 +232,7 @@ export function createWorkflowNodeApp(
         "docs_url",
         "changelog_url",
         "contract",
+        "checks",
       ] as const) {
         if (content[key] === null) {
           delete content[key];
