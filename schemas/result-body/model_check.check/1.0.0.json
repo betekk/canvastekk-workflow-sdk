@@ -1,0 +1,275 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:canvastekk:result-body:model_check.check:1.0.0",
+  "title": "model_check.check body 1.0.0",
+  "description": "Body of a model-check result file written by the SDK verdict step (CheckNodeBase). checks[] holds one entry per check key with the limits and filters the run used; measurements[] holds one judged row per reading. Counts are per subject (subject_id), never per row.",
+  "type": "object",
+  "required": [
+    "checks",
+    "measurements"
+  ],
+  "definitions": {
+    "verdict": {
+      "enum": [
+        "PASS",
+        "WARNING",
+        "FAIL",
+        "NOT_EVALUABLE"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PASS",
+        "WARNING",
+        "FAIL",
+        "NOT_EVALUABLE"
+      ],
+      "properties": {
+        "PASS": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "WARNING": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "FAIL": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "NOT_EVALUABLE": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "limit_used": {
+      "type": "object",
+      "required": [
+        "input",
+        "role",
+        "operator",
+        "value"
+      ],
+      "properties": {
+        "input": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "LIMIT",
+            "WARNING_LIMIT"
+          ]
+        },
+        "operator": {
+          "enum": [
+            "GT",
+            "GTE",
+            "LT",
+            "LTE",
+            "EQ",
+            "NE",
+            "IN",
+            "NOT_IN"
+          ]
+        },
+        "value": {},
+        "tolerance": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "ignore_case": {
+          "type": "boolean"
+        },
+        "fixed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "filter_used": {
+      "type": "object",
+      "required": [
+        "input",
+        "value"
+      ],
+      "properties": {
+        "input": {
+          "type": "string"
+        },
+        "value": {}
+      }
+    },
+    "failed_limit": {
+      "type": "object",
+      "required": [
+        "input",
+        "side"
+      ],
+      "properties": {
+        "input": {
+          "type": "string"
+        },
+        "side": {
+          "enum": [
+            "BELOW",
+            "ABOVE",
+            "EQUAL",
+            "MISMATCH",
+            "NOT_IN",
+            "IN"
+          ]
+        }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "check",
+          "verdict",
+          "verdict_counts",
+          "limits_used",
+          "filters_used"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "verdict": {
+            "$ref": "#/definitions/verdict"
+          },
+          "verdict_counts": {
+            "$ref": "#/definitions/counts"
+          },
+          "limits_used": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/limit_used"
+            }
+          },
+          "filters_used": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/filter_used"
+            }
+          },
+          "not_evaluated_reason": {
+            "$ref": "#/definitions/reason"
+          },
+          "cross_reference": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "check",
+          "subject_id",
+          "kind",
+          "verdict"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "subject_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "value",
+              "predicate",
+              "fail_by_name",
+              "not_evaluable"
+            ]
+          },
+          "element_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_id": {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          "global_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "actual": {},
+          "actual_raw": {},
+          "bound": {
+            "enum": [
+              "LOWER",
+              "UPPER",
+              null
+            ]
+          },
+          "alternatives": {
+            "type": "object"
+          },
+          "verdict": {
+            "$ref": "#/definitions/verdict"
+          },
+          "failed_limits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/failed_limit"
+            }
+          },
+          "reason": {
+            "$ref": "#/definitions/reason"
+          },
+          "verdict_caveat": {
+            "type": "object"
+          },
+          "extra": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}
