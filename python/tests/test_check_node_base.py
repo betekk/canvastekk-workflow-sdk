@@ -21,7 +21,7 @@ from canvastekk_workflow_sdk import (
     build_workflow_node_registry_payload,
     check_node_conformance_errors,
 )
-from canvastekk_workflow_sdk.check_verdict import load_check_body_schema
+from canvastekk_workflow_sdk.check_verdict import CheckVerdictError, load_check_body_schema
 from canvastekk_workflow_sdk.result_file import (
     RESULT_FILE_HEADER_KEYS_BY_VERSION,
     RESULT_FILE_OUTPUT_FIELD,
@@ -262,6 +262,38 @@ def test_check_node_writes_a_valid_1_1_0_file_and_inline_outputs(tmp_path: Path,
     assert data["verdict"] == "FAIL"
     assert data["summary"]["warning_count"] == 1
     assert data["body"]["measurements"][0]["actual"] == 3000
+
+
+class EvidenceBeamNode(BeamNode):
+    def body_extra(self, judged, inputs, context):  # noqa: ANN001, ANN201
+        return {"measurements": {"sets": [{"id": "len"}]}, "instances": [{"gid": "B7"}], "verdict": judged.verdict}
+
+
+class BadEvidenceBeamNode(BeamNode):
+    def body_extra(self, judged, inputs, context):  # noqa: ANN001, ANN201
+        return ["not", "an", "object"]
+
+
+def test_body_extra_is_written_as_body_extra_and_validates(tmp_path: Path) -> None:
+    outputs = EvidenceBeamNode().execute({}, _context(tmp_path))
+    data = json.loads(Path(outputs[RESULT_FILE_OUTPUT_FIELD]).read_text(encoding="utf-8"))
+    assert data["body"]["extra"] == {
+        "measurements": {"sets": [{"id": "len"}]},
+        "instances": [{"gid": "B7"}],
+        "verdict": "FAIL",
+    }
+    assert not list(Draft7Validator(load_check_body_schema()).iter_errors(data["body"]))
+
+
+def test_without_body_extra_the_body_has_no_extra(tmp_path: Path) -> None:
+    outputs = BeamNode().execute({}, _context(tmp_path))
+    data = json.loads(Path(outputs[RESULT_FILE_OUTPUT_FIELD]).read_text(encoding="utf-8"))
+    assert "extra" not in data["body"]
+
+
+def test_non_object_body_extra_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(CheckVerdictError, match="must be an object"):
+        BadEvidenceBeamNode().execute({}, _context(tmp_path))
 
 
 def test_check_node_cannot_override_execute() -> None:

@@ -94,6 +94,28 @@ class CheckNodeBase(WorkflowNodeBase, ABC):
         """
         ...
 
+    def body_extra(
+        self,
+        judged: JudgedResult,
+        inputs: dict[str, Any],
+        context: NodeExecutionContext,
+    ) -> dict[str, Any] | None:
+        """Return the check's viewer evidence, written as the body's top-level ``extra`` (#285).
+
+        Readers show it as the check's evidence (the frontend reads it as the
+        0.x ``result``, with ``measurements`` and ``instances`` inside it). It
+        never decides a verdict. ``None`` (the default) writes no ``extra``.
+
+        Args:
+            judged: The SDK's verdicts.
+            inputs: The validated inputs.
+            context: The execution context.
+
+        Returns:
+            A JSON object, or ``None``.
+        """
+        return None
+
     def verdict_policy(self) -> VerdictPolicy | None:
         """Return the app's reading rules (e.g. allowed NOT_EVALUABLE codes); none by default."""
         return None
@@ -145,7 +167,7 @@ class CheckNodeBase(WorkflowNodeBase, ABC):
                 context,
                 result_schema=CHECK_RESULT_SCHEMA,
                 result_schema_version=CHECK_RESULT_SCHEMA_VERSION,
-                body=judged.body(),
+                body=judged.body(extra=self.body_extra(judged, inputs, context)),
                 summary=judged.summary(),
                 filename=self.result_file_name,
                 result_file_version=RESULT_FILE_VERSION_1_1_0,
