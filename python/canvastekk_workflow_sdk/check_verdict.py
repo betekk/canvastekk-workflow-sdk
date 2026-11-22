@@ -515,6 +515,8 @@ class Reading:
                 raise CheckVerdictError("alternatives must not be empty")
             if not self.straddle_code:
                 raise CheckVerdictError("a reading with alternatives needs a straddle_code")
+            if not REASON_CODE_PATTERN.fullmatch(self.straddle_code):
+                raise CheckVerdictError(f"Straddle code {self.straddle_code!r} must be UPPER_SNAKE_CASE")
             if self.bound is not None:
                 raise CheckVerdictError("a reading cannot carry both bound and alternatives")
 

@@ -286,6 +286,7 @@ def test_marked_input_values_are_the_verdict_inputs_only() -> None:
         lambda: Reading.value("c", subject_id="s", alternatives={"a": 1}),
         lambda: Reading.value("c", subject_id="s", alternatives={"a": 1}, straddle_code="X", bound="LOWER"),
         lambda: Reading.value("c", subject_id="s", alternatives={}, straddle_code="X"),
+        lambda: Reading.value("c", subject_id="s", alternatives={"a": 1}, straddle_code="datum-straddle"),
     ],
 )
 def test_reading_constructor_guards(build) -> None:

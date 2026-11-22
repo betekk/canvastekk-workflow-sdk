@@ -108,7 +108,8 @@ calculation first and its file format later.
 
 Rules: a broken `LIMIT` → FAIL; else a broken `WARNING_LIMIT` → WARNING; else
 PASS. A bound that settles every limit decides the row (with a
-`verdict_caveat`); one that does not → FAIL `<CHECK>_NOT_SETTLED`.
+`verdict_caveat`); one that does not → FAIL `<CHECK>_NOT_SETTLED`. A warning
+limit the bound cannot settle is not raised (only a settled break warns).
 Alternatives that disagree → FAIL with their `straddle_code`. `EQ` failures
 name their side (`BELOW` / `ABOVE`). An app can restrict readings with a
 `VerdictPolicy` (`verdict_policy()` on the node).
