@@ -12,9 +12,9 @@
     "checks": [{"check": "beam_length", "verdict": "FAIL",
       "verdict_counts": {"PASS": 1, "WARNING": 1, "FAIL": 1, "NOT_EVALUABLE": 1},
       "limits_used": [
-        {"input": "beam_length_min", "role": "LIMIT", "operator": "GTE", "value": 1000, "tolerance": 5.0},
-        {"input": "beam_length_max", "role": "LIMIT", "operator": "LT", "value": 7000, "tolerance": 5.0},
-        {"input": "beam_length_warn_max", "role": "WARNING_LIMIT", "operator": "LTE", "value": 6000, "tolerance": 0.0}],
+        {"input": "beam_length_min", "role": "LIMIT", "operator": "GTE", "value": 1000, "tolerance": 5},
+        {"input": "beam_length_max", "role": "LIMIT", "operator": "LT", "value": 7000, "tolerance": 5},
+        {"input": "beam_length_warn_max", "role": "WARNING_LIMIT", "operator": "LTE", "value": 6000, "tolerance": 0}],
       "filters_used": [{"input": "include_cantilevers", "value": false}]}],
     "measurements": [
       {"check": "beam_length", "subject_id": "B7", "kind": "value", "verdict": "PASS", "failed_limits": [], "element_name": "Beam B7", "file_id": 11, "global_ids": ["2O2Fr"], "actual": 3000},

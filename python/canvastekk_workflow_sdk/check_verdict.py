@@ -362,7 +362,7 @@ class Rule:
     role: str
     value: Any
     operator: str | None = None
-    tolerance: float = 0.0
+    tolerance: float | int = 0
     ignore_case: bool = False
     fixed: bool = False
 
@@ -423,7 +423,7 @@ def rules_from_inputs(input_schema: Mapping[str, Any], inputs: Mapping[str, Any]
             or a tolerance is negative.
     """
     marks = marked_inputs(input_schema)
-    tolerances: dict[tuple[str, str], float] = {}
+    tolerances: dict[tuple[str, str], float | int] = {}
     for name, prop in marks.items():
         mark = prop[VERDICT_MARK]
         if mark.get("role") != "TOLERANCE":
@@ -444,7 +444,7 @@ def rules_from_inputs(input_schema: Mapping[str, Any], inputs: Mapping[str, Any]
                     and _value_kind(p) == "number"
                 ]
             for target in targets:
-                tolerances[(check, target)] = float(value)
+                tolerances[(check, target)] = value
     rules: list[Rule] = []
     for name, prop in marks.items():
         mark = prop[VERDICT_MARK]
@@ -472,7 +472,7 @@ def rules_from_inputs(input_schema: Mapping[str, Any], inputs: Mapping[str, Any]
                     role=role,
                     value=value,
                     operator=mark.get("operator"),
-                    tolerance=tolerances.get((check, name), 0.0),
+                    tolerance=tolerances.get((check, name), 0),
                     ignore_case=bool(mark.get("ignore_case", False)),
                     fixed=fixed,
                 )
