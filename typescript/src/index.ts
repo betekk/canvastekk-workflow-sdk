@@ -185,8 +185,30 @@ export {
   writeResultFile,
   resultFileOutputSchema,
   resultFileDeclarationErrors,
+  RESULT_FILE_VERSION_1_1_0,
+  RESULT_FILE_INPUTS_MAX_BYTES,
+  RESULT_FILE_HEADER_KEYS_BY_VERSION,
+  RESULT_FILE_OPTIONAL_HEADER_KEYS,
+  RESULT_FILE_SCHEMA_1_1_0,
+  workflowDefinitionFromRunContext,
 } from "./result-file.js";
+export {
+  VERDICT_MARK,
+  CHECK_RESULT_SCHEMA,
+  CHECK_RESULT_SCHEMA_VERSION,
+  TekkCheckRoleEnum,
+  TekkCheckOperatorEnum,
+  TekkWorkflowRunVerdictEnum,
+  TekkCheckRoundingEnum,
+  VERDICT_PRECEDENCE,
+  STATEMENT_PLACEHOLDERS,
+  rollupVerdicts,
+  CheckSpecSchema,
+  MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0,
+} from "./check-verdict.js";
+export type { TekkCheckRole, TekkCheckOperator, TekkWorkflowRunVerdict, CheckSpec } from "./check-verdict.js";
 export type {
+  ResultFileWorkflowDefinition,
   ResultFileHeader,
   ResultFileHeaderOptions,
   ResultFileSummaryValue,

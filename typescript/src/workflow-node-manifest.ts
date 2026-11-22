@@ -1,3 +1,4 @@
+import { CheckSpecSchema } from "./check-verdict.js";
 import { z } from "zod";
 import { VERSION } from "./version.js";
 import { WorkflowNodeManifestValidationError } from "./exceptions.js";
@@ -317,6 +318,8 @@ const WorkflowNodeManifestObjectSchema = z
       .nullable()
       .default(null),
     contract: NodeContractSchema.nullable().default(null),
+    /** Check nodes only (#283): one entry per check key; marked inputs name these keys. */
+    checks: z.record(z.string(), CheckSpecSchema).nullable().default(null),
   })
   .transform((data, ctx) => {
     const { id: _id, ...rest } = data;
