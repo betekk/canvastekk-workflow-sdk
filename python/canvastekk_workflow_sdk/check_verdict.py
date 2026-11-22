@@ -482,7 +482,7 @@ def rules_from_inputs(input_schema: Mapping[str, Any], inputs: Mapping[str, Any]
 
 # --- readings -----------------------------------------------------------------
 
-ReadingKind = Literal["value", "predicate", "fail_by_name", "not_evaluable", "observation", "scope"]
+ReadingKind = Literal["value", "predicate", "fail_by_name", "not_evaluable", "observation", "scope", "cross_reference"]
 
 
 @dataclass(frozen=True)
@@ -502,14 +502,22 @@ class Reading:
     file_id: int | str | None = None
     global_ids: tuple[str, ...] = ()
     extra: Mapping[str, Any] | None = None
+    measured_by: str | None = None
 
     def __post_init__(self) -> None:
         if self.kind in _JUDGED_KINDS and not self.subject_id:
             raise CheckVerdictError(f"A {self.kind} reading of check {self.check!r} needs a subject_id")
         if self.reason_code is not None and not REASON_CODE_PATTERN.fullmatch(self.reason_code):
             raise CheckVerdictError(f"Reason code {self.reason_code!r} must be UPPER_SNAKE_CASE")
-        if self.kind in ("fail_by_name", "not_evaluable") and not self.reason_code:
+        if self.kind in ("fail_by_name", "not_evaluable", "cross_reference") and not self.reason_code:
             raise CheckVerdictError(f"A {self.kind} reading needs a reason_code")
+        if self.kind == "cross_reference":
+            if not self.measured_by or not CHECK_KEY_PATTERN.fullmatch(self.measured_by):
+                raise CheckVerdictError(
+                    f"A cross_reference reading of check {self.check!r} needs a snake_case measured_by"
+                )
+            if self.measured_by == self.check:
+                raise CheckVerdictError(f"Check {self.check!r} cannot be cross-referenced to itself")
         if self.alternatives is not None:
             if not self.alternatives:
                 raise CheckVerdictError("alternatives must not be empty")
@@ -630,6 +638,24 @@ class Reading:
             global_ids=tuple(global_ids),
             extra=extra,
         )
+
+    @classmethod
+    def cross_reference(
+        cls,
+        check: str,
+        *,
+        measured_by: str,
+        reason_code: str,
+        reason: str | None = None,
+    ) -> Reading:
+        """The whole check is measured by another check (D90, #285).
+
+        The check reports NOT_EVALUABLE with ``reason_code``, its ``checks[]``
+        entry carries ``cross_reference: measured_by``, and it is left out of
+        the run verdict and the run counts. A check takes either one
+        cross-reference reading or judged readings, never both.
+        """
+        return cls(kind="cross_reference", check=check, reason_code=reason_code, reason=reason, measured_by=measured_by)
 
     @classmethod
     def observation(cls, check: str, *, extra: Mapping[str, Any], subject_id: str | None = None) -> Reading:
@@ -801,6 +827,8 @@ class JudgedCheck:
     limits_used: list[dict[str, Any]]
     filters_used: list[dict[str, Any]]
     not_evaluated_reason: dict[str, str] | None = None
+    cross_reference: str | None = None
+    """The check that measures this one (#285); such a check counts nowhere in the run."""
 
     def to_body(self) -> dict[str, Any]:
         """Return the body entry."""
@@ -813,6 +841,8 @@ class JudgedCheck:
         }
         if self.not_evaluated_reason is not None:
             entry["not_evaluated_reason"] = dict(self.not_evaluated_reason)
+        if self.cross_reference is not None:
+            entry["cross_reference"] = self.cross_reference
         return entry
 
 
@@ -858,8 +888,12 @@ class JudgedResult:
             "requirement_verdicts": {c.check: c.verdict for c in self.checks},
         }
 
-    def body(self) -> dict[str, Any]:
+    def body(self, extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Return the ``model_check.check`` 1.0.0 body, validated against its schema.
+
+        Args:
+            extra: The check's viewer evidence, written as the body's top-level
+                ``extra`` (#285); omitted when ``None``.
 
         Raises:
             CheckVerdictError: When the body breaks the published schema.
@@ -878,6 +912,10 @@ class JudgedResult:
                 }
                 for o in self.observations
             ]
+        if extra is not None:
+            if not isinstance(extra, Mapping):
+                raise CheckVerdictError(f"body extra must be an object, got {type(extra).__name__}")
+            body["extra"] = dict(extra)
         errors = sorted(_body_validator().iter_errors(body), key=lambda e: list(e.absolute_path))
         if errors:
             first = errors[0]
@@ -1027,6 +1065,16 @@ def judge(
         rules_by_check.setdefault(rule.check, []).append(rule)
     measurements: list[JudgedMeasurement] = []
     observations: list[Reading] = []
+    crossed: dict[str, Reading] = {}
+    for reading in readings:
+        if reading.kind != "cross_reference":
+            continue
+        if reading.check in crossed:
+            raise CheckVerdictError(f"Check {reading.check!r} has more than one cross_reference reading")
+        crossed[reading.check] = reading
+    mixed = sorted({r.check for r in readings if r.kind in _JUDGED_KINDS} & set(crossed))
+    if mixed:
+        raise CheckVerdictError(f"Checks {mixed} have both a cross_reference reading and judged readings")
     for reading in readings:
         if reading.check not in specs:
             raise CheckVerdictError(f"Reading names check {reading.check!r}, which the manifest does not declare")
@@ -1035,12 +1083,33 @@ def judge(
         if reading.kind in ("observation", "scope"):
             observations.append(reading)
             continue
+        if reading.kind == "cross_reference":
+            if reading.measured_by not in specs:
+                raise CheckVerdictError(
+                    f"Check {reading.check!r} is measured by {reading.measured_by!r}, which the manifest does not declare"
+                )
+            continue
         measurements.append(_judge_reading(reading, rules_by_check.get(reading.check, []), specs[reading.check]))
     judged_checks: list[JudgedCheck] = []
     for key in specs:
+        check_rules = rules_by_check.get(key, [])
+        cross = crossed.get(key)
+        if cross is not None:
+            reason = {"code": str(cross.reason_code), **({"message": cross.reason} if cross.reason else {})}
+            judged_checks.append(
+                JudgedCheck(
+                    check=key,
+                    verdict="NOT_EVALUABLE",
+                    verdict_counts=_empty_counts(),
+                    limits_used=[r.as_limit_used() for r in check_rules if r.role in ("LIMIT", "WARNING_LIMIT")],
+                    filters_used=[{"input": r.input, "value": r.value} for r in check_rules if r.role == "FILTER"],
+                    not_evaluated_reason=reason,
+                    cross_reference=cross.measured_by,
+                )
+            )
+            continue
         rows = [m for m in measurements if m.reading.check == key]
         counts = _count_subjects(rows)
-        check_rules = rules_by_check.get(key, [])
         judged_checks.append(
             JudgedCheck(
                 check=key,
@@ -1055,7 +1124,8 @@ def judge(
         checks=judged_checks,
         measurements=measurements,
         observations=observations,
-        verdict=rollup(c.verdict for c in judged_checks),
+        # D90 (#285): a cross-referenced check counts nowhere; its owner carries the result.
+        verdict=rollup(c.verdict for c in judged_checks if c.cross_reference is None),
         subject_counts=_count_subjects(measurements),
     )
 

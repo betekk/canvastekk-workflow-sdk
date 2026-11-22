@@ -547,3 +547,102 @@ def test_beam_example_matches_the_plan() -> None:
         [],
     ]
     assert judged.inline_outputs()["requirement_verdicts"] == {"beam_length": "FAIL"}
+
+
+# --- cross-referenced checks (#285, D90) ---------------------------------------------
+
+
+def _wash_basin_judge(*extra_readings: Reading):
+    rules = [Rule(check="corridor_width", input="w_min", role="LIMIT", value=1200, operator="GTE")]
+    checks = {"corridor_width": {"label": "Corridor width"}, "wash_basin_corridor_width": {"label": "Basin corridor"}}
+    readings = [
+        Reading.value("corridor_width", subject_id="c-1", actual=1500),
+        Reading.cross_reference(
+            "wash_basin_corridor_width",
+            measured_by="corridor_width",
+            reason_code="CORRIDOR_WIDTH_MEASURED_BY_CHECK_7",
+            reason="Measured by check 07.",
+        ),
+        *extra_readings,
+    ]
+    return judge(rules, readings, checks)
+
+
+def test_cross_referenced_check_counts_nowhere_in_the_run() -> None:
+    judged = _wash_basin_judge()
+    by_check = {c.check: c for c in judged.checks}
+    crossed = by_check["wash_basin_corridor_width"]
+    assert crossed.verdict == "NOT_EVALUABLE"
+    assert crossed.cross_reference == "corridor_width"
+    assert crossed.not_evaluated_reason == {
+        "code": "CORRIDOR_WIDTH_MEASURED_BY_CHECK_7",
+        "message": "Measured by check 07.",
+    }
+    assert crossed.verdict_counts == {"PASS": 0, "WARNING": 0, "FAIL": 0, "NOT_EVALUABLE": 0}
+    assert judged.verdict == "PASS"
+    assert judged.subject_counts == {"PASS": 1, "WARNING": 0, "FAIL": 0, "NOT_EVALUABLE": 0}
+    assert judged.summary()["verdict"] == "PASS"
+    assert judged.inline_outputs()["requirement_verdicts"]["wash_basin_corridor_width"] == "NOT_EVALUABLE"
+    body = judged.body()
+    entry = next(c for c in body["checks"] if c["check"] == "wash_basin_corridor_width")
+    assert entry["cross_reference"] == "corridor_width"
+    assert entry["not_evaluated_reason"]["code"] == "CORRIDOR_WIDTH_MEASURED_BY_CHECK_7"
+    assert not any(m["check"] == "wash_basin_corridor_width" for m in body["measurements"])
+    Draft7Validator(json.loads(CANONICAL_BODY.read_text())).validate(body)
+
+
+def test_without_cross_reference_an_empty_check_still_rolls_up() -> None:
+    judged = judge(
+        [Rule(check="a", input="x", role="LIMIT", value=1, operator="GTE")],
+        [Reading.value("a", subject_id="s", actual=2)],
+        {"a": {"label": "A"}, "b": {"label": "B"}},
+    )
+    assert judged.verdict == "NOT_EVALUABLE"
+    assert all("cross_reference" not in c for c in judged.body()["checks"])
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "fragment"),
+    [
+        ({"measured_by": "Corridor", "reason_code": "X"}, "snake_case measured_by"),
+        ({"measured_by": "wash_basin_corridor_width", "reason_code": "X"}, "to itself"),
+        ({"measured_by": "corridor_width", "reason_code": "bad code"}, "UPPER_SNAKE_CASE"),
+    ],
+)
+def test_cross_reference_reading_is_validated(kwargs: dict, fragment: str) -> None:
+    with pytest.raises(CheckVerdictError, match=fragment):
+        Reading.cross_reference("wash_basin_corridor_width", **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("reading", "fragment"),
+    [
+        (Reading.value("wash_basin_corridor_width", subject_id="b-1", actual=1), "both a cross_reference"),
+        (
+            Reading.cross_reference("wash_basin_corridor_width", measured_by="corridor_width", reason_code="AGAIN"),
+            "more than one",
+        ),
+    ],
+)
+def test_cross_referenced_check_takes_no_other_readings(reading: Reading, fragment: str) -> None:
+    with pytest.raises(CheckVerdictError, match=fragment):
+        _wash_basin_judge(reading)
+
+
+def test_cross_reference_to_an_undeclared_check_is_refused() -> None:
+    with pytest.raises(CheckVerdictError, match="does not declare"):
+        judge(
+            [],
+            [Reading.cross_reference("b", measured_by="zzz", reason_code="X")],
+            {"b": {"label": "B"}},
+        )
+
+
+def test_body_extra_is_written_and_validates() -> None:
+    judged = _wash_basin_judge()
+    body = judged.body(extra={"measurements": {"sets": []}, "instances": [{"gid": "g"}]})
+    assert body["extra"] == {"measurements": {"sets": []}, "instances": [{"gid": "g"}]}
+    Draft7Validator(json.loads(CANONICAL_BODY.read_text())).validate(body)
+    assert "extra" not in judged.body()
+    with pytest.raises(CheckVerdictError, match="must be an object"):
+        judged.body(extra=["not", "a", "dict"])  # type: ignore[arg-type]
