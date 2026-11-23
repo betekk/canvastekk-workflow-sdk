@@ -52,3 +52,4 @@ None open. Consumed by betekk/canvastekk-llm-service#887.
 - 1.0.0 shape may gain fields: additive by policy; unknown fields are ignored.
 
 ## Trace
+GATE c5420cf tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a
