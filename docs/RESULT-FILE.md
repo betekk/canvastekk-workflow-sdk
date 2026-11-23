@@ -181,6 +181,33 @@ with open(path, "rb") as handle:
 assert header["result_schema"] == "model_check.check"
 ```
 
+## Reading a model-check body without loading it
+
+`open_check_result(path)` (Python, optional extra `reader`:
+`pip install canvastekk-workflow-sdk[reader]`, which installs `ijson`) reads a
+staged `model_check.check` file with a streaming parser. Memory stays flat in
+the file size: only the facts asked for are kept. Three calls, each with
+bounded output:
+
+| Call | Answers |
+|---|---|
+| `overview()` | header facts, run verdict, one entry per check (verdict, counts, limits used, failing count); for 0.x files also the clause text, coverage, not-evaluable summary and config |
+| `failures(check, offset, limit)` | the failing readings of one check, a page at a time (max 100): element name, GlobalIds (capped at 8), file id, actual value, each failed limit with threshold and `margin = actual - threshold`, reason |
+| `element(global_id)` | every row that concerns one element (max 50) |
+
+It reads `model_check.check` and the older label `model_check.rule` at any
+`0.x`, and `model_check.check` at `1.x` (the verdict standard, #283). Any other
+label or major fails with a named `CheckResultReadError` (`code` is one of
+`UNSUPPORTED_RESULT_SCHEMA`, `UNSUPPORTED_RESULT_SCHEMA_VERSION`,
+`INVALID_RESULT_FILE`, `READER_UNAVAILABLE`). `0.x` and `1.x` answer with the
+same item shape; for `0.x` a check is one entry of `result.requirements`.
+
+```python
+reader = open_check_result("/tmp/staged/result_file.json")
+overview = reader.overview()
+page = reader.failures("door_width", offset=0, limit=20)
+```
+
 ## Versioning
 
 - `result_file_version` changes only with this layout. Released schema files
