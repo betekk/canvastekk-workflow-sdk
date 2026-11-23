@@ -53,3 +53,4 @@ None open. Consumed by betekk/canvastekk-llm-service#887.
 
 ## Trace
 GATE c5420cf tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a
+GATE 73f350a tier=full lint=t typecheck=n.a build=- unit=t e2e=n.a
