@@ -28,7 +28,7 @@ with a pull parser and only the facts being asked for are kept.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import IO, Any
 
@@ -498,7 +498,7 @@ def open_check_result(path: str | os.PathLike[str] | IO[bytes]) -> CheckResultRe
     return CheckResultReader(path)  # type: ignore[arg-type]
 
 
-def _rollup(verdicts: Iterator[Any] | Any) -> str | None:
+def _rollup(verdicts: Iterable[Any]) -> str | None:
     seen = {v for v in verdicts if v}
     for verdict in ("FAIL", "NOT_EVALUABLE", "WARNING", "PASS"):
         if verdict in seen:
