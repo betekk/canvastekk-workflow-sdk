@@ -48,7 +48,12 @@ from canvastekk_workflow_sdk.auth.core import (
     TekkNodeAuth,
 )
 from canvastekk_workflow_sdk.check_node_base import CheckNodeBase, check_node_conformance_errors
-from canvastekk_workflow_sdk.check_result_reader import CheckResultReader, CheckResultReadError, open_check_result
+from canvastekk_workflow_sdk.check_result_reader import (
+    CheckFinding,
+    CheckResultReader,
+    CheckResultReadError,
+    open_check_result,
+)
 from canvastekk_workflow_sdk.check_verdict import (
     VERDICT_MARK,
     CheckResolution,
@@ -157,6 +162,7 @@ __all__ = [
     "CheckNodeBase",
     "CheckResolution",
     "CheckResultReadError",
+    "CheckFinding",
     "CheckResultReader",
     "CheckSpec",
     "CheckVerdictError",

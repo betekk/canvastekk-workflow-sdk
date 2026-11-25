@@ -50,6 +50,7 @@ CHECK_RESULT_SCHEMA = "model_check.check"
 """Result-file label of the body :meth:`JudgedResult.body` builds."""
 
 CHECK_RESULT_SCHEMA_VERSION = "1.0.0"
+CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0"
 """Version of that body."""
 
 FLOAT_ALLOWANCE = 1e-10
@@ -156,6 +157,13 @@ class CheckSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     label: str = Field(min_length=1, max_length=200, description="Readable name, e.g. 'Beam length'.")
+    description: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=2000,
+        exclude_if=lambda value: value is None,
+        description="What the subcheck evaluates and why it matters.",
+    )
     unit: str | None = Field(default=None, max_length=32, description="Unit of measured values, e.g. 'mm'.")
     resolution: CheckResolution | None = Field(default=None)
     statements: dict[TekkWorkflowRunVerdictEnum, str] | None = Field(
@@ -927,7 +935,7 @@ class JudgedResult:
 @cache
 def load_check_body_schema(version: str = CHECK_RESULT_SCHEMA_VERSION) -> dict[str, Any]:
     """Return the packaged ``model_check.check`` body JSON Schema."""
-    if version != CHECK_RESULT_SCHEMA_VERSION:
+    if version not in (CHECK_RESULT_SCHEMA_VERSION, CHECK_RESULT_SCHEMA_VERSION_2_0_0):
         raise CheckVerdictError(f"Unsupported model_check.check body version {version!r}")
     root = resources.files("canvastekk_workflow_sdk").joinpath("data", "schemas", "result-body", CHECK_RESULT_SCHEMA)
     return json.loads(root.joinpath(f"{version}.json").read_text(encoding="utf-8"))
@@ -1140,6 +1148,7 @@ def _verdicts_by_subject(rows: Iterable[JudgedMeasurement]) -> dict[str, list[st
 __all__ = [
     "CHECK_RESULT_SCHEMA",
     "CHECK_RESULT_SCHEMA_VERSION",
+    "CHECK_RESULT_SCHEMA_VERSION_2_0_0",
     "FLOAT_ALLOWANCE",
     "STATEMENT_PLACEHOLDERS",
     "VERDICT_MARK",

@@ -1,4 +1,4 @@
-"""Streaming reader for ``model_check.check`` result files (0.x and 1.0.0).
+"""Streaming reader for ``model_check.check`` result files.
 
 A check's result file can be very large (the 0.x body of one failed check is
 51 KB to 845 KB on dev; 1.0.0 grows with every reading). Agents and services
@@ -11,6 +11,7 @@ questions with bounded output:
 - :meth:`CheckResultReader.failures`: the failing readings of one check, one page
   at a time.
 - :meth:`CheckResultReader.element`: every row that concerns one element (GlobalId).
+- :meth:`CheckResultReader.iter_findings`: lossless facts for 1.0.0 and 2.0.0.
 
 Supported shapes (anything else fails with a named :class:`CheckResultReadError`):
 
@@ -18,7 +19,8 @@ Supported shapes (anything else fails with a named :class:`CheckResultReadError`
   version (the body carries ``result.requirements``, ``result.rows``,
   ``measurements.measurements`` and ``instances.instances``);
 - ``model_check.check`` ``1.x`` (the verdict standard: ``checks[]`` and
-  ``measurements[]`` with ``failed_limits``; #283).
+  ``measurements[]`` with ``failed_limits``; #283);
+- ``model_check.check`` ``2.0.0`` (each check owns its measurements).
 
 Requires the optional extra ``reader`` (``pip install canvastekk-workflow-sdk[reader]``),
 which installs ``ijson``. Memory stays flat in the file size: the file is scanned
@@ -30,9 +32,21 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import IO, Any
 
-from canvastekk_workflow_sdk.result_file import ResultFileFormatError, read_result_file_header
+from jsonschema import Draft7Validator
+
+from canvastekk_workflow_sdk.check_verdict import (
+    CHECK_RESULT_SCHEMA_VERSION,
+    CHECK_RESULT_SCHEMA_VERSION_2_0_0,
+    load_check_body_schema,
+)
+from canvastekk_workflow_sdk.result_file import (
+    RESULT_FILE_VERSION_1_1_0,
+    ResultFileFormatError,
+    read_result_file_header,
+)
 
 CHECK_RESULT_LABEL = "model_check.check"
 LEGACY_RESULT_LABEL = "model_check.rule"
@@ -47,6 +61,8 @@ MAX_ELEMENT_ROWS = 50
 IDENTITY_LIST_CAP = 8
 
 _FAIL = "FAIL"
+_CHECK_ITEM = "body.checks.item"
+_NESTED_ROWS = f"{_CHECK_ITEM}.measurements"
 _SMALL_BODY_MEMBERS_0X = (
     "check_id",
     "rule_id",
@@ -155,11 +171,92 @@ def _items(path: str, prefix: str) -> Iterator[dict[str, Any]]:
             yield _dict(item)
 
 
+@lru_cache(maxsize=4)
+def _part_validator(version: str, part: str) -> Draft7Validator:
+    schema = load_check_body_schema(version)
+    definition = schema["definitions"][part] if version == CHECK_RESULT_SCHEMA_VERSION_2_0_0 else (
+        schema["properties"]["checks" if part == "check" else "measurements"]["items"]
+    )
+    return Draft7Validator(schema).evolve(schema=definition)
+
+
+def _validate_part(value: Any, version: str, part: str) -> None:
+    error = next(_part_validator(version, part).iter_errors(value), None)
+    if error is not None:
+        raise CheckResultReadError("INVALID_RESULT_FILE", f"malformed {part} in {version} body")
+
+
+def _grouped_checks(path: str) -> Iterator[dict[str, Any]]:
+    """Stream each check descriptor, keeping the measurement array marker but not its rows."""
+    ijson = _ijson()
+    allowed = load_check_body_schema(CHECK_RESULT_SCHEMA_VERSION_2_0_0)["properties"]
+    found_checks = False
+
+    def descriptors(stream: IO[bytes]) -> Iterator[tuple[str, str, Any]]:
+        nonlocal found_checks
+        for prefix, event, value in ijson.parse(stream, use_float=True):
+            if prefix == "body" and event == "map_key" and value not in allowed:
+                raise CheckResultReadError("INVALID_RESULT_FILE", "unexpected member in 2.0.0 body")
+            if prefix == "body.checks" and event == "start_array":
+                found_checks = True
+            if not prefix.startswith(f"{_NESTED_ROWS}."):
+                yield prefix, event, value
+
+    seen: set[str] = set()
+    try:
+        with open(path, "rb") as stream:
+            for check in ijson.items(descriptors(stream), _CHECK_ITEM):
+                _validate_part(check, CHECK_RESULT_SCHEMA_VERSION_2_0_0, "check")
+                if check["check"] in seen:
+                    raise CheckResultReadError("INVALID_RESULT_FILE", "duplicate check key in 2.0.0 body")
+                seen.add(check["check"])
+                yield check
+    except ijson.JSONError as exc:
+        raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
+    if not found_checks:
+        raise CheckResultReadError("INVALID_RESULT_FILE", "missing checks array in 2.0.0 body")
+
+
+def _grouped_rows(path: str) -> Iterator[tuple[int, int, dict[str, Any]]]:
+    """Stream one nested reading at a time with its original check ordinal and index."""
+    ijson = _ijson()
+    check_index = -1
+    measurement_index = 0
+
+    def track(stream: IO[bytes]) -> Iterator[tuple[str, str, Any]]:
+        nonlocal check_index, measurement_index
+        for prefix, event, value in ijson.parse(stream, use_float=True):
+            if prefix == _CHECK_ITEM and event == "start_map":
+                check_index += 1
+                measurement_index = 0
+            yield prefix, event, value
+
+    try:
+        with open(path, "rb") as stream:
+            for row in ijson.items(track(stream), f"{_NESTED_ROWS}.item"):
+                _validate_part(row, CHECK_RESULT_SCHEMA_VERSION_2_0_0, "measurement")
+                yield check_index, measurement_index, row
+                measurement_index += 1
+    except ijson.JSONError as exc:
+        raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
+
+
+@dataclass(frozen=True)
+class CheckFinding:
+    """A finding reference, its original measurement facts, and the recorded check limits."""
+
+    workflow_run_id: str
+    check: str
+    measurement_index: int
+    measurement: dict[str, Any]
+    limits_used: tuple[dict[str, Any], ...]
+
+
 @dataclass(frozen=True)
 class _Layout:
     """Which body shape a file carries."""
 
-    kind: str  # "verdict" (1.x) or "legacy" (0.x)
+    kind: str  # "grouped" (2.0.0), "verdict" (1.x), or "legacy" (0.x)
     schema: str
     version: str
 
@@ -207,15 +304,60 @@ class CheckResultReader:
             return _Layout("legacy", schema, version)
         if major == "1" and schema == CHECK_RESULT_LABEL:
             return _Layout("verdict", schema, version)
+        if version == CHECK_RESULT_SCHEMA_VERSION_2_0_0 and schema == CHECK_RESULT_LABEL:
+            if header["result_file_version"] != RESULT_FILE_VERSION_1_1_0:
+                raise CheckResultReadError("INVALID_RESULT_FILE", "2.0.0 check bodies require result-file layout 1.1.0")
+            return _Layout("grouped", schema, version)
         raise CheckResultReadError(
             "UNSUPPORTED_RESULT_SCHEMA_VERSION",
-            f"{schema} {version} is not readable: this reader knows 0.x and (for {CHECK_RESULT_LABEL}) 1.x",
+            f"{schema} {version} is not readable: this reader knows 0.x and (for {CHECK_RESULT_LABEL}) 1.x and 2.0.0",
         )
 
     @property
     def header(self) -> dict[str, Any]:
         """The validated result-file header (everything before ``body``)."""
         return dict(self._header)
+
+    def _check_records(self) -> Iterator[dict[str, Any]]:
+        if self._layout.kind == "grouped":
+            return _grouped_checks(self._path)
+        return _items(self._path, _CHECK_ITEM)
+
+    def _judged_rows(self, checks: list[dict[str, Any]]) -> Iterator[tuple[str, int, dict[str, Any]]]:
+        if self._layout.kind == "grouped":
+            for group, index, row in _grouped_rows(self._path):
+                if not 0 <= group < len(checks):
+                    raise CheckResultReadError("INVALID_RESULT_FILE", "measurement outside its check")
+                yield checks[group]["check"], index, row
+            return
+        for index, row in enumerate(_items(self._path, "body.measurements.item")):
+            yield row.get("check"), index, row
+
+    def iter_findings(self) -> Iterator[CheckFinding]:
+        """Yield raw findings with flat 1.0.0 or check-local 2.0.0 indices in file order.
+
+        Unknown formats or malformed findings raise ``CheckResultReadError``.
+        A missing limit or element identity is never filled from a guess.
+        """
+        version = self._layout.version
+        if version not in (CHECK_RESULT_SCHEMA_VERSION, CHECK_RESULT_SCHEMA_VERSION_2_0_0):
+            raise CheckResultReadError("UNSUPPORTED_RESULT_SCHEMA_VERSION", f"lossless findings are unavailable in {version}")
+        checks = list(self._check_records())
+        limits: dict[str, tuple[dict[str, Any], ...]] = {}
+        for record in checks:
+            if version == CHECK_RESULT_SCHEMA_VERSION:
+                _validate_part(record, version, "check")
+            key = record["check"]
+            if key in limits:
+                raise CheckResultReadError("INVALID_RESULT_FILE", "duplicate check key in result body")
+            limits[key] = tuple(_list(record.get("limits_used")))
+        run_id = self._header["workflow_run_id"]
+        for check, index, row in self._judged_rows(checks):
+            if version == CHECK_RESULT_SCHEMA_VERSION:
+                _validate_part(row, version, "measurement")
+                if check not in limits:
+                    raise CheckResultReadError("INVALID_RESULT_FILE", "finding has no recorded check")
+            yield CheckFinding(run_id, check, index, row, limits[check])
 
     # ---------------------------------------------------------------- overview
 
@@ -241,8 +383,8 @@ class CheckResultReader:
             "generated_at": header.get("generated_at"),
             "summary": header.get("summary"),
         }
-        if self._layout.kind == "verdict":
-            checks = [self._check_entry_1x(c) for c in _items(self._path, "body.checks.item")]
+        if self._layout.kind != "legacy":
+            checks = [self._check_entry_1x(c) for c in self._check_records()]
             out["verdict"] = header.get("verdict") or _rollup(c["verdict"] for c in checks)
             out["checks"] = checks
             return out
@@ -305,7 +447,7 @@ class CheckResultReader:
 
         Args:
             check: Check key (as in :meth:`overview`); ``None`` for every check.
-            offset: Items to skip (0-based, in file order for 1.0.0; sorted by check, element and row for 0.x).
+            offset: Items to skip (0-based, in file order for 1.x/2.0.0; sorted by check, element and row for 0.x).
             limit: Page size, 1 to :data:`MAX_PAGE_SIZE`.
 
         Returns:
@@ -316,8 +458,8 @@ class CheckResultReader:
         """
         offset = max(0, int(offset))
         limit = min(MAX_PAGE_SIZE, max(1, int(limit)))
-        if self._layout.kind == "verdict":
-            total, items = self._failures_1x(check, offset, limit)
+        if self._layout.kind != "legacy":
+            total, items = self._failures_judged(check, offset, limit)
         else:
             total, items = self._failures_0x(check, offset, limit)
         end = offset + len(items)
@@ -330,24 +472,26 @@ class CheckResultReader:
             "items": items,
         }
 
-    def _limit_values(self) -> dict[str, dict[str, dict[str, Any]]]:
+    @staticmethod
+    def _limit_values(checks: Iterable[dict[str, Any]]) -> dict[str, dict[str, dict[str, Any]]]:
         """Per check key: limit input name to its ``limits_used`` entry."""
         table: dict[str, dict[str, dict[str, Any]]] = {}
-        for check in _items(self._path, "body.checks.item"):
+        for check in checks:
             table[str(check.get("check"))] = {
                 str(limit.get("input")): _dict(limit) for limit in _list(check.get("limits_used"))
             }
         return table
 
-    def _failures_1x(self, check: str | None, offset: int, limit: int) -> tuple[int, list[dict[str, Any]]]:
-        limits = self._limit_values()
+    def _failures_judged(self, check: str | None, offset: int, limit: int) -> tuple[int, list[dict[str, Any]]]:
+        checks = list(self._check_records())
+        limits = self._limit_values(checks)
         total = 0
         page: list[dict[str, Any]] = []
-        for row in _items(self._path, "body.measurements.item"):
-            if row.get("verdict") != _FAIL or (check is not None and row.get("check") != check):
+        for key, _, row in self._judged_rows(checks):
+            if row.get("verdict") != _FAIL or (check is not None and key != check):
                 continue
             if offset <= total < offset + limit:
-                page.append(_item_1x(row, limits.get(str(row.get("check")), {})))
+                page.append(self._compact_judged_item(key, row, limits.get(str(key), {})))
             total += 1
         return total, page
 
@@ -438,18 +582,23 @@ class CheckResultReader:
             (same item shape as :meth:`failures`, any verdict) and ``truncated``.
         """
         limit = min(MAX_ELEMENT_ROWS, max(1, int(limit)))
-        if self._layout.kind == "verdict":
-            limits = self._limit_values()
+        if self._layout.kind != "legacy":
+            checks = list(self._check_records())
+            limits = self._limit_values(checks)
             rows: list[dict[str, Any]] = []
             total = 0
             name: str | None = None
-            for row in _items(self._path, "body.measurements.item"):
-                gids = [str(g) for g in _list(row.get("global_ids"))]
-                if global_id not in gids and row.get("subject_id") != global_id:
+            for key, _, row in self._judged_rows(checks):
+                if self._layout.kind == "grouped":
+                    matches = row.get("element_id_type") == "ifc_guid" and row.get("element_id") == global_id
+                else:
+                    gids = [str(g) for g in _list(row.get("global_ids"))]
+                    matches = global_id in gids or row.get("subject_id") == global_id
+                if not matches:
                     continue
                 name = name or row.get("element_name")
                 if total < limit:
-                    item = _item_1x(row, limits.get(str(row.get("check")), {}))
+                    item = self._compact_judged_item(key, row, limits.get(str(key), {}))
                     item["verdict"] = row.get("verdict")
                     rows.append(item)
                 total += 1
@@ -482,6 +631,17 @@ class CheckResultReader:
             "rows": measurements,
             "truncated": total > len(measurements),
         }
+
+    def _compact_judged_item(
+        self, key: str, row: dict[str, Any], limits: dict[str, dict[str, Any]]
+    ) -> dict[str, Any]:
+        if self._layout.kind == "grouped":
+            identity = row.get("element_id") if row.get("element_id_type") == "ifc_guid" else None
+            row = {
+                **row, "check": key, "global_ids": [identity] if identity else [],
+                "file_id": row.get("element_id_source_file"),
+            }
+        return _item_1x(row, limits)
 
 
 def open_check_result(path: str | os.PathLike[str] | IO[bytes]) -> CheckResultReader:

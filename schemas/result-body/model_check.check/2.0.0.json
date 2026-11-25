@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:canvastekk:result-body:model_check.check:2.0.0",
+  "title": "model_check.check body 2.0.0",
+  "description": "Each check owns its original measurement array. Counts are per subject, never per row. Use result-file layout 1.1.0; derive an omitted limit only from the pinned rules and the inputs used by that run.",
+  "type": "object",
+  "required": ["checks"],
+  "additionalProperties": false,
+  "properties": {
+    "checks": { "type": "array", "items": { "$ref": "#/definitions/check" } },
+    "observations": { "type": "array", "items": { "type": "object" } },
+    "extra": { "type": "object" }
+  },
+  "definitions": {
+    "verdict": { "enum": ["PASS", "WARNING", "FAIL", "NOT_EVALUABLE"] },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["PASS", "WARNING", "FAIL", "NOT_EVALUABLE"],
+      "properties": {
+        "PASS": { "type": "integer", "minimum": 0 },
+        "WARNING": { "type": "integer", "minimum": 0 },
+        "FAIL": { "type": "integer", "minimum": 0 },
+        "NOT_EVALUABLE": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "limit_used": {
+      "type": "object",
+      "required": ["input", "role", "operator", "value"],
+      "properties": {
+        "input": { "type": "string" },
+        "role": { "enum": ["LIMIT", "WARNING_LIMIT"] },
+        "operator": { "enum": ["GT", "GTE", "LT", "LTE", "EQ", "NE", "IN", "NOT_IN"] },
+        "value": {},
+        "tolerance": { "type": ["number", "null"], "minimum": 0 },
+        "ignore_case": { "type": "boolean" },
+        "fixed": { "type": "boolean" }
+      }
+    },
+    "filter_used": {
+      "type": "object",
+      "required": ["input", "value"],
+      "properties": { "input": { "type": "string" }, "value": {} }
+    },
+    "failed_limit": {
+      "type": "object",
+      "required": ["input", "side"],
+      "properties": {
+        "input": { "type": "string" },
+        "side": { "enum": ["BELOW", "ABOVE", "EQUAL", "MISMATCH", "NOT_IN", "IN"] }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "message": { "type": "string" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["check", "verdict", "verdict_counts", "measurements"],
+      "additionalProperties": false,
+      "properties": {
+        "check": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "verdict": { "$ref": "#/definitions/verdict" },
+        "verdict_counts": { "$ref": "#/definitions/counts" },
+        "limits_used": { "type": "array", "items": { "$ref": "#/definitions/limit_used" } },
+        "filters_used": { "type": "array", "items": { "$ref": "#/definitions/filter_used" } },
+        "not_evaluated_reason": { "$ref": "#/definitions/reason" },
+        "cross_reference": { "type": "string" },
+        "measurements": { "type": "array", "items": { "$ref": "#/definitions/measurement" } }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["subject_id", "kind", "verdict"],
+      "additionalProperties": false,
+      "dependencies": {
+        "element_id": ["element_id_type"],
+        "element_id_type": ["element_id"],
+        "element_id_source_file": ["element_id", "element_id_type"]
+      },
+      "properties": {
+        "subject_id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["value", "predicate", "fail_by_name", "not_evaluable"] },
+        "actual": {},
+        "actual_raw": {},
+        "bound": { "enum": ["LOWER", "UPPER", null] },
+        "alternatives": { "type": "object" },
+        "verdict": { "$ref": "#/definitions/verdict" },
+        "failed_limits": { "type": "array", "items": { "$ref": "#/definitions/failed_limit" } },
+        "reason": { "$ref": "#/definitions/reason" },
+        "verdict_caveat": { "type": "object" },
+        "element_name": { "type": "string" },
+        "element_id": { "type": "string", "pattern": "^[0-3][0-9A-Za-z_$]{21}$" },
+        "element_id_type": { "const": "ifc_guid" },
+        "element_id_source_file": {
+          "description": "Original stored file ID when the producer verifies it. Never infer this from the subject or drawing.",
+          "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "string", "minLength": 1 }]
+        },
+        "viewer_representation": {
+          "type": "object",
+          "required": ["schema_version", "primitives"],
+          "properties": {
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "primitives": { "type": "array", "items": { "type": "object" } }
+          }
+        },
+        "extra": { "type": "object" }
+      }
+    }
+  }
+}
