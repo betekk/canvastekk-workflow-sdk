@@ -3,7 +3,7 @@
  *
  * TypeScript mirror of the Python `check_verdict` module's vocabulary: the
  * `x-verdict` mark, the role / operator / verdict enums, the roll-up order
- * and the published `model_check.check` 1.0.0 body schema. The verdict step
+ * and the published `model_check.check` body schemas. The verdict step
  * itself (`judge`, `CheckNodeBase`) is Python-only for now: every check node
  * is a Python node. Guide: `docs/CHECK-VERDICT.md`.
  */
@@ -16,8 +16,11 @@ export const VERDICT_MARK = "x-verdict";
 /** Result-file label of the check body. */
 export const CHECK_RESULT_SCHEMA = "model_check.check";
 
-/** Version of that body. */
+/** Default writer version for backwards compatibility. */
 export const CHECK_RESULT_SCHEMA_VERSION = "1.0.0";
+
+/** Version with findings nested under their owning check. */
+export const CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0";
 
 /** What a marked input does for its check. */
 export const TekkCheckRoleEnum = {
@@ -85,6 +88,7 @@ export function rollupVerdicts(verdicts: Iterable<string>): TekkWorkflowRunVerdi
 export const CheckSpecSchema = z
   .object({
     label: z.string().min(1).max(200),
+    description: z.string().min(1).max(2000).nullish(),
     unit: z.string().max(32).nullish(),
     resolution: z
       .object({
@@ -98,8 +102,7 @@ export const CheckSpecSchema = z
   .strict();
 export type CheckSpec = z.infer<typeof CheckSpecSchema>;
 
-/** `model_check.check` body 1.0.0 — must equal `schemas/result-body/model_check.check/1.0.0.json` (test-enforced). */
-export const MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0: Readonly<Record<string, unknown>> = {
+const bodyV1 = {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:canvastekk:result-body:model_check.check:1.0.0",
   "title": "model_check.check body 1.0.0",
@@ -373,4 +376,68 @@ export const MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0: Readonly<Record<string, unknow
       }
     }
   }
+};
+
+/** Published `model_check.check` 1.0.0 contract (cross-language parity tested). */
+export const MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0: Readonly<Record<string, unknown>> = bodyV1;
+
+const {
+  check: _check, global_ids: _globalIds, file_id: _fileId, ...readingFields
+} = bodyV1.properties.measurements.items.properties;
+const checkFields = bodyV1.properties.checks.items.properties;
+
+/** Published `model_check.check` 2.0.0 contract with locally nested findings. */
+export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0: Readonly<Record<string, unknown>> = {
+  $schema: bodyV1.$schema,
+  $id: "urn:canvastekk:result-body:model_check.check:2.0.0",
+  title: "model_check.check body 2.0.0",
+  description: "Each check owns its original measurement array. Counts are per subject, never per row. Use result-file layout 1.1.0; derive an omitted limit only from the pinned rules and the inputs used by that run.",
+  type: "object",
+  required: ["checks"],
+  additionalProperties: false,
+  properties: {
+    checks: { type: "array", items: { $ref: "#/definitions/check" } },
+    observations: bodyV1.properties.observations,
+    extra: { type: "object" },
+  },
+  definitions: {
+    ...bodyV1.definitions,
+    check: {
+      type: "object",
+      required: ["check", "verdict", "verdict_counts", "measurements"],
+      additionalProperties: false,
+      properties: {
+        ...checkFields,
+        measurements: { type: "array", items: { $ref: "#/definitions/measurement" } },
+      },
+    },
+    measurement: {
+      type: "object",
+      required: ["subject_id", "kind", "verdict"],
+      additionalProperties: false,
+      dependencies: {
+        element_id: ["element_id_type"],
+        element_id_type: ["element_id"],
+        element_id_source_file: ["element_id", "element_id_type"],
+      },
+      properties: {
+        ...readingFields,
+        element_name: { type: "string" },
+        element_id: { type: "string", pattern: "^[0-3][0-9A-Za-z_$]{21}$" },
+        element_id_type: { const: "ifc_guid" },
+        element_id_source_file: {
+          description: "Original stored file ID when the producer verifies it. Never infer this from the subject or drawing.",
+          oneOf: [{ type: "integer", minimum: 1 }, { type: "string", minLength: 1 }],
+        },
+        viewer_representation: {
+          type: "object",
+          required: ["schema_version", "primitives"],
+          properties: {
+            schema_version: { type: "integer", minimum: 1 },
+            primitives: { type: "array", items: { type: "object" } },
+          },
+        },
+      },
+    },
+  },
 };

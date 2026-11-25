@@ -1,4 +1,4 @@
-"""#288: streaming reader for ``model_check.check`` result files (0.x and 1.0.0)."""
+"""Streaming compact and lossless reads of ``model_check.check`` result files."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from jsonschema import Draft7Validator
 
 pytest.importorskip("ijson")
 
@@ -17,10 +18,13 @@ from canvastekk_workflow_sdk.check_result_reader import (  # noqa: E402
     CheckResultReadError,
     open_check_result,
 )
+from canvastekk_workflow_sdk.check_verdict import CheckSpec, load_check_body_schema  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures" / "check_results"
 REPORT_346 = FIXTURES / "report_346_entrance_sightline_0.3.0.json"
 RULE_0_1_0 = FIXTURES / "model_check_rule_0.1.0.json"
+SCHEMA_V2 = Path(__file__).parents[2] / "schemas/result-body/model_check.check"
+GUID = "2h7VCQmP56uPcWBc9vN$1A"
 
 LIMITS = [
     {"input": "min_width_mm", "role": "LIMIT", "operator": "GTE", "value": 900},
@@ -80,6 +84,116 @@ def _write_v1(
 def _small_v1(tmp_path: Path) -> Path:
     rows = [_measurement(i, verdict="FAIL" if i % 2 == 0 else "PASS") for i in range(10)]
     return _write_v1(tmp_path / "v1.json", rows)
+
+
+def _header_v2() -> dict[str, Any]:
+    return {
+        "result_file_version": "1.1.0",
+        "result_schema": "model_check.check",
+        "result_schema_version": "2.0.0",
+        "workflow_run_id": "run-2",
+        "workflow_definition": {"id": "width-group-1.2.3", "slug": "width-group", "version": "1.2.3"},
+        "inputs": {"min_width": 900},
+        "generated_at": "2026-11-23T10:00:00.000Z",
+    }
+
+
+def _body_v2() -> dict[str, Any]:
+    return json.loads((SCHEMA_V2 / "examples/nested-2.0.0.json").read_text())
+
+
+def _write_v2(tmp_path: Path, body: dict[str, Any]) -> Path:
+    path = tmp_path / "v2.json"
+    path.write_text(json.dumps({**_header_v2(), "body": body}))
+    return path
+
+
+class TestNestedFindings:
+    def test_packaged_schema_matches_canonical_and_keeps_old_write_default(self) -> None:
+        schema = load_check_body_schema("2.0.0")
+        assert schema == json.loads((SCHEMA_V2 / "2.0.0.json").read_text())
+        Draft7Validator.check_schema(schema)
+        assert Draft7Validator(schema).is_valid(_body_v2())
+        assert load_check_body_schema()["$id"].endswith(":1.0.0")
+        assert "description" not in CheckSpec(label="Width").model_dump()
+        described = CheckSpec(label="Width", description="The opening's clear width.")
+        assert described.model_dump()["description"] == "The opening's clear width."
+
+    def test_keeps_the_nested_indices_raw_facts_and_exact_limits(self, tmp_path: Path) -> None:
+        body = _body_v2()
+        reader = open_check_result(_write_v2(tmp_path, body))
+        findings = list(reader.iter_findings())
+        assert [(r.workflow_run_id, r.check, r.measurement_index) for r in findings] == [
+            ("run-2", "clear_width", 0), ("run-2", "clear_width", 1), ("run-2", "door_height", 0)
+        ]
+        assert findings[1].measurement == body["checks"][0]["measurements"][1]
+        assert findings[1].limits_used == tuple(body["checks"][0]["limits_used"])
+        assert findings[2].measurement == body["checks"][1]["measurements"][0]
+        assert findings[2].limits_used == ()
+        assert reader.header["inputs"] == {"min_width": 900}
+
+    def test_compact_queries_keep_counts_and_only_verified_identity(self, tmp_path: Path) -> None:
+        reader = open_check_result(_write_v2(tmp_path, _body_v2()))
+        assert reader.overview()["checks"][0]["verdict_counts"] == {"PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0}
+        [failed] = reader.failures("clear_width")["items"]
+        assert failed["limits"] == [
+            {"input": "min_width", "side": "BELOW", "threshold": 900, "operator": "GTE", "margin": -60}
+        ]
+        assert failed["global_ids"]["ids"] == [GUID]
+        assert failed["file_id"] is None
+        assert len(reader.element(GUID)["rows"]) == 1
+        assert reader.element("0z40zcHTf5xfp$pr$3uZQI")["rows"] == []
+
+    def test_preserves_original_indices_in_the_flat_reader(self, tmp_path: Path) -> None:
+        reader = open_check_result(_small_v1(tmp_path))
+        fails = [row for row in reader.iter_findings() if row.measurement["verdict"] == "FAIL"]
+        assert [row.measurement_index for row in fails] == [0, 2, 4, 6, 8]
+        assert fails[0].measurement["bound"] == "LOWER"
+        assert fails[0].limits_used == tuple(LIMITS)
+
+    def test_rejects_a_body_without_recorded_row_verdict(self, tmp_path: Path) -> None:
+        body = _body_v2()
+        del body["checks"][0]["measurements"][0]["verdict"]
+        assert not Draft7Validator(load_check_body_schema("2.0.0")).is_valid(body)
+        with pytest.raises(CheckResultReadError, match="malformed measurement"):
+            list(open_check_result(_write_v2(tmp_path, body)).iter_findings())
+
+    def test_rejects_flat_members_and_duplicate_check_keys(self, tmp_path: Path) -> None:
+        body = _body_v2()
+        with pytest.raises(CheckResultReadError, match="unexpected member"):
+            open_check_result(_write_v2(tmp_path, {**body, "measurements": []})).overview()
+        body["checks"].append(body["checks"][0])
+        with pytest.raises(CheckResultReadError, match="duplicate check key"):
+            list(open_check_result(_write_v2(tmp_path, body)).iter_findings())
+
+    def test_lossless_mode_refuses_legacy_compact_only_files(self) -> None:
+        with pytest.raises(CheckResultReadError, match="UNSUPPORTED_RESULT_SCHEMA_VERSION"):
+            list(open_check_result(REPORT_346).iter_findings())
+
+    def test_nested_body_requires_layout_1_1_0(self, tmp_path: Path) -> None:
+        path = _write_v1(tmp_path / "old-layout.json", [], version="2.0.0")
+        with pytest.raises(CheckResultReadError, match="require result-file layout 1.1.0"):
+            open_check_result(path)
+
+    def test_overview_does_not_materialize_nested_geometry(self, tmp_path: Path) -> None:
+        path = tmp_path / "large-v2.json"
+        body = _body_v2()
+        row = body["checks"][0]["measurements"][0] | {"extra": {"payload": "x" * 4096}}
+        check = {k: v for k, v in body["checks"][0].items() if k != "measurements"}
+        with path.open("w") as stream:
+            stream.write(json.dumps(_header_v2())[:-1] + ', "body":{"checks":[' + json.dumps(check)[:-1])
+            stream.write(', "measurements": [')
+            wire = json.dumps(row)
+            for i in range(2500):
+                stream.write(("," if i else "") + wire)
+            stream.write("]}]}}")
+        tracemalloc.start()
+        try:
+            assert open_check_result(path).overview()["checks"][0]["check"] == "clear_width"
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert peak < 3 * 1024 * 1024
 
 
 class TestOverview:
@@ -175,7 +289,7 @@ class TestElement:
 
 class TestRefusals:
     def test_unknown_major_fails_with_a_named_error(self, tmp_path: Path) -> None:
-        path = _write_v1(tmp_path / "x.json", [], version="2.0.0")
+        path = _write_v1(tmp_path / "x.json", [], version="2.1.0")
         with pytest.raises(CheckResultReadError) as info:
             open_check_result(path)
         assert info.value.code == "UNSUPPORTED_RESULT_SCHEMA_VERSION"

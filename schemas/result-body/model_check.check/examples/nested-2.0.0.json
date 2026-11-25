@@ -1,0 +1,46 @@
+{
+  "checks": [
+    {
+      "measurements": [
+        {
+          "subject_id": "door-a",
+          "kind": "value",
+          "verdict": "PASS",
+          "actual": 920
+        },
+        {
+          "subject_id": "door-a",
+          "kind": "value",
+          "verdict": "FAIL",
+          "actual": 840,
+          "actual_raw": 840.02,
+          "bound": "UPPER",
+          "failed_limits": [{ "input": "min_width", "side": "BELOW" }],
+          "element_id": "2h7VCQmP56uPcWBc9vN$1A",
+          "element_id_type": "ifc_guid",
+          "viewer_representation": {
+            "schema_version": 1,
+            "primitives": [{ "kind": "path_polyline" }, { "kind": "contact_disc" }]
+          }
+        }
+      ],
+      "check": "clear_width",
+      "verdict": "FAIL",
+      "verdict_counts": { "PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0 },
+      "limits_used": [{ "input": "min_width", "role": "LIMIT", "operator": "GTE", "value": 900, "tolerance": 5 }]
+    },
+    {
+      "check": "door_height",
+      "verdict": "NOT_EVALUABLE",
+      "verdict_counts": { "PASS": 0, "WARNING": 0, "FAIL": 0, "NOT_EVALUABLE": 1 },
+      "measurements": [
+        {
+          "subject_id": "0z40zcHTf5xfp$pr$3uZQI",
+          "kind": "not_evaluable",
+          "verdict": "NOT_EVALUABLE",
+          "reason": { "code": "NO_FLOOR", "message": "The floor was not identified." }
+        }
+      ]
+    }
+  ]
+}

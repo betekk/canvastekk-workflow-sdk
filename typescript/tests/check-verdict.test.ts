@@ -9,7 +9,11 @@ import { NodeExecutionRequestSchema } from "../src/node-execution-request.js";
 import { WorkflowNodeManifestSchema } from "../src/workflow-node-manifest.js";
 import { buildWorkflowNodeRegistryPayload } from "../src/workflow-node-registry.js";
 import {
+  CHECK_RESULT_SCHEMA_VERSION,
+  CHECK_RESULT_SCHEMA_VERSION_2_0_0,
+  CheckSpecSchema,
   MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0,
+  MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0,
   VERDICT_PRECEDENCE,
   rollupVerdicts,
 } from "../src/check-verdict.js";
@@ -55,8 +59,44 @@ describe("embedded schemas (#283)", () => {
   it("are exported from the package root", () => {
     expect(sdk.RESULT_FILE_SCHEMA_1_1_0).toBe(RESULT_FILE_SCHEMA_1_1_0);
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0);
+    expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0);
     expect(sdk.VERDICT_MARK).toBe("x-verdict");
     expect(sdk.TekkWorkflowRunVerdictEnum.NOT_EVALUABLE).toBe("NOT_EVALUABLE");
+  });
+});
+
+describe("nested check result body", () => {
+  const folder = dirname(BODY);
+  const body = JSON.parse(readFileSync(join(folder, "examples", "nested-2.0.0.json"), "utf8"));
+  const validate = new Ajv().compile(MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0);
+
+  it("validates the same contract as Python and keeps the version-one write default", () => {
+    expect(MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0).toEqual(JSON.parse(readFileSync(join(folder, "2.0.0.json"), "utf8")));
+    expect(CHECK_RESULT_SCHEMA_VERSION_2_0_0).toBe("2.0.0");
+    expect(CHECK_RESULT_SCHEMA_VERSION).toBe("1.0.0");
+    expect(validate(body)).toBe(true);
+  });
+
+  it.each([
+    ["a missing verdict", { verdict: undefined }],
+    ["a legacy row check", { check: "another_check" }],
+    ["unverified original file", { element_id_source_file: 42 }],
+    ["an identity without a type", { element_id: "2h7VCQmP56uPcWBc9vN$1A" }],
+  ])("rejects a finding with %s", (_label, patch) => {
+    const first = body.checks[0];
+    const row = { ...first.measurements[0], ...patch };
+    expect(validate({ checks: [{ ...first, measurements: [row] }] })).toBe(false);
+  });
+
+  it("rejects flat measurements in the new body", () => {
+    expect(validate({ ...body, measurements: [] })).toBe(false);
+  });
+
+  it("preserves optional subcheck descriptions", () => {
+    expect(CheckSpecSchema.parse({ label: "Width" })).not.toHaveProperty("description");
+    expect(CheckSpecSchema.parse({ label: "Width", description: "The opening's clear width." }).description)
+      .toBe("The opening's clear width.");
+    expect(CheckSpecSchema.safeParse({ label: "Width", description: "" }).success).toBe(false);
   });
 });
 
