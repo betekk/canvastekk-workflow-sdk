@@ -102,9 +102,9 @@ def _body_v2() -> dict[str, Any]:
     return json.loads((SCHEMA_V2 / "examples/nested-2.0.0.json").read_text())
 
 
-def _write_v2(tmp_path: Path, body: dict[str, Any]) -> Path:
-    path = tmp_path / "v2.json"
-    path.write_text(json.dumps({**_header_v2(), "body": body}))
+def _write_v2(tmp_path: Path, body: dict[str, Any], *, version: str = "2.0.0") -> Path:
+    path = tmp_path / f"{version}.json"
+    path.write_text(json.dumps({**_header_v2(), "result_schema_version": version, "body": body}))
     return path
 
 
@@ -119,9 +119,10 @@ class TestNestedFindings:
         described = CheckSpec(label="Width", description="The opening's clear width.")
         assert described.model_dump()["description"] == "The opening's clear width."
 
-    def test_keeps_the_nested_indices_raw_facts_and_exact_limits(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0"])
+    def test_keeps_the_nested_indices_raw_facts_and_exact_limits(self, tmp_path: Path, version: str) -> None:
         body = _body_v2()
-        reader = open_check_result(_write_v2(tmp_path, body))
+        reader = open_check_result(_write_v2(tmp_path, body, version=version))
         findings = list(reader.iter_findings())
         assert [(r.workflow_run_id, r.check, r.measurement_index) for r in findings] == [
             ("run-2", "clear_width", 0), ("run-2", "clear_width", 1), ("run-2", "door_height", 0)
@@ -132,8 +133,9 @@ class TestNestedFindings:
         assert findings[2].limits_used == ()
         assert reader.header["inputs"] == {"min_width": 900}
 
-    def test_compact_queries_keep_counts_and_only_verified_identity(self, tmp_path: Path) -> None:
-        reader = open_check_result(_write_v2(tmp_path, _body_v2()))
+    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0"])
+    def test_compact_queries_keep_counts_and_only_verified_identity(self, tmp_path: Path, version: str) -> None:
+        reader = open_check_result(_write_v2(tmp_path, _body_v2(), version=version))
         assert reader.overview()["checks"][0]["verdict_counts"] == {"PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0}
         [failed] = reader.failures("clear_width")["items"]
         assert failed["limits"] == [
@@ -194,6 +196,57 @@ class TestNestedFindings:
         finally:
             tracemalloc.stop()
         assert peak < 3 * 1024 * 1024
+
+    def test_optional_plan_bands_are_additive_and_selected_explicitly(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.1.0.json").read_text())
+        schema = load_check_body_schema("2.1.0")
+        assert schema == json.loads((SCHEMA_V2 / "2.1.0.json").read_text())
+        Draft7Validator.check_schema(schema)
+        validator = Draft7Validator(schema)
+        validator.validate(body)
+        validator.validate(_body_v2())
+
+        plans = body["report_visuals"]
+        plan = plans["basin-1-plan"]
+        plans["outside-request"] = plan
+        plans["invalid-shape"] = {**plan, "z_band_mm": [1400]}
+        plans["inverted-band"] = {**plan, "z_band_mm": [1800, 1400]}
+        assert not validator.is_valid(body)
+
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.1.0"))
+        [finding] = reader.iter_findings()
+        assert reader.header["result_schema_version"] == "2.1.0"
+        assert finding.measurement_index == 0
+        assert finding.measurement["actual"] == 200
+        assert finding.measurement["report_visual_refs"] == ["basin-1-plan"]
+        requested = {"basin-1-plan", "invalid-shape", "inverted-band", "not-present"}
+        assert reader.report_visuals(requested) == {"basin-1-plan": plan}
+
+    def test_unrequested_drawing_is_not_materialized(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.1.0.json").read_text())
+        plan = body["report_visuals"]["basin-1-plan"]
+        body["report_visuals"]["large"] = {**plan, "layers": {"wall": plan["layers"]["wall"] * 50_000}}
+        body["report_visuals"]["basin.2"] = plan
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.1.0"))
+
+        tracemalloc.start()
+        try:
+            assert reader.report_visuals({"basin.2"}) == {"basin.2": plan}
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert peak < 3 * 1024 * 1024
+
+    def test_invalid_optional_refs_do_not_discard_required_facts(self, tmp_path: Path) -> None:
+        body = _body_v2()
+        row = body["checks"][0]["measurements"][1]
+        row["report_visual_refs"] = ["duplicate", "duplicate"]
+        assert not Draft7Validator(load_check_body_schema("2.1.0")).is_valid(body)
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.1.0"))
+        finding = list(reader.iter_findings())[1]
+        assert finding.measurement_index == 1
+        assert finding.measurement == {key: value for key, value in row.items() if key != "report_visual_refs"}
+        assert reader.report_visuals({"duplicate"}) == {}
 
 
 class TestOverview:
@@ -288,8 +341,9 @@ class TestElement:
 
 
 class TestRefusals:
-    def test_unknown_major_fails_with_a_named_error(self, tmp_path: Path) -> None:
-        path = _write_v1(tmp_path / "x.json", [], version="2.1.0")
+    @pytest.mark.parametrize("version", ["2.2.0", "3.0.0"])
+    def test_unknown_version_fails_with_a_named_error(self, tmp_path: Path, version: str) -> None:
+        path = _write_v1(tmp_path / "x.json", [], version=version)
         with pytest.raises(CheckResultReadError) as info:
             open_check_result(path)
         assert info.value.code == "UNSUPPORTED_RESULT_SCHEMA_VERSION"
