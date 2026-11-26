@@ -196,8 +196,8 @@ bounded output:
 | `element(global_id)` | every row that concerns one element (max 50) |
 
 It reads `model_check.check` and the older label `model_check.rule` at any
-`0.x`, and `model_check.check` at `1.x` (the verdict standard, #283). Any other
-label or major fails with a named `CheckResultReadError` (`code` is one of
+`0.x`, and `model_check.check` at `1.x`, `2.0.0`, and `2.1.0`. An unsupported
+label or version fails with a named `CheckResultReadError` (`code` is one of
 `UNSUPPORTED_RESULT_SCHEMA`, `UNSUPPORTED_RESULT_SCHEMA_VERSION`,
 `INVALID_RESULT_FILE`, `READER_UNAVAILABLE`). `0.x` and `1.x` answer with the
 same item shape; for `0.x` a check is one entry of `result.requirements`.
@@ -207,6 +207,20 @@ reader = open_check_result("/tmp/staged/result_file.json")
 overview = reader.overview()
 page = reader.failures("door_width", offset=0, limit=20)
 ```
+
+### Optional drawings in `model_check.check` body 2.1.0
+
+The [2.1.0 body schema](../schemas/result-body/model_check.check/2.1.0.json)
+adds `report_visual_refs` to each measurement and `report_visuals` to the
+body. Both are optional. A reference names a drawing within the same result
+file; it is never a storage pointer. Plan bands record the crop, actual Z
+bounds, and polygon layers in model-space millimetres. The measurement
+overlay stays in the original `viewer_representation`.
+
+Read original grouped facts with `iter_findings()` and look up only the
+drawings a report needs with `report_visuals(ids)`. Missing or invalid drawings
+are omitted from the lookup. Layout `1.1.0` and the result header stay the
+same. See the [Basin Base Height example](../schemas/result-body/model_check.check/examples/nested-2.1.0.json).
 
 ## Versioning
 

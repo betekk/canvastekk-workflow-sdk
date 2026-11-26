@@ -14,6 +14,7 @@ import {
   CheckSpecSchema,
   MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0,
   MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0,
+  MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0,
   VERDICT_PRECEDENCE,
   rollupVerdicts,
 } from "../src/check-verdict.js";
@@ -60,6 +61,7 @@ describe("embedded schemas (#283)", () => {
     expect(sdk.RESULT_FILE_SCHEMA_1_1_0).toBe(RESULT_FILE_SCHEMA_1_1_0);
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0);
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0);
+    expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0);
     expect(sdk.VERDICT_MARK).toBe("x-verdict");
     expect(sdk.TekkWorkflowRunVerdictEnum.NOT_EVALUABLE).toBe("NOT_EVALUABLE");
   });
@@ -90,6 +92,17 @@ describe("nested check result body", () => {
 
   it("rejects flat measurements in the new body", () => {
     expect(validate({ ...body, measurements: [] })).toBe(false);
+  });
+
+  it("validates the additive drawing contract in both SDKs", () => {
+    const schema = JSON.parse(readFileSync(join(folder, "2.1.0.json"), "utf8"));
+    const example = JSON.parse(readFileSync(join(folder, "examples", "nested-2.1.0.json"), "utf8"));
+    expect(MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0).toEqual(schema);
+    const validateVisuals = new Ajv().compile(MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0);
+    expect(validateVisuals(body)).toBe(true);
+    expect(validateVisuals(example)).toBe(true);
+    example.report_visuals["basin-1-plan"].crop_xy_mm = [0, 1];
+    expect(validateVisuals(example)).toBe(false);
   });
 
   it("preserves optional subcheck descriptions", () => {

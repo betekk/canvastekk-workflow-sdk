@@ -51,6 +51,8 @@ CHECK_RESULT_SCHEMA = "model_check.check"
 
 CHECK_RESULT_SCHEMA_VERSION = "1.0.0"
 CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0"
+CHECK_RESULT_SCHEMA_VERSION_2_1_0 = "2.1.0"
+GROUPED_CHECK_RESULT_SCHEMA_VERSIONS = (CHECK_RESULT_SCHEMA_VERSION_2_0_0, CHECK_RESULT_SCHEMA_VERSION_2_1_0)
 """Version of that body."""
 
 FLOAT_ALLOWANCE = 1e-10
@@ -935,7 +937,7 @@ class JudgedResult:
 @cache
 def load_check_body_schema(version: str = CHECK_RESULT_SCHEMA_VERSION) -> dict[str, Any]:
     """Return the packaged ``model_check.check`` body JSON Schema."""
-    if version not in (CHECK_RESULT_SCHEMA_VERSION, CHECK_RESULT_SCHEMA_VERSION_2_0_0):
+    if version not in (CHECK_RESULT_SCHEMA_VERSION, *GROUPED_CHECK_RESULT_SCHEMA_VERSIONS):
         raise CheckVerdictError(f"Unsupported model_check.check body version {version!r}")
     root = resources.files("canvastekk_workflow_sdk").joinpath("data", "schemas", "result-body", CHECK_RESULT_SCHEMA)
     return json.loads(root.joinpath(f"{version}.json").read_text(encoding="utf-8"))
@@ -1149,6 +1151,8 @@ __all__ = [
     "CHECK_RESULT_SCHEMA",
     "CHECK_RESULT_SCHEMA_VERSION",
     "CHECK_RESULT_SCHEMA_VERSION_2_0_0",
+    "CHECK_RESULT_SCHEMA_VERSION_2_1_0",
+    "GROUPED_CHECK_RESULT_SCHEMA_VERSIONS",
     "FLOAT_ALLOWANCE",
     "STATEMENT_PLACEHOLDERS",
     "VERDICT_MARK",

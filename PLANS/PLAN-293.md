@@ -6,8 +6,10 @@
 
 ## Acceptance Criteria
 
-- [ ] The installed SDK ships the schema and example. Its streaming reader opens supported existing fixtures and 2.1.0 findings with or without drawings, preserving row indexes and facts.
-- [ ] Validation covers plan-band drawing records and references. Verdict-only consumers can read the existing envelope and summary without the geometry.
+- [x] The installed Python SDK ships the canonical schema and example, and the TypeScript validator exposes the same schema.
+- [x] The streaming reader opens supported existing fixtures and 2.1.0 findings with or without drawings, preserving row indexes and facts.
+- [x] Validation covers plan-band drawing records and references.
+- [x] Verdict-only consumers can read the existing envelope and summary without loading optional geometry.
 
 ## Dependency & Consumer Map
 
@@ -23,14 +25,16 @@
 
 ### Phase 1: Add the optional drawing contract
 
-- [ ] **1.1** Publish the additive 2.1.0 schema and fixture in both SDK packages.
+- [x] **1.1** Publish the additive 2.1.0 schema and fixture in both SDK packages.
     — **Why:** All producers and consumers need the same optional drawing shape before a workflow emits it.
     — **Done when:** The Python wheel contains the schema and example; Python and TypeScript validators agree with the canonical schema, accept the example and an unchanged grouped body, and reject malformed drawing and reference shapes.
     — **Consumers affected:** Installed Python and TypeScript SDKs, IFC writers and result-body validators.
-- [ ] **1.2** Dispatch grouped reads by the recorded body version and expose selected drawing lookup.
+    — **Done:** Draft 7 and Ajv match the canonical schema; the built wheel loads the example and the npm package exports the validator. Files: schema, examples, package exports and parity tests; fixes: none.
+- [x] **1.2** Dispatch grouped reads by the recorded body version and expose selected drawing lookup.
     — **Why:** Required findings and the quick verdict must remain available when an optional drawing is absent.
     — **Done when:** Fixtures preserve old results, exact finding indices and compact queries for 2.1.0; result headers stay unchanged; only requested valid drawings are returned when explicitly read; corrupt optional drawings never change verdict facts.
     — **Consumers affected:** IFC statements and report assembly, LLM evidence tools, independent header readers.
+    — **Done:** Older and new compact and lossless reads preserve recorded facts; the built wheel reads the header verdict and resolves the 1.4–1.8 m band. Files: Python reader, tests and result-file docs; fixes: updated unsupported-version test to select still-unsupported versions.
 
 ## Technical Notes
 
@@ -45,3 +49,7 @@ None. IFC, web, and AI readers upgrade after the SDK release and before writer a
 Check both compact and lossless entry points, older layout acceptance, supplied-but-unavailable graphics, and installed package content before merge.
 
 ## Trace
+
+LOG Full exit gate: schema change and cross-module readers in both SDK packages.
+LOG Fix 1: unsupported-version test now probes 2.2.0 and 3.0.0 because 2.1.0 is a supported body.
+LOG Scoped Ruff and ESLint, Python compile and built wheel smoke, TypeScript typechecks and package smoke, 1,339 Python tests, 574 TypeScript tests. Backend SDK change; no browser E2E target.

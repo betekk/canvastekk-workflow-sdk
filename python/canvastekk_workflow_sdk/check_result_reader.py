@@ -3,15 +3,15 @@
 A check's result file can be very large (the 0.x body of one failed check is
 51 KB to 845 KB on dev; 1.0.0 grows with every reading). Agents and services
 that need to *look inside* one must not load it whole. This module reads a
-staged file from disk with a streaming JSON parser and answers three
-questions with bounded output:
+staged file from disk with a streaming JSON parser:
 
 - :meth:`CheckResultReader.overview`: header, verdict, summary and one entry per
   check (verdict, counts, limits used).
 - :meth:`CheckResultReader.failures`: the failing readings of one check, one page
   at a time.
 - :meth:`CheckResultReader.element`: every row that concerns one element (GlobalId).
-- :meth:`CheckResultReader.iter_findings`: lossless facts for 1.0.0 and 2.0.0.
+- :meth:`CheckResultReader.iter_findings`: lossless facts for 1.0.0 and grouped bodies.
+- :meth:`CheckResultReader.report_visuals`: selected optional drawings, read separately.
 
 Supported shapes (anything else fails with a named :class:`CheckResultReadError`):
 
@@ -20,7 +20,7 @@ Supported shapes (anything else fails with a named :class:`CheckResultReadError`
   ``measurements.measurements`` and ``instances.instances``);
 - ``model_check.check`` ``1.x`` (the verdict standard: ``checks[]`` and
   ``measurements[]`` with ``failed_limits``; #283);
-- ``model_check.check`` ``2.0.0`` (each check owns its measurements).
+- ``model_check.check`` ``2.0.0`` and ``2.1.0`` (each check owns its measurements).
 
 Requires the optional extra ``reader`` (``pip install canvastekk-workflow-sdk[reader]``),
 which installs ``ijson``. Memory stays flat in the file size: the file is scanned
@@ -30,16 +30,17 @@ with a pull parser and only the facts being asked for are kept.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Collection, Iterable, Iterator
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import cache
 from typing import IO, Any
 
 from jsonschema import Draft7Validator
 
 from canvastekk_workflow_sdk.check_verdict import (
     CHECK_RESULT_SCHEMA_VERSION,
-    CHECK_RESULT_SCHEMA_VERSION_2_0_0,
+    CHECK_RESULT_SCHEMA_VERSION_2_1_0,
+    GROUPED_CHECK_RESULT_SCHEMA_VERSIONS,
     load_check_body_schema,
 )
 from canvastekk_workflow_sdk.result_file import (
@@ -171,10 +172,10 @@ def _items(path: str, prefix: str) -> Iterator[dict[str, Any]]:
             yield _dict(item)
 
 
-@lru_cache(maxsize=4)
+@cache
 def _part_validator(version: str, part: str) -> Draft7Validator:
     schema = load_check_body_schema(version)
-    definition = schema["definitions"][part] if version == CHECK_RESULT_SCHEMA_VERSION_2_0_0 else (
+    definition = schema["definitions"][part] if version in GROUPED_CHECK_RESULT_SCHEMA_VERSIONS else (
         schema["properties"]["checks" if part == "check" else "measurements"]["items"]
     )
     return Draft7Validator(schema).evolve(schema=definition)
@@ -186,17 +187,17 @@ def _validate_part(value: Any, version: str, part: str) -> None:
         raise CheckResultReadError("INVALID_RESULT_FILE", f"malformed {part} in {version} body")
 
 
-def _grouped_checks(path: str) -> Iterator[dict[str, Any]]:
+def _grouped_checks(path: str, version: str) -> Iterator[dict[str, Any]]:
     """Stream each check descriptor, keeping the measurement array marker but not its rows."""
     ijson = _ijson()
-    allowed = load_check_body_schema(CHECK_RESULT_SCHEMA_VERSION_2_0_0)["properties"]
+    allowed = load_check_body_schema(version)["properties"]
     found_checks = False
 
     def descriptors(stream: IO[bytes]) -> Iterator[tuple[str, str, Any]]:
         nonlocal found_checks
         for prefix, event, value in ijson.parse(stream, use_float=True):
             if prefix == "body" and event == "map_key" and value not in allowed:
-                raise CheckResultReadError("INVALID_RESULT_FILE", "unexpected member in 2.0.0 body")
+                raise CheckResultReadError("INVALID_RESULT_FILE", f"unexpected member in {version} body")
             if prefix == "body.checks" and event == "start_array":
                 found_checks = True
             if not prefix.startswith(f"{_NESTED_ROWS}."):
@@ -206,18 +207,18 @@ def _grouped_checks(path: str) -> Iterator[dict[str, Any]]:
     try:
         with open(path, "rb") as stream:
             for check in ijson.items(descriptors(stream), _CHECK_ITEM):
-                _validate_part(check, CHECK_RESULT_SCHEMA_VERSION_2_0_0, "check")
+                _validate_part(check, version, "check")
                 if check["check"] in seen:
-                    raise CheckResultReadError("INVALID_RESULT_FILE", "duplicate check key in 2.0.0 body")
+                    raise CheckResultReadError("INVALID_RESULT_FILE", f"duplicate check key in {version} body")
                 seen.add(check["check"])
                 yield check
     except ijson.JSONError as exc:
         raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
     if not found_checks:
-        raise CheckResultReadError("INVALID_RESULT_FILE", "missing checks array in 2.0.0 body")
+        raise CheckResultReadError("INVALID_RESULT_FILE", f"missing checks array in {version} body")
 
 
-def _grouped_rows(path: str) -> Iterator[tuple[int, int, dict[str, Any]]]:
+def _grouped_rows(path: str, version: str) -> Iterator[tuple[int, int, dict[str, Any]]]:
     """Stream one nested reading at a time with its original check ordinal and index."""
     ijson = _ijson()
     check_index = -1
@@ -234,7 +235,14 @@ def _grouped_rows(path: str) -> Iterator[tuple[int, int, dict[str, Any]]]:
     try:
         with open(path, "rb") as stream:
             for row in ijson.items(track(stream), f"{_NESTED_ROWS}.item"):
-                _validate_part(row, CHECK_RESULT_SCHEMA_VERSION_2_0_0, "measurement")
+                if (
+                    version == CHECK_RESULT_SCHEMA_VERSION_2_1_0
+                    and isinstance(row, dict)
+                    and "report_visual_refs" in row
+                    and not _part_validator(version, "report_visual_refs").is_valid(row["report_visual_refs"])
+                ):
+                    del row["report_visual_refs"]
+                _validate_part(row, version, "measurement")
                 yield check_index, measurement_index, row
                 measurement_index += 1
     except ijson.JSONError as exc:
@@ -256,7 +264,7 @@ class CheckFinding:
 class _Layout:
     """Which body shape a file carries."""
 
-    kind: str  # "grouped" (2.0.0), "verdict" (1.x), or "legacy" (0.x)
+    kind: str  # "grouped" (2.0.0/2.1.0), "verdict" (1.x), or "legacy" (0.x)
     schema: str
     version: str
 
@@ -304,13 +312,13 @@ class CheckResultReader:
             return _Layout("legacy", schema, version)
         if major == "1" and schema == CHECK_RESULT_LABEL:
             return _Layout("verdict", schema, version)
-        if version == CHECK_RESULT_SCHEMA_VERSION_2_0_0 and schema == CHECK_RESULT_LABEL:
+        if version in GROUPED_CHECK_RESULT_SCHEMA_VERSIONS and schema == CHECK_RESULT_LABEL:
             if header["result_file_version"] != RESULT_FILE_VERSION_1_1_0:
-                raise CheckResultReadError("INVALID_RESULT_FILE", "2.0.0 check bodies require result-file layout 1.1.0")
+                raise CheckResultReadError("INVALID_RESULT_FILE", f"{version} check bodies require result-file layout 1.1.0")
             return _Layout("grouped", schema, version)
         raise CheckResultReadError(
             "UNSUPPORTED_RESULT_SCHEMA_VERSION",
-            f"{schema} {version} is not readable: this reader knows 0.x and (for {CHECK_RESULT_LABEL}) 1.x and 2.0.0",
+            f"{schema} {version} is not readable: this reader knows 0.x and (for {CHECK_RESULT_LABEL}) 1.x, 2.0.0 and 2.1.0",
         )
 
     @property
@@ -320,12 +328,12 @@ class CheckResultReader:
 
     def _check_records(self) -> Iterator[dict[str, Any]]:
         if self._layout.kind == "grouped":
-            return _grouped_checks(self._path)
+            return _grouped_checks(self._path, self._layout.version)
         return _items(self._path, _CHECK_ITEM)
 
     def _judged_rows(self, checks: list[dict[str, Any]]) -> Iterator[tuple[str, int, dict[str, Any]]]:
         if self._layout.kind == "grouped":
-            for group, index, row in _grouped_rows(self._path):
+            for group, index, row in _grouped_rows(self._path, self._layout.version):
                 if not 0 <= group < len(checks):
                     raise CheckResultReadError("INVALID_RESULT_FILE", "measurement outside its check")
                 yield checks[group]["check"], index, row
@@ -334,13 +342,14 @@ class CheckResultReader:
             yield row.get("check"), index, row
 
     def iter_findings(self) -> Iterator[CheckFinding]:
-        """Yield raw findings with flat 1.0.0 or check-local 2.0.0 indices in file order.
+        """Yield findings with flat 1.0.0 or check-local grouped indices in file order.
 
         Unknown formats or malformed findings raise ``CheckResultReadError``.
         A missing limit or element identity is never filled from a guess.
+        Malformed optional drawing references are omitted.
         """
         version = self._layout.version
-        if version not in (CHECK_RESULT_SCHEMA_VERSION, CHECK_RESULT_SCHEMA_VERSION_2_0_0):
+        if version not in (CHECK_RESULT_SCHEMA_VERSION, *GROUPED_CHECK_RESULT_SCHEMA_VERSIONS):
             raise CheckResultReadError("UNSUPPORTED_RESULT_SCHEMA_VERSION", f"lossless findings are unavailable in {version}")
         checks = list(self._check_records())
         limits: dict[str, tuple[dict[str, Any], ...]] = {}
@@ -358,6 +367,37 @@ class CheckResultReader:
                 if check not in limits:
                     raise CheckResultReadError("INVALID_RESULT_FILE", "finding has no recorded check")
             yield CheckFinding(run_id, check, index, row, limits[check])
+
+    def report_visuals(self, visual_ids: Collection[str]) -> dict[str, dict[str, Any]]:
+        """Read requested, valid plan bands keyed by their IDs in this result file.
+
+        Missing, malformed, and repeated drawings are omitted. Older body versions
+        have no embedded drawings. Finding and header reads do not use this method.
+        """
+        version = self._layout.version
+        if not visual_ids or version != CHECK_RESULT_SCHEMA_VERSION_2_1_0:
+            return {}
+        ijson = _ijson()
+        validator = _part_validator(version, "plan_band")
+        selected: dict[str, dict[str, Any]] = {}
+        seen: set[str] = set()
+        try:
+            with open(self._path, "rb") as stream:
+                for name, drawing in ijson.kvitems(stream, "body.report_visuals", use_float=True):
+                    if not name or name not in visual_ids:
+                        continue
+                    if name in seen:
+                        selected.pop(name, None)
+                        continue
+                    seen.add(name)
+                    if validator.is_valid(drawing):
+                        min_x, min_y, max_x, max_y = drawing["crop_xy_mm"]
+                        bottom, top = drawing["z_band_mm"]
+                        if min_x < max_x and min_y < max_y and bottom < top:
+                            selected[name] = drawing
+        except ijson.JSONError as exc:
+            raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
+        return selected
 
     # ---------------------------------------------------------------- overview
 

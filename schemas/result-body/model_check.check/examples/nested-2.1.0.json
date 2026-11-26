@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "check": "basin_base_height",
+      "verdict": "FAIL",
+      "verdict_counts": { "PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0 },
+      "limits_used": [{ "input": "min_height_mm", "role": "LIMIT", "operator": "GTE", "value": 300 }],
+      "measurements": [
+        {
+          "subject_id": "basin-1",
+          "kind": "value",
+          "actual": 200,
+          "verdict": "FAIL",
+          "failed_limits": [{ "input": "min_height_mm", "side": "BELOW" }],
+          "viewer_representation": {
+            "schema_version": 1,
+            "primitives": [
+              {
+                "kind": "path_polyline",
+                "primitive_id": "basin-1:height",
+                "row_id": "basin-1",
+                "verdict": "FAIL",
+                "label": "Basin base height",
+                "path_semantics": "measurement",
+                "geometry": { "points_model_mm": [[1200, 800, 1500], [1200, 800, 1700]] }
+              }
+            ]
+          },
+          "report_visual_refs": ["basin-1-plan"]
+        }
+      ]
+    }
+  ],
+  "report_visuals": {
+    "basin-1-plan": {
+      "kind": "plan_band",
+      "crop_xy_mm": [200, -200, 2200, 1800],
+      "z_band_mm": [1400, 1800],
+      "layers": {
+        "wall": [[[[200, 200], [2200, 200], [2200, 300], [200, 300]]]]
+      }
+    }
+  }
+}

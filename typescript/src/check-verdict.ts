@@ -21,6 +21,7 @@ export const CHECK_RESULT_SCHEMA_VERSION = "1.0.0";
 
 /** Version with findings nested under their owning check. */
 export const CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0";
+export const CHECK_RESULT_SCHEMA_VERSION_2_1_0 = "2.1.0";
 
 /** What a marked input does for its check. */
 export const TekkCheckRoleEnum = {
@@ -386,8 +387,7 @@ const {
 } = bodyV1.properties.measurements.items.properties;
 const checkFields = bodyV1.properties.checks.items.properties;
 
-/** Published `model_check.check` 2.0.0 contract with locally nested findings. */
-export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0: Readonly<Record<string, unknown>> = {
+const bodyV2 = {
   $schema: bodyV1.$schema,
   $id: "urn:canvastekk:result-body:model_check.check:2.0.0",
   title: "model_check.check body 2.0.0",
@@ -435,6 +435,70 @@ export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0: Readonly<Record<string, unknow
           properties: {
             schema_version: { type: "integer", minimum: 1 },
             primitives: { type: "array", items: { type: "object" } },
+          },
+        },
+      },
+    },
+  },
+};
+
+/** Published `model_check.check` 2.0.0 contract with locally nested findings. */
+export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0: Readonly<Record<string, unknown>> = bodyV2;
+
+/** Published `model_check.check` 2.1.0 contract with optional plan-band drawings. */
+export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0: Readonly<Record<string, unknown>> = {
+  ...bodyV2,
+  $id: "urn:canvastekk:result-body:model_check.check:2.1.0",
+  title: "model_check.check body 2.1.0",
+  description: "Grouped check findings with optional, file-local drawing references. Uses result-file layout 1.1.0.",
+  properties: {
+    ...bodyV2.properties,
+    report_visuals: {
+      type: "object",
+      propertyNames: { type: "string", minLength: 1 },
+      additionalProperties: { $ref: "#/definitions/plan_band" },
+    },
+  },
+  definitions: {
+    ...bodyV2.definitions,
+    measurement: {
+      ...bodyV2.definitions.measurement,
+      properties: {
+        ...bodyV2.definitions.measurement.properties,
+        report_visual_refs: { $ref: "#/definitions/report_visual_refs" },
+      },
+    },
+    report_visual_refs: {
+      description: "Drawing identifiers in this result body's report_visuals map.",
+      type: "array",
+      uniqueItems: true,
+      items: { type: "string", minLength: 1 },
+    },
+    point_xy_mm: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" } },
+    plan_band: {
+      description: "Projected context in the same model-space millimetres as the finding overlay.",
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "crop_xy_mm", "z_band_mm", "layers"],
+      properties: {
+        kind: { const: "plan_band" },
+        crop_xy_mm: {
+          description: "Crop bounds in [min X, min Y, max X, max Y] order.",
+          type: "array", minItems: 4, maxItems: 4, items: { type: "number" },
+        },
+        z_band_mm: {
+          description: "Actual clipping elevations in [bottom, top] order.",
+          type: "array", minItems: 2, maxItems: 2, items: { type: "number" },
+        },
+        layers: {
+          description: "Named layers of polygons, each with an exterior ring followed by any holes.",
+          type: "object",
+          additionalProperties: {
+            type: "array",
+            items: {
+              type: "array", minItems: 1,
+              items: { type: "array", minItems: 3, items: { $ref: "#/definitions/point_xy_mm" } },
+            },
           },
         },
       },
