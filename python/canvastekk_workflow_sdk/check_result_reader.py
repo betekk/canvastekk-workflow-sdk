@@ -64,6 +64,7 @@ IDENTITY_LIST_CAP = 8
 _FAIL = "FAIL"
 _CHECK_ITEM = "body.checks.item"
 _NESTED_ROWS = f"{_CHECK_ITEM}.measurements"
+_REPORT_VISUALS = "body.report_visuals"
 _SMALL_BODY_MEMBERS_0X = (
     "check_id",
     "rule_id",
@@ -379,13 +380,25 @@ class CheckResultReader:
             return {}
         ijson = _ijson()
         validator = _part_validator(version, "plan_band")
+        wanted = set(visual_ids)
+        wanted.discard("")
+
+        def requested_entries(stream: IO[bytes]) -> Iterator[tuple[str, str, Any]]:
+            # Filter parser events before kvitems builds the drawing objects.
+            keep_entry = False
+            for prefix, event, value in ijson.parse(stream, use_float=True):
+                if prefix == _REPORT_VISUALS:
+                    keep_entry = event == "map_key" and value in wanted
+                    if keep_entry or event in ("start_map", "end_map"):
+                        yield prefix, event, value
+                elif keep_entry:
+                    yield prefix, event, value
+
         selected: dict[str, dict[str, Any]] = {}
         seen: set[str] = set()
         try:
             with open(self._path, "rb") as stream:
-                for name, drawing in ijson.kvitems(stream, "body.report_visuals", use_float=True):
-                    if not name or name not in visual_ids:
-                        continue
+                for name, drawing in ijson.kvitems(requested_entries(stream), _REPORT_VISUALS):
                     if name in seen:
                         selected.pop(name, None)
                         continue

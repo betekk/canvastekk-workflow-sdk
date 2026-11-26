@@ -53,3 +53,4 @@ Check both compact and lossless entry points, older layout acceptance, supplied-
 LOG Full exit gate: schema change and cross-module readers in both SDK packages.
 LOG Fix 1: unsupported-version test now probes 2.2.0 and 3.0.0 because 2.1.0 is a supported body.
 LOG Scoped Ruff and ESLint, Python compile and built wheel smoke, TypeScript typechecks and package smoke, 1,339 Python tests, 574 TypeScript tests. Backend SDK change; no browser E2E target.
+LOG Inline review fix: filter drawing IDs in the parser event stream before building objects. A large unrequested polygon layer stays below the reader's 3 MiB test ceiling.

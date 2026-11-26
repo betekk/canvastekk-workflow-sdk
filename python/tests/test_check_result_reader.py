@@ -222,6 +222,21 @@ class TestNestedFindings:
         requested = {"basin-1-plan", "invalid-shape", "inverted-band", "not-present"}
         assert reader.report_visuals(requested) == {"basin-1-plan": plan}
 
+    def test_unrequested_drawing_is_not_materialized(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.1.0.json").read_text())
+        plan = body["report_visuals"]["basin-1-plan"]
+        body["report_visuals"]["large"] = {**plan, "layers": {"wall": plan["layers"]["wall"] * 50_000}}
+        body["report_visuals"]["basin.2"] = plan
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.1.0"))
+
+        tracemalloc.start()
+        try:
+            assert reader.report_visuals({"basin.2"}) == {"basin.2": plan}
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert peak < 3 * 1024 * 1024
+
     def test_invalid_optional_refs_do_not_discard_required_facts(self, tmp_path: Path) -> None:
         body = _body_v2()
         row = body["checks"][0]["measurements"][1]
