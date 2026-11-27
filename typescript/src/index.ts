@@ -197,6 +197,7 @@ export {
   CHECK_RESULT_SCHEMA_VERSION,
   CHECK_RESULT_SCHEMA_VERSION_2_0_0,
   CHECK_RESULT_SCHEMA_VERSION_2_1_0,
+  CHECK_RESULT_SCHEMA_VERSION_2_2_0,
   TekkCheckRoleEnum,
   TekkCheckOperatorEnum,
   TekkWorkflowRunVerdictEnum,
@@ -208,7 +209,9 @@ export {
   MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0,
   MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0,
   MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0,
+  MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0,
 } from "./check-verdict.js";
+export { MODEL_CHECK_FLOOR_GROUP_TEST_VECTORS } from "./model-check-floor-group-vectors.js";
 export type { TekkCheckRole, TekkCheckOperator, TekkWorkflowRunVerdict, CheckSpec } from "./check-verdict.js";
 export type {
   ResultFileHeader,

@@ -22,6 +22,7 @@ export const CHECK_RESULT_SCHEMA_VERSION = "1.0.0";
 /** Version with findings nested under their owning check. */
 export const CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0";
 export const CHECK_RESULT_SCHEMA_VERSION_2_1_0 = "2.1.0";
+export const CHECK_RESULT_SCHEMA_VERSION_2_2_0 = "2.2.0";
 
 /** What a marked input does for its check. */
 export const TekkCheckRoleEnum = {
@@ -483,11 +484,11 @@ export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0: Readonly<Record<string, unknow
       properties: {
         kind: { const: "plan_band" },
         crop_xy_mm: {
-          description: "Crop bounds in [min X, min Y, max X, max Y] order.",
+          description: "Crop bounds in [min X, min Y, max X, max Y] order. Model-space millimetres: the finding's viewer-representation footprint padded by 1000 mm on every side.",
           type: "array", minItems: 4, maxItems: 4, items: { type: "number" },
         },
         z_band_mm: {
-          description: "Actual clipping elevations in [bottom, top] order.",
+          description: "Actual clipping elevations in [bottom, top] order. Model-space millimetres: bottom = the finding's lowest viewer-representation point - 100 mm, top = its highest viewer-representation point + 100 mm.",
           type: "array", minItems: 2, maxItems: 2, items: { type: "number" },
         },
         layers: {
@@ -501,6 +502,230 @@ export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0: Readonly<Record<string, unknow
             },
           },
         },
+      },
+    },
+  },
+};
+
+const ifcGuidV22 = { type: "string", pattern: "^[0-3][0-9A-Za-z_$]{21}$" };
+const polygonV22 = {
+  description: "One polygon: an exterior ring followed by any holes.",
+  type: "array",
+  minItems: 1,
+  items: { type: "array", minItems: 3, items: { $ref: "#/definitions/point_xy_mm" } },
+};
+const polygonsV22 = { type: "array", items: { $ref: "#/definitions/polygon" } };
+
+/** Published `model_check.check` 2.2.0 contract with layout plans and sourced spatial observations. */
+export const MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0: Readonly<Record<string, unknown>> = {
+  ...bodyV2,
+  $id: "urn:canvastekk:result-body:model_check.check:2.2.0",
+  title: "model_check.check body 2.2.0",
+  description: "Grouped check findings with optional file-local drawings and sourced spatial observations. Uses result-file layout 1.1.0.",
+  properties: {
+    ...bodyV2.properties,
+    report_visuals: {
+      type: "object",
+      propertyNames: { type: "string", minLength: 1 },
+      additionalProperties: {
+        oneOf: [{ $ref: "#/definitions/plan_band" }, { $ref: "#/definitions/layout_plan" }],
+      },
+    },
+    spatial_reference: { $ref: "#/definitions/spatial_reference" },
+  },
+  definitions: {
+    ...bodyV2.definitions,
+    measurement: {
+      ...bodyV2.definitions.measurement,
+      properties: {
+        ...bodyV2.definitions.measurement.properties,
+        report_visual_refs: { $ref: "#/definitions/report_visual_refs" },
+        spatial_context: { $ref: "#/definitions/spatial_context" },
+      },
+    },
+    report_visual_refs: {
+      description: "Drawing identifiers in this result body's report_visuals map.",
+      type: "array",
+      uniqueItems: true,
+      items: { type: "string", minLength: 1 },
+    },
+    source_file_id: {
+      oneOf: [{ type: "integer", minimum: 1 }, { type: "string", minLength: 1 }],
+    },
+    spatial_reference: {
+      description: "Optional sourced storey observations. Storey refs are labels, never stored floor-level authority.",
+      type: "object",
+      additionalProperties: false,
+      required: ["source", "storeys"],
+      properties: {
+        source: { type: "string", minLength: 1 },
+        storeys: { type: "array", items: { $ref: "#/definitions/storey" } },
+      },
+    },
+    storey: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ref", "global_id", "name", "source_file_id", "elevation_mm", "elevation_raw_mm"],
+      properties: {
+        ref: { type: "string", minLength: 1 },
+        global_id: ifcGuidV22,
+        name: { type: "string", minLength: 1 },
+        source_file_id: { $ref: "#/definitions/source_file_id" },
+        elevation_mm: {
+          description: "Placement-resolved elevation in the same frame and units as finding primitives.",
+          type: "number",
+        },
+        elevation_raw_mm: {
+          description: "IFC storey elevation attribute as written, converted to millimetres without placement resolution.",
+          type: "number",
+        },
+      },
+    },
+    spatial_context: {
+      description: "Optional sourced spatial observations for one measurement; absent means not observed.",
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        anchor_z_mm: {
+          description: "Lowest viewer-representation primitive Z in model-space millimetres.",
+          type: "number",
+        },
+        storey_below: { $ref: "#/definitions/storey_observation" },
+        storey_above: { $ref: "#/definitions/storey_observation" },
+        floor_surface: { $ref: "#/definitions/floor_surface" },
+        region: { $ref: "#/definitions/region_observation" },
+      },
+    },
+    storey_observation: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ref", "offset_mm"],
+      properties: {
+        ref: { type: "string", minLength: 1 },
+        offset_mm: { type: "number" },
+      },
+    },
+    floor_surface: {
+      type: "object",
+      additionalProperties: false,
+      required: ["elevation_mm", "offset_mm", "global_id", "ifc_class", "source"],
+      properties: {
+        elevation_mm: { type: "number" },
+        offset_mm: { type: "number" },
+        global_id: ifcGuidV22,
+        ifc_class: { type: "string", minLength: 1 },
+        source: { type: "string", minLength: 1 },
+      },
+    },
+    region_observation: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "gender", "source"],
+      properties: {
+        id: { type: "string", minLength: 1 },
+        gender: { type: "string", minLength: 1 },
+        source: { type: "string", minLength: 1 },
+      },
+    },
+    point_xy_mm: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" } },
+    crop_xy_mm: {
+      description: "Crop bounds in [min X, min Y, max X, max Y] order, in model-space millimetres.",
+      type: "array",
+      minItems: 4,
+      maxItems: 4,
+      items: { type: "number" },
+    },
+    polygon: polygonV22,
+    polygons: polygonsV22,
+    plan_band: {
+      description: "Projected context in the same model-space millimetres as the finding overlay.",
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "crop_xy_mm", "z_band_mm", "layers"],
+      properties: {
+        kind: { const: "plan_band" },
+        crop_xy_mm: {
+          description: "Crop bounds in [min X, min Y, max X, max Y] order. Model-space millimetres: the finding's viewer-representation footprint padded by 1000 mm on every side.",
+          type: "array",
+          minItems: 4,
+          maxItems: 4,
+          items: { type: "number" },
+        },
+        z_band_mm: {
+          description: "Actual clipping elevations in [bottom, top] order. Model-space millimetres: bottom = the finding's lowest viewer-representation point - 100 mm, top = its highest viewer-representation point + 100 mm.",
+          type: "array",
+          minItems: 2,
+          maxItems: 2,
+          items: { type: "number" },
+        },
+        layers: {
+          description: "Named layers of polygons, each with an exterior ring followed by any holes.",
+          type: "object",
+          additionalProperties: { $ref: "#/definitions/polygons" },
+        },
+      },
+    },
+    layout_plan: {
+      description: "Check-level plan context in model-space millimetres. Detail plan bands remain separate finding insets.",
+      type: "object",
+      additionalProperties: false,
+      required: ["kind", "floor_elevation_mm", "cut_z_mm", "crop_xy_mm", "layers"],
+      properties: {
+        kind: { const: "layout_plan" },
+        storey_ref: { type: "string", minLength: 1 },
+        floor_elevation_mm: { type: "number" },
+        cut_z_mm: { type: "number" },
+        crop_xy_mm: { $ref: "#/definitions/crop_xy_mm" },
+        layers: {
+          type: "object",
+          additionalProperties: { $ref: "#/definitions/polygons" },
+        },
+        fixtures: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["global_id", "footprint"],
+            properties: {
+              global_id: ifcGuidV22,
+              footprint: { $ref: "#/definitions/polygon" },
+            },
+          },
+        },
+        regions: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["region_id", "class", "gender", "polygons"],
+            properties: {
+              region_id: { type: "string", minLength: 1 },
+              class: { type: "string", minLength: 1 },
+              gender: { type: "string", minLength: 1 },
+              polygons: { $ref: "#/definitions/polygons" },
+            },
+          },
+        },
+        portals: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["portal_id", "region_id", "mouth_chord", "lobby_polygon"],
+            properties: {
+              portal_id: { type: "string", minLength: 1 },
+              region_id: { type: "string", minLength: 1 },
+              mouth_chord: {
+                type: "array",
+                minItems: 2,
+                maxItems: 2,
+                items: { $ref: "#/definitions/point_xy_mm" },
+              },
+              lobby_polygon: { $ref: "#/definitions/polygon" },
+            },
+          },
+        },
+        true_north_deg: { type: "number" },
       },
     },
   },

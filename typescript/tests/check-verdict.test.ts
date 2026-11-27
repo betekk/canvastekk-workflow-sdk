@@ -11,10 +11,12 @@ import { buildWorkflowNodeRegistryPayload } from "../src/workflow-node-registry.
 import {
   CHECK_RESULT_SCHEMA_VERSION,
   CHECK_RESULT_SCHEMA_VERSION_2_0_0,
+  CHECK_RESULT_SCHEMA_VERSION_2_2_0,
   CheckSpecSchema,
   MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0,
   MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0,
   MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0,
+  MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0,
   VERDICT_PRECEDENCE,
   rollupVerdicts,
 } from "../src/check-verdict.js";
@@ -62,6 +64,8 @@ describe("embedded schemas (#283)", () => {
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_1_0_0);
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_0_0);
     expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_1_0);
+    expect(sdk.MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0).toBe(MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0);
+    expect(sdk.CHECK_RESULT_SCHEMA_VERSION_2_2_0).toBe(CHECK_RESULT_SCHEMA_VERSION_2_2_0);
     expect(sdk.VERDICT_MARK).toBe("x-verdict");
     expect(sdk.TekkWorkflowRunVerdictEnum.NOT_EVALUABLE).toBe("NOT_EVALUABLE");
   });
@@ -103,6 +107,29 @@ describe("nested check result body", () => {
     expect(validateVisuals(example)).toBe(true);
     example.report_visuals["basin-1-plan"].crop_xy_mm = [0, 1];
     expect(validateVisuals(example)).toBe(false);
+  });
+
+  it("validates layout plans and spatial observations without breaking 2.1.0 content", () => {
+    const schema = JSON.parse(readFileSync(join(folder, "2.2.0.json"), "utf8"));
+    const previous = JSON.parse(readFileSync(join(folder, "examples", "nested-2.1.0.json"), "utf8"));
+    const example = JSON.parse(readFileSync(join(folder, "examples", "nested-2.2.0.json"), "utf8"));
+    expect(CHECK_RESULT_SCHEMA_VERSION_2_2_0).toBe("2.2.0");
+    expect(MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0).toEqual(schema);
+    const validateBody = new Ajv().compile(MODEL_CHECK_CHECK_BODY_SCHEMA_2_2_0);
+    expect(validateBody(previous)).toBe(true);
+    expect(validateBody(example)).toBe(true);
+
+    const unknownKind = structuredClone(example);
+    unknownKind.report_visuals["level-1-layout"].kind = "future_drawing";
+    expect(validateBody(unknownKind)).toBe(false);
+
+    const unknownMeasurementKey = structuredClone(example);
+    unknownMeasurementKey.checks[0].measurements[0].level_id = "S1";
+    expect(validateBody(unknownMeasurementKey)).toBe(false);
+
+    const unknownLayoutKey = structuredClone(example);
+    unknownLayoutKey.report_visuals["level-1-layout"].level_id = "S1";
+    expect(validateBody(unknownLayoutKey)).toBe(false);
   });
 
   it("preserves optional subcheck descriptions", () => {

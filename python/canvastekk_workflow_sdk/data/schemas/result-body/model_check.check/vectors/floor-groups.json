@@ -1,0 +1,134 @@
+{
+  "schema": "model-check-floor-groups/v1",
+  "fallback_gap_mm": 1500,
+  "cases": [
+    {
+      "name": "single_floor_mixed_heights",
+      "spatial_reference": {
+        "storeys": [
+          { "ref": "S1", "name": "Level 1", "elevation_mm": 0 },
+          { "ref": "S2", "name": "Level 2", "elevation_mm": 3500 }
+        ]
+      },
+      "measurements": [
+        { "subject_id": "basin-rim", "spatial_context": { "anchor_z_mm": 850, "storey_below": { "ref": "S1", "offset_mm": 850 }, "floor_surface": { "elevation_mm": 0 } } },
+        { "subject_id": "floor-drop", "spatial_context": { "anchor_z_mm": -20, "storey_below": { "ref": "S1", "offset_mm": -20 }, "floor_surface": { "elevation_mm": 0 } } },
+        { "subject_id": "ceiling", "spatial_context": { "anchor_z_mm": 2400, "storey_below": { "ref": "S1", "offset_mm": 2400 }, "floor_surface": { "elevation_mm": 0 } } },
+        { "subject_id": "mirror", "spatial_context": { "anchor_z_mm": 1500, "storey_below": { "ref": "S1", "offset_mm": 1500 }, "floor_surface": { "elevation_mm": 0 } } }
+      ],
+      "expected": {
+        "groups": [
+          { "key": "storey:S1", "storey_ref": "S1", "name": "Level 1", "elevation_mm": 0, "subject_ids": ["basin-rim", "floor-drop", "ceiling", "mirror"] }
+        ],
+        "unplaced_subject_ids": [],
+        "clips": []
+      }
+    },
+    {
+      "name": "two_floors_same_check",
+      "spatial_reference": {
+        "storeys": [
+          { "ref": "S1", "name": "Level 1", "elevation_mm": 0 },
+          { "ref": "S2", "name": "Level 2", "elevation_mm": 3500 }
+        ]
+      },
+      "measurements": [
+        { "subject_id": "basin-l1", "spatial_context": { "anchor_z_mm": 950, "storey_below": { "ref": "S1", "offset_mm": 850 }, "floor_surface": { "elevation_mm": 100 } } },
+        { "subject_id": "basin-l2", "spatial_context": { "anchor_z_mm": 4450, "storey_below": { "ref": "S2", "offset_mm": 850 }, "floor_surface": { "elevation_mm": 3600 } } }
+      ],
+      "expected": {
+        "groups": [
+          { "key": "storey:S1", "storey_ref": "S1", "name": "Level 1", "elevation_mm": 100, "subject_ids": ["basin-l1"] },
+          { "key": "storey:S2", "storey_ref": "S2", "name": "Level 2", "elevation_mm": 3600, "subject_ids": ["basin-l2"] }
+        ],
+        "unplaced_subject_ids": [],
+        "clips": []
+      }
+    },
+    {
+      "name": "degenerate_storeys_floor_surface_fallback",
+      "spatial_reference": {
+        "storeys": [
+          { "ref": "S1", "name": "Storey A", "elevation_mm": 0 },
+          { "ref": "S2", "name": "Storey B", "elevation_mm": 0 }
+        ]
+      },
+      "measurements": [
+        { "subject_id": "surface-0", "spatial_context": { "storey_below": { "ref": "S1", "offset_mm": 0 }, "floor_surface": { "elevation_mm": 0 } } },
+        { "subject_id": "surface-1500", "spatial_context": { "storey_below": { "ref": "S1", "offset_mm": 1500 }, "floor_surface": { "elevation_mm": 1500 } } },
+        { "subject_id": "surface-3001", "spatial_context": { "storey_below": { "ref": "S2", "offset_mm": 3001 }, "floor_surface": { "elevation_mm": 3001 } } },
+        { "subject_id": "surface-4500", "spatial_context": { "storey_below": { "ref": "S2", "offset_mm": 4500 }, "floor_surface": { "elevation_mm": 4500 } } }
+      ],
+      "expected": {
+        "groups": [
+          { "key": "floor:0", "storey_ref": null, "name": "Floor 0 mm", "elevation_mm": 0, "subject_ids": ["surface-0", "surface-1500"] },
+          { "key": "floor:3001", "storey_ref": null, "name": "Floor 3001 mm", "elevation_mm": 3001, "subject_ids": ["surface-3001", "surface-4500"] }
+        ],
+        "unplaced_subject_ids": [],
+        "clips": []
+      }
+    },
+    {
+      "name": "unplaced_row_and_usable_z_fallback",
+      "spatial_reference": {
+        "storeys": [
+          { "ref": "S1", "name": "Level 1", "elevation_mm": 0 },
+          { "ref": "S2", "name": "Level 2", "elevation_mm": 3500 }
+        ]
+      },
+      "measurements": [
+        { "subject_id": "no-context-no-z" },
+        {
+          "subject_id": "z-only",
+          "viewer_representation": {
+            "primitives": [
+              { "primitive_id": "z-only-point", "geometry": { "points_model_mm": [[10, 20, 3700]] } }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "groups": [
+          { "key": "storey:S2", "storey_ref": "S2", "name": "Level 2", "elevation_mm": 3500, "subject_ids": ["z-only"] }
+        ],
+        "unplaced_subject_ids": ["no-context-no-z"],
+        "clips": []
+      }
+    },
+    {
+      "name": "cross_floor_path",
+      "spatial_reference": {
+        "storeys": [
+          { "ref": "S1", "name": "Level 1", "elevation_mm": 0 },
+          { "ref": "S2", "name": "Level 2", "elevation_mm": 3500 },
+          { "ref": "S3", "name": "Level 3", "elevation_mm": 7000 }
+        ]
+      },
+      "measurements": [
+        {
+          "subject_id": "cross-floor-path",
+          "spatial_context": { "anchor_z_mm": 1000, "storey_below": { "ref": "S1", "offset_mm": 1000 } },
+          "viewer_representation": {
+            "primitives": [
+              {
+                "primitive_id": "path-1",
+                "kind": "path_polyline",
+                "geometry": { "points_model_mm": [[0, 0, 1000], [0, 0, 4000]] }
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "groups": [
+          { "key": "storey:S1", "storey_ref": "S1", "name": "Level 1", "elevation_mm": 0, "subject_ids": ["cross-floor-path"] }
+        ],
+        "unplaced_subject_ids": [],
+        "clips": [
+          { "group_key": "storey:S1", "primitive_id": "path-1", "points_model_mm": [[0, 0, 1000], [0, 0, 3500]], "continuation_label": null },
+          { "group_key": "storey:S2", "primitive_id": "path-1", "points_model_mm": [[0, 0, 3500], [0, 0, 4000]], "continuation_label": "Continues from Level 1" }
+        ]
+      }
+    }
+  ]
+}

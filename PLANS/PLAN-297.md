@@ -7,14 +7,14 @@
 ## Acceptance Criteria
 
 - [ ] A body tagged 2.2.0 with 2.1.0-only content reads through `CheckResultReader` with `report_visual_refs` preserved; the same input is mishandled on current `dev` (refs stripped).
-- [ ] The 2.1.0 example file validates unchanged under the 2.2.0 schema.
-- [ ] A `layout_plan` entry, a `spatial_reference` and a `spatial_context` validate; an unknown `kind`, a measurement with an unknown top-level key and a `layout_plan` with an unknown key are rejected.
+- [x] The 2.1.0 example file validates unchanged under the 2.2.0 schema.
+- [x] A `layout_plan` entry, a `spatial_reference` and a `spatial_context` validate; an unknown `kind`, a measurement with an unknown top-level key and a `layout_plan` with an unknown key are rejected.
 - [ ] `report_visuals(ids)` returns a valid `layout_plan` and a valid `plan_band` from one body, and omits an entry whose `kind` is unknown without raising.
 - [ ] A measurement with a malformed `spatial_context` is yielded without it and does not raise; malformed body `spatial_reference` reads as absent.
 - [ ] A body tagged with a version that has no schema file still raises `CheckResultReadError`.
 - [ ] All published test vectors pass against reference implementations in both SDK test lanes, and the vectors are importable from the published Python and TypeScript packages.
 - [ ] `docs/RESULT-FILE.md` documents 2.2.0, the new keys and the grouping rule; the 2.1.0 section is unchanged.
-- [ ] A 2.2.0 example is added under `schemas/result-body/model_check.check/examples/` and its packaged mirror.
+- [x] A 2.2.0 example is added under `schemas/result-body/model_check.check/examples/` and its packaged mirror.
 - [ ] The version lands as a minor release (`feat` commits), and the release-note source names result body 2.2.0; Step 10 verifies that text in the actual PR body.
 
 ## Dependency & Consumer Map
@@ -35,22 +35,26 @@
 
 ### Phase 1: Publish the 2.2.0 contract and shared vectors
 
-- [ ] **1.1** Add canonical and packaged 2.2.0 schemas as additive copies of 2.1.0: discriminated `plan_band`/`layout_plan` drawings, optional body `spatial_reference`, optional measurement `spatial_context`, and reusable polygon definitions; leave every released schema byte-unchanged.
+- [x] **1.1** Add canonical and packaged 2.2.0 schemas as additive copies of 2.1.0: discriminated `plan_band`/`layout_plan` drawings, optional body `spatial_reference`, optional measurement `spatial_context`, and reusable polygon definitions; leave every released schema byte-unchanged.
     — **Why:** downstream readers and producers need one immutable, versioned contract before any 2.2.0 result is emitted.
     — **Done when:** Draft 7 accepts the unchanged 2.1.0 example and the new spatial/drawing example, while unknown drawing kinds and unknown closed-object keys fail validation.
     — **Consumers affected:** Python/TypeScript validators, CRS/FE readers and CISA producers.
-- [ ] **1.2** Add canonical and packaged `nested-2.2.0.json` examples containing one `layout_plan`, one `plan_band`, body spatial reference and measurement spatial context.
+    — **Done:** canonical and packaged Draft 7 schemas accept both old and new examples and reject unknown kind/measurement/layout keys; files: schemas/result-body/model_check.check/2.2.0.json, python/canvastekk_workflow_sdk/data/schemas/result-body/model_check.check/2.2.0.json; fixes: none
+- [x] **1.2** Add canonical and packaged `nested-2.2.0.json` examples containing one `layout_plan`, one `plan_band`, body spatial reference and measurement spatial context.
     — **Why:** a complete valid example pins the intended additive shape and gives every consumer a common fixture.
     — **Done when:** both example copies are byte-identical and validate against both language schema mirrors.
     — **Consumers affected:** SDK tests, downstream fixture authors and package consumers.
-- [ ] **1.3** Export the 2.2.0 TypeScript schema and add parity/rejection tests beside the existing 2.0.0/2.1.0 tests.
+    — **Done:** byte-identical canonical and packaged examples contain both drawing kinds and both spatial objects; files: schemas/result-body/model_check.check/examples/nested-2.2.0.json, python/canvastekk_workflow_sdk/data/schemas/result-body/model_check.check/examples/nested-2.2.0.json; fixes: none
+- [x] **1.3** Export the 2.2.0 TypeScript schema and add parity/rejection tests beside the existing 2.0.0/2.1.0 tests.
     — **Why:** publishing only the Python mirror would leave the TypeScript contract at 2.1.0 and split the SDK's cross-language guarantee.
     — **Done when:** Ajv deep-equals the canonical schema, accepts both old and new examples and rejects the required malformed counterexamples.
     — **Consumers affected:** published TypeScript SDK consumers and FE contract tests.
-- [ ] **1.4** Publish floor-grouping JSON vectors in the canonical schema folder, Python package resources and TypeScript exports, covering mixed-height single floor, two floors, degenerate-storey fallback, unplaced rows and a cross-floor path.
+    — **Done:** exported Ajv mirror deep-equals canonical 2.2.0 and passes positive/negative parity tests; files: typescript/src/check-verdict.ts, typescript/src/index.ts, typescript/tests/check-verdict.test.ts; fixes: corrected two pre-existing 2.1.0 description-only mirror drifts proven by the base parity test
+- [x] **1.4** Publish floor-grouping JSON vectors in the canonical schema folder, Python package resources and TypeScript exports, covering mixed-height single floor, two floors, degenerate-storey fallback, unplaced rows and a cross-floor path.
     — **Why:** CRS and FE must derive identical report-only floor groups rather than inventing separate measurement semantics.
     — **Done when:** resource/export parity tests match the canonical bytes/data and name all five required cases with deterministic expected groups, display elevations, unplaced rows and continuation labels.
     — **Consumers affected:** SDK reference tests, CRS #309 and FE #3697.
+    — **Done:** canonical, Python-resource and TypeScript-export vectors match and name all five required cases with expected groups, elevations, unplaced rows and cross-floor clips; files: schemas/result-body/model_check.check/vectors/floor-groups.json, python/canvastekk_workflow_sdk/data/schemas/result-body/model_check.check/vectors/floor-groups.json, typescript/src/model-check-floor-group-vectors.json, typescript/src/model-check-floor-group-vectors.ts, typescript/src/index.ts, python/tests/test_floor_group_vectors.py, typescript/tests/floor-group-vectors.test.ts; fixes: none
 
 ### Phase 2: Read later 2.x bodies safely and document grouping
 
@@ -100,3 +104,5 @@ None in the run. Later reader/producer tickets are blocked by this SDK merge and
 LOG Architecture review: one Major malformed-evidence finding corrected before implementation; release-note evidence is now the feat commit plus prepared PR text, with actual PR-body verification pinned to Step 10. Consumers inspected: plan executor, PR create route, Python/TypeScript schema and reader callers. Requirements Gaps: [].
 LOG Phase 1 full-gate escalation: public schema additions and cross-module consumers.
 LOG Phase 2 full-gate escalation: public reader contract and unconditional ticket exit gate.
+LOG Phase 1 gate: Draft 7 positive/negative checks green; Python vector resource test 1 passed; full Python Ruff + compileall + pytest 1341 passed + wheel/sdist build green; TypeScript ESLint + typechecks + Vitest 576 passed + tsup build green. Pre-existing 2.1.0 TS description drift reproduced before correction (23 passed, 1 failed); no validation-rule change. E2E n.a. (backend/package only).
+GATE e1a4a88 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
