@@ -113,3 +113,6 @@ LOG Phase 1 gate: Draft 7 positive/negative checks green; Python vector resource
 GATE e1a4a88 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
 LOG Phase 2 scoped reader gate initially failed 14 tests: one remaining exact-version tuple and resource-vs-envelope error ordering; fixed at the shared seam, rerun 40 passed. Vector implementation fixes recorded per step. Final full gate: Python Ruff + compileall + pytest 1348 passed + wheel/sdist build; TypeScript ESLint + both typechecks + Vitest 577 passed + tsup build. Wheel and dist package smoke green. E2E n.a. (backend/package only).
 GATE d6cab63 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Inline code review: 18 files; zero findings; direct-caller coverage complete; Requirements Gaps: []. One deduplicated learning recorded; derived LEARNINGS/_index.md intentionally not staged per repo policy.
+LOG Post-review gate on pushed implementation 00b9b60: Python Ruff + compileall + pytest 1348 passed + wheel/sdist build; TypeScript ESLint + both typechecks + Vitest 577 passed + tsup build. E2E n.a.
+GATE 00b9b60 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
