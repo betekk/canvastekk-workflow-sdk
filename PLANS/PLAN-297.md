@@ -6,16 +6,16 @@
 
 ## Acceptance Criteria
 
-- [ ] A body tagged 2.2.0 with 2.1.0-only content reads through `CheckResultReader` with `report_visual_refs` preserved; the same input is mishandled on current `dev` (refs stripped).
+- [x] A body tagged 2.2.0 with 2.1.0-only content reads through `CheckResultReader` with `report_visual_refs` preserved; the same input is mishandled on current `dev` (refs stripped).
 - [x] The 2.1.0 example file validates unchanged under the 2.2.0 schema.
 - [x] A `layout_plan` entry, a `spatial_reference` and a `spatial_context` validate; an unknown `kind`, a measurement with an unknown top-level key and a `layout_plan` with an unknown key are rejected.
-- [ ] `report_visuals(ids)` returns a valid `layout_plan` and a valid `plan_band` from one body, and omits an entry whose `kind` is unknown without raising.
-- [ ] A measurement with a malformed `spatial_context` is yielded without it and does not raise; malformed body `spatial_reference` reads as absent.
-- [ ] A body tagged with a version that has no schema file still raises `CheckResultReadError`.
-- [ ] All published test vectors pass against reference implementations in both SDK test lanes, and the vectors are importable from the published Python and TypeScript packages.
-- [ ] `docs/RESULT-FILE.md` documents 2.2.0, the new keys and the grouping rule; the 2.1.0 section is unchanged.
+- [x] `report_visuals(ids)` returns a valid `layout_plan` and a valid `plan_band` from one body, and omits an entry whose `kind` is unknown without raising.
+- [x] A measurement with a malformed `spatial_context` is yielded without it and does not raise; malformed body `spatial_reference` reads as absent.
+- [x] A body tagged with a version that has no schema file still raises `CheckResultReadError`.
+- [x] All published test vectors pass against reference implementations in both SDK test lanes, and the vectors are importable from the published Python and TypeScript packages.
+- [x] `docs/RESULT-FILE.md` documents 2.2.0, the new keys and the grouping rule; the 2.1.0 section is unchanged.
 - [x] A 2.2.0 example is added under `schemas/result-body/model_check.check/examples/` and its packaged mirror.
-- [ ] The version lands as a minor release (`feat` commits), and the release-note source names result body 2.2.0; Step 10 verifies that text in the actual PR body.
+- [x] The version lands as a minor release (`feat` commits), and the release-note source names result body 2.2.0; Step 10 verifies that text in the actual PR body.
 
 ## Dependency & Consumer Map
 
@@ -58,26 +58,31 @@
 
 ### Phase 2: Read later 2.x bodies safely and document grouping
 
-- [ ] **2.1** Add explicit grouped-version and 2.1-or-later predicates, load only syntactically supported versions whose schema resource exists, and replace exact-version checks in schema-part selection, optional-reference cleanup and drawing lookup.
+- [x] **2.1** Add explicit grouped-version and 2.1-or-later predicates, load only syntactically supported versions whose schema resource exists, and replace exact-version checks in schema-part selection, optional-reference cleanup and drawing lookup.
     — **Why:** additive 2.x minors must retain required facts without making an unshipped future schema silently readable.
     — **Done when:** the 2.1-content-as-2.2 counterexample preserves refs, 2.0.0 behavior is unchanged, and an unshipped 2.3.0 tag raises `UNSUPPORTED_RESULT_SCHEMA_VERSION` at open.
     — **Consumers affected:** all `CheckResultReader` users and downstream SDK version-gate imports.
-- [ ] **2.2** Validate requested drawings by their `kind`, expose valid body `spatial_reference` through one bounded reader call, and drop malformed optional spatial objects while yielding required measurement facts.
+    — **Done:** shipped-schema-bounded grouped/visual predicates now drive layout, part selection and optional cleanup; the 2.1-as-2.2 counterexample and 2.3.0 refusal pass; files: python/canvastekk_workflow_sdk/check_verdict.py, python/canvastekk_workflow_sdk/check_result_reader.py, python/tests/test_check_result_reader.py; fixes: replaced the remaining iter_findings tuple dependency and ordered schema-resource refusal before envelope validation
+- [x] **2.2** Validate requested drawings by their `kind`, expose valid body `spatial_reference` through one bounded reader call, and drop malformed optional spatial objects while yielding required measurement facts.
     — **Why:** optional report evidence must never invalidate a check verdict or discard unrelated valid drawings.
     — **Done when:** mixed valid bands/layout plans return together, unknown/malformed/inverted drawings are omitted, malformed spatial context is removed from its yielded row, and malformed spatial reference reads as absent.
     — **Consumers affected:** CISA summary packaging, CRS visuals and downstream finding consumers.
-- [ ] **2.3** Add test-local Python and TypeScript reference implementations of the documented render-time grouping algorithm and run every published vector in both lanes.
+    — **Done:** kind-specific mixed drawing lookup, geometric checks, valid spatial-reference reads and malformed spatial cleanup pass without losing required rows; files: python/canvastekk_workflow_sdk/check_result_reader.py, python/tests/test_check_result_reader.py; fixes: none
+- [x] **2.3** Add test-local Python and TypeScript reference implementations of the documented render-time grouping algorithm and run every published vector in both lanes.
     — **Why:** the ticket requires executable proof of the shared rule without creating a new production renderer API that downstream tickets did not request.
     — **Done when:** both test lanes pass all vector cases, including the 1.5 m fallback boundary, home-floor assignment and continuation label for a cross-floor path.
     — **Consumers affected:** CRS/FE implementations that reuse the same vectors; no production API added.
-- [ ] **2.4** Append a 2.2.0 section to `docs/RESULT-FILE.md` without editing the 2.1.0 section, documenting every new key, optional-versus-required containment, source/elevation semantics and all five grouping rules.
+    — **Done:** Python and TypeScript test-local references pass all five vectors including exact-gap clustering and cross-floor clips; files: python/tests/test_floor_group_vectors.py, typescript/tests/floor-group-vectors.test.ts; fixes: passed root fallback gap explicitly, included single-point z evidence and corrected adjacent-segment iteration
+- [x] **2.4** Append a 2.2.0 section to `docs/RESULT-FILE.md` without editing the 2.1.0 section, documenting every new key, optional-versus-required containment, source/elevation semantics and all five grouping rules.
     — **Why:** producers and renderers need the contract and report-only grouping semantics in the SDK's canonical documentation.
     — **Done when:** a diff shows the existing 2.1.0 section unchanged and the new section links the schema, example and vectors.
     — **Consumers affected:** SDK users and all downstream ticket implementers.
-- [ ] **2.5** Run the full SDK gate on the final tree (Python Ruff, compile/type smoke, full pytest and wheel/sdist build; TypeScript ESLint, both typechecks, full Vitest and tsup build), verify built-package access to schema/example/vectors, tick satisfied ACs and record the final-SHA full-gate memo.
+    — **Done:** appended the 2.2.0 contract and five-rule grouping section with schema/example/vector links; the existing 2.1.0 section is untouched; files: docs/RESULT-FILE.md; fixes: none
+- [x] **2.5** Run the full SDK gate on the final tree (Python Ruff, compile/type smoke, full pytest and wheel/sdist build; TypeScript ESLint, both typechecks, full Vitest and tsup build), verify built-package access to schema/example/vectors, tick satisfied ACs and record the final-SHA full-gate memo.
     — **Why:** this is a public schema and cross-module reader change, so both phases and the ticket exit require full verification.
     — **Done when:** every applicable gate is green, built artifacts expose the new resources/exports, the phase's `feat` commit subject and the prepared PR release-note sentence name result body 2.2.0, no implementation AC remains unchecked, and `GATE <short-sha> tier=full` names the pushed tree.
     — **Consumers affected:** all SDK release consumers.
+    — **Done:** final full gate passed with 1348 Python and 577 TypeScript tests plus both builds; wheel and dist smoke imports expose 2.2.0 and five vectors; feat commits and prepared PR text name 2.2.0; files: PLANS/PLAN-297.md; fixes: normalized four mirrored JSON files from executable to regular mode
 
 ## Technical Notes
 
@@ -106,3 +111,5 @@ LOG Phase 1 full-gate escalation: public schema additions and cross-module consu
 LOG Phase 2 full-gate escalation: public reader contract and unconditional ticket exit gate.
 LOG Phase 1 gate: Draft 7 positive/negative checks green; Python vector resource test 1 passed; full Python Ruff + compileall + pytest 1341 passed + wheel/sdist build green; TypeScript ESLint + typechecks + Vitest 576 passed + tsup build green. Pre-existing 2.1.0 TS description drift reproduced before correction (23 passed, 1 failed); no validation-rule change. E2E n.a. (backend/package only).
 GATE e1a4a88 tier=full lint=t typecheck=t build=t unit=t e2e=n.a
+LOG Phase 2 scoped reader gate initially failed 14 tests: one remaining exact-version tuple and resource-vs-envelope error ordering; fixed at the shared seam, rerun 40 passed. Vector implementation fixes recorded per step. Final full gate: Python Ruff + compileall + pytest 1348 passed + wheel/sdist build; TypeScript ESLint + both typechecks + Vitest 577 passed + tsup build. Wheel and dist package smoke green. E2E n.a. (backend/package only).
+GATE d6cab63 tier=full lint=t typecheck=t build=t unit=t e2e=n.a

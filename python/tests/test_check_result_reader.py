@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tracemalloc
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -119,7 +120,7 @@ class TestNestedFindings:
         described = CheckSpec(label="Width", description="The opening's clear width.")
         assert described.model_dump()["description"] == "The opening's clear width."
 
-    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0"])
+    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0", "2.2.0"])
     def test_keeps_the_nested_indices_raw_facts_and_exact_limits(self, tmp_path: Path, version: str) -> None:
         body = _body_v2()
         reader = open_check_result(_write_v2(tmp_path, body, version=version))
@@ -133,7 +134,7 @@ class TestNestedFindings:
         assert findings[2].limits_used == ()
         assert reader.header["inputs"] == {"min_width": 900}
 
-    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0"])
+    @pytest.mark.parametrize("version", ["2.0.0", "2.1.0", "2.2.0"])
     def test_compact_queries_keep_counts_and_only_verified_identity(self, tmp_path: Path, version: str) -> None:
         reader = open_check_result(_write_v2(tmp_path, _body_v2(), version=version))
         assert reader.overview()["checks"][0]["verdict_counts"] == {"PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0}
@@ -248,6 +249,63 @@ class TestNestedFindings:
         assert finding.measurement == {key: value for key, value in row.items() if key != "report_visual_refs"}
         assert reader.report_visuals({"duplicate"}) == {}
 
+    def test_2_1_content_tagged_2_2_preserves_optional_refs(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.1.0.json").read_text())
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.2.0"))
+        [finding] = reader.iter_findings()
+        assert finding.measurement["report_visual_refs"] == ["basin-1-plan"]
+        assert reader.report_visuals({"basin-1-plan"}) == {"basin-1-plan": body["report_visuals"]["basin-1-plan"]}
+
+    def test_2_2_schema_example_and_mixed_drawing_lookup(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.2.0.json").read_text())
+        schema = load_check_body_schema("2.2.0")
+        assert schema == json.loads((SCHEMA_V2 / "2.2.0.json").read_text())
+        Draft7Validator.check_schema(schema)
+        validator = Draft7Validator(schema)
+        validator.validate(body)
+        validator.validate(json.loads((SCHEMA_V2 / "examples/nested-2.1.0.json").read_text()))
+        unknown_kind = deepcopy(body)
+        unknown_kind["report_visuals"]["level-1-layout"]["kind"] = "future_drawing"
+        unknown_measurement_key = deepcopy(body)
+        unknown_measurement_key["checks"][0]["measurements"][0]["level_id"] = "S1"
+        unknown_layout_key = deepcopy(body)
+        unknown_layout_key["report_visuals"]["level-1-layout"]["level_id"] = "S1"
+        assert not validator.is_valid(unknown_kind)
+        assert not validator.is_valid(unknown_measurement_key)
+        assert not validator.is_valid(unknown_layout_key)
+
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.2.0"))
+        [finding] = reader.iter_findings()
+        assert finding.measurement["spatial_context"] == body["checks"][0]["measurements"][0]["spatial_context"]
+        assert reader.spatial_reference() == body["spatial_reference"]
+        assert reader.report_visuals({"basin-1-plan", "level-1-layout"}) == body["report_visuals"]
+
+    def test_malformed_optional_spatial_data_and_unknown_drawings_are_dropped(self, tmp_path: Path) -> None:
+        body = json.loads((SCHEMA_V2 / "examples/nested-2.2.0.json").read_text())
+        row = body["checks"][0]["measurements"][0]
+        row["spatial_context"] = {"anchor_z_mm": "not-a-number", "level_id": "S1"}
+        body["spatial_reference"] = {"storeys": "not-an-array"}
+        body["report_visuals"]["future"] = {"kind": "future_drawing"}
+        body["report_visuals"]["inverted-layout"] = {
+            **body["report_visuals"]["level-1-layout"],
+            "cut_z_mm": body["report_visuals"]["level-1-layout"]["floor_elevation_mm"],
+        }
+        reader = open_check_result(_write_v2(tmp_path, body, version="2.2.0"))
+        [finding] = reader.iter_findings()
+        assert finding.measurement["subject_id"] == "basin-1"
+        assert "spatial_context" not in finding.measurement
+        assert reader.spatial_reference() == {}
+        requested = {"basin-1-plan", "level-1-layout", "future", "inverted-layout"}
+        assert reader.report_visuals(requested) == {
+            key: value for key, value in body["report_visuals"].items() if key in {"basin-1-plan", "level-1-layout"}
+        }
+
+    def test_2_0_keeps_unknown_optional_members_strict(self, tmp_path: Path) -> None:
+        body = _body_v2()
+        body["checks"][0]["measurements"][0]["report_visual_refs"] = ["not-in-2-0"]
+        with pytest.raises(CheckResultReadError, match="malformed measurement"):
+            list(open_check_result(_write_v2(tmp_path, body, version="2.0.0")).iter_findings())
+
 
 class TestOverview:
     def test_0_3_0_report_346(self) -> None:
@@ -341,7 +399,7 @@ class TestElement:
 
 
 class TestRefusals:
-    @pytest.mark.parametrize("version", ["2.2.0", "3.0.0"])
+    @pytest.mark.parametrize("version", ["2.3.0", "3.0.0"])
     def test_unknown_version_fails_with_a_named_error(self, tmp_path: Path, version: str) -> None:
         path = _write_v1(tmp_path / "x.json", [], version=version)
         with pytest.raises(CheckResultReadError) as info:
