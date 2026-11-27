@@ -132,11 +132,11 @@
       "properties": {
         "kind": { "const": "plan_band" },
         "crop_xy_mm": {
-          "description": "Crop bounds in [min X, min Y, max X, max Y] order.",
+          "description": "Crop bounds in [min X, min Y, max X, max Y] order. Model-space millimetres: the finding's viewer-representation footprint padded by 1000 mm on every side.",
           "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "number" }
         },
         "z_band_mm": {
-          "description": "Actual clipping elevations in [bottom, top] order.",
+          "description": "Actual clipping elevations in [bottom, top] order. Model-space millimetres: bottom = the finding's lowest viewer-representation point - 100 mm, top = its highest viewer-representation point + 100 mm.",
           "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" }
         },
         "layers": {
