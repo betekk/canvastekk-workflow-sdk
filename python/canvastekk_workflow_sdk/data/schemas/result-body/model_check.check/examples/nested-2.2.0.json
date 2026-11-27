@@ -1,0 +1,112 @@
+{
+  "checks": [
+    {
+      "check": "basin_base_height",
+      "verdict": "FAIL",
+      "verdict_counts": { "PASS": 0, "WARNING": 0, "FAIL": 1, "NOT_EVALUABLE": 0 },
+      "limits_used": [{ "input": "min_height_mm", "role": "LIMIT", "operator": "GTE", "value": 300 }],
+      "measurements": [
+        {
+          "subject_id": "basin-1",
+          "kind": "value",
+          "actual": 200,
+          "verdict": "FAIL",
+          "failed_limits": [{ "input": "min_height_mm", "side": "BELOW" }],
+          "viewer_representation": {
+            "schema_version": 1,
+            "primitives": [
+              {
+                "kind": "path_polyline",
+                "primitive_id": "basin-1:height",
+                "row_id": "basin-1",
+                "verdict": "FAIL",
+                "label": "Basin base height",
+                "path_semantics": "measurement",
+                "geometry": { "points_model_mm": [[1200, 800, 10035], [1200, 800, 10235]] }
+              }
+            ]
+          },
+          "report_visual_refs": ["basin-1-plan", "level-1-layout"],
+          "spatial_context": {
+            "anchor_z_mm": 10035,
+            "storey_below": { "ref": "S1", "offset_mm": 200 },
+            "storey_above": { "ref": "S2", "offset_mm": -3315 },
+            "floor_surface": {
+              "elevation_mm": 9835,
+              "offset_mm": 200,
+              "global_id": "2h7VCQmP56uPcWBc9vN$1A",
+              "ifc_class": "IfcCovering.FLOORING",
+              "source": "floor_ray"
+            },
+            "region": { "id": "region-04", "gender": "female", "source": "floor_walk" }
+          }
+        }
+      ]
+    }
+  ],
+  "spatial_reference": {
+    "source": "ifc:IfcBuildingStorey",
+    "storeys": [
+      {
+        "ref": "S1",
+        "global_id": "0z40zcHTf5xfp$pr$3uZQI",
+        "name": "Level 1",
+        "source_file_id": 17,
+        "elevation_mm": 9835,
+        "elevation_raw_mm": 0
+      },
+      {
+        "ref": "S2",
+        "global_id": "1h7VCQmP56uPcWBc9vN$1B",
+        "name": "Level 2",
+        "source_file_id": 17,
+        "elevation_mm": 13350,
+        "elevation_raw_mm": 3515
+      }
+    ]
+  },
+  "report_visuals": {
+    "basin-1-plan": {
+      "kind": "plan_band",
+      "crop_xy_mm": [200, -200, 2200, 1800],
+      "z_band_mm": [9935, 10335],
+      "layers": {
+        "wall": [[[[200, 200], [2200, 200], [2200, 300], [200, 300]]]]
+      }
+    },
+    "level-1-layout": {
+      "kind": "layout_plan",
+      "storey_ref": "S1",
+      "floor_elevation_mm": 9835,
+      "cut_z_mm": 10835,
+      "crop_xy_mm": [0, 0, 5000, 4000],
+      "layers": {
+        "wall": [[[[0, 0], [5000, 0], [5000, 100], [0, 100]]]],
+        "partition": [[[[2500, 100], [2600, 100], [2600, 2500], [2500, 2500]]]]
+      },
+      "fixtures": [
+        {
+          "global_id": "2h7VCQmP56uPcWBc9vN$1A",
+          "footprint": [[[1000, 600], [1400, 600], [1400, 1000], [1000, 1000]]]
+        }
+      ],
+      "regions": [
+        {
+          "region_id": "region-04",
+          "class": "toilet",
+          "gender": "female",
+          "polygons": [[[[100, 100], [2400, 100], [2400, 2400], [100, 2400]]]]
+        }
+      ],
+      "portals": [
+        {
+          "portal_id": "portal-04",
+          "region_id": "region-04",
+          "mouth_chord": [[1200, 100], [1700, 100]],
+          "lobby_polygon": [[[1000, 0], [2000, 0], [2000, 500], [1000, 500]]]
+        }
+      ],
+      "true_north_deg": 12.5
+    }
+  }
+}

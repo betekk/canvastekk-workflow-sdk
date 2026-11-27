@@ -52,8 +52,25 @@ CHECK_RESULT_SCHEMA = "model_check.check"
 CHECK_RESULT_SCHEMA_VERSION = "1.0.0"
 CHECK_RESULT_SCHEMA_VERSION_2_0_0 = "2.0.0"
 CHECK_RESULT_SCHEMA_VERSION_2_1_0 = "2.1.0"
-GROUPED_CHECK_RESULT_SCHEMA_VERSIONS = (CHECK_RESULT_SCHEMA_VERSION_2_0_0, CHECK_RESULT_SCHEMA_VERSION_2_1_0)
-"""Version of that body."""
+CHECK_RESULT_SCHEMA_VERSION_2_2_0 = "2.2.0"
+GROUPED_CHECK_RESULT_SCHEMA_VERSIONS = (
+    CHECK_RESULT_SCHEMA_VERSION_2_0_0,
+    CHECK_RESULT_SCHEMA_VERSION_2_1_0,
+    CHECK_RESULT_SCHEMA_VERSION_2_2_0,
+)
+"""Released grouped body versions. Later 2.x minors are recognized by their shipped schema."""
+
+
+def is_grouped_check_result_schema_version(version: str) -> bool:
+    """Return whether ``version`` has the grouped ``2.<minor>.<patch>`` body shape."""
+    return re.fullmatch(r"2\.\d+\.\d+", version) is not None
+
+
+def is_embedded_visual_check_result_schema_version(version: str) -> bool:
+    """Return whether a 2.x body is at least 2.1.0 and may embed report visuals."""
+    match = re.fullmatch(r"2\.(\d+)\.\d+", version)
+    return match is not None and int(match.group(1)) >= 1
+
 
 FLOAT_ALLOWANCE = 1e-10
 """Absolute allowance on inclusive numeric bounds (float noise, not a tolerance)."""
@@ -936,11 +953,18 @@ class JudgedResult:
 
 @cache
 def load_check_body_schema(version: str = CHECK_RESULT_SCHEMA_VERSION) -> dict[str, Any]:
-    """Return the packaged ``model_check.check`` body JSON Schema."""
-    if version not in (CHECK_RESULT_SCHEMA_VERSION, *GROUPED_CHECK_RESULT_SCHEMA_VERSIONS):
+    """Return a shipped ``model_check.check`` schema; never substitute another version.
+
+    Raises:
+        CheckVerdictError: If the version has no packaged schema resource.
+    """
+    if version != CHECK_RESULT_SCHEMA_VERSION and not is_grouped_check_result_schema_version(version):
         raise CheckVerdictError(f"Unsupported model_check.check body version {version!r}")
     root = resources.files("canvastekk_workflow_sdk").joinpath("data", "schemas", "result-body", CHECK_RESULT_SCHEMA)
-    return json.loads(root.joinpath(f"{version}.json").read_text(encoding="utf-8"))
+    try:
+        return json.loads(root.joinpath(f"{version}.json").read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CheckVerdictError(f"Unsupported model_check.check body version {version!r}") from exc
 
 
 @cache

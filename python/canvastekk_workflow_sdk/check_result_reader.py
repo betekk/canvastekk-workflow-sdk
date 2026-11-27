@@ -20,7 +20,7 @@ Supported shapes (anything else fails with a named :class:`CheckResultReadError`
   ``measurements.measurements`` and ``instances.instances``);
 - ``model_check.check`` ``1.x`` (the verdict standard: ``checks[]`` and
   ``measurements[]`` with ``failed_limits``; #283);
-- ``model_check.check`` ``2.0.0`` and ``2.1.0`` (each check owns its measurements).
+- ``model_check.check`` shipped grouped ``2.x`` bodies (each check owns its measurements).
 
 Requires the optional extra ``reader`` (``pip install canvastekk-workflow-sdk[reader]``),
 which installs ``ijson``. Memory stays flat in the file size: the file is scanned
@@ -39,8 +39,9 @@ from jsonschema import Draft7Validator
 
 from canvastekk_workflow_sdk.check_verdict import (
     CHECK_RESULT_SCHEMA_VERSION,
-    CHECK_RESULT_SCHEMA_VERSION_2_1_0,
-    GROUPED_CHECK_RESULT_SCHEMA_VERSIONS,
+    CheckVerdictError,
+    is_embedded_visual_check_result_schema_version,
+    is_grouped_check_result_schema_version,
     load_check_body_schema,
 )
 from canvastekk_workflow_sdk.result_file import (
@@ -176,7 +177,7 @@ def _items(path: str, prefix: str) -> Iterator[dict[str, Any]]:
 @cache
 def _part_validator(version: str, part: str) -> Draft7Validator:
     schema = load_check_body_schema(version)
-    definition = schema["definitions"][part] if version in GROUPED_CHECK_RESULT_SCHEMA_VERSIONS else (
+    definition = schema["definitions"][part] if is_grouped_check_result_schema_version(version) else (
         schema["properties"]["checks" if part == "check" else "measurements"]["items"]
     )
     return Draft7Validator(schema).evolve(schema=definition)
@@ -233,16 +234,24 @@ def _grouped_rows(path: str, version: str) -> Iterator[tuple[int, int, dict[str,
                 measurement_index = 0
             yield prefix, event, value
 
+    definitions = load_check_body_schema(version)["definitions"]
     try:
         with open(path, "rb") as stream:
             for row in ijson.items(track(stream), f"{_NESTED_ROWS}.item"):
                 if (
-                    version == CHECK_RESULT_SCHEMA_VERSION_2_1_0
+                    is_embedded_visual_check_result_schema_version(version)
                     and isinstance(row, dict)
                     and "report_visual_refs" in row
                     and not _part_validator(version, "report_visual_refs").is_valid(row["report_visual_refs"])
                 ):
                     del row["report_visual_refs"]
+                if (
+                    "spatial_context" in definitions
+                    and isinstance(row, dict)
+                    and "spatial_context" in row
+                    and not _part_validator(version, "spatial_context").is_valid(row["spatial_context"])
+                ):
+                    del row["spatial_context"]
                 _validate_part(row, version, "measurement")
                 yield check_index, measurement_index, row
                 measurement_index += 1
@@ -313,13 +322,19 @@ class CheckResultReader:
             return _Layout("legacy", schema, version)
         if major == "1" and schema == CHECK_RESULT_LABEL:
             return _Layout("verdict", schema, version)
-        if version in GROUPED_CHECK_RESULT_SCHEMA_VERSIONS and schema == CHECK_RESULT_LABEL:
+        if is_grouped_check_result_schema_version(version) and schema == CHECK_RESULT_LABEL:
+            try:
+                load_check_body_schema(version)
+            except CheckVerdictError as exc:
+                raise CheckResultReadError(
+                    "UNSUPPORTED_RESULT_SCHEMA_VERSION", f"{schema} {version} has no shipped body schema"
+                ) from exc
             if header["result_file_version"] != RESULT_FILE_VERSION_1_1_0:
                 raise CheckResultReadError("INVALID_RESULT_FILE", f"{version} check bodies require result-file layout 1.1.0")
             return _Layout("grouped", schema, version)
         raise CheckResultReadError(
             "UNSUPPORTED_RESULT_SCHEMA_VERSION",
-            f"{schema} {version} is not readable: this reader knows 0.x and (for {CHECK_RESULT_LABEL}) 1.x, 2.0.0 and 2.1.0",
+            f"{schema} {version} is not readable: this reader knows 0.x, 1.x and shipped grouped 2.x body schemas",
         )
 
     @property
@@ -350,7 +365,7 @@ class CheckResultReader:
         Malformed optional drawing references are omitted.
         """
         version = self._layout.version
-        if version not in (CHECK_RESULT_SCHEMA_VERSION, *GROUPED_CHECK_RESULT_SCHEMA_VERSIONS):
+        if version != CHECK_RESULT_SCHEMA_VERSION and not is_grouped_check_result_schema_version(version):
             raise CheckResultReadError("UNSUPPORTED_RESULT_SCHEMA_VERSION", f"lossless findings are unavailable in {version}")
         checks = list(self._check_records())
         limits: dict[str, tuple[dict[str, Any], ...]] = {}
@@ -369,17 +384,32 @@ class CheckResultReader:
                     raise CheckResultReadError("INVALID_RESULT_FILE", "finding has no recorded check")
             yield CheckFinding(run_id, check, index, row, limits[check])
 
-    def report_visuals(self, visual_ids: Collection[str]) -> dict[str, dict[str, Any]]:
-        """Read requested, valid plan bands keyed by their IDs in this result file.
+    def spatial_reference(self) -> dict[str, Any]:
+        """Return the valid body spatial reference, or an empty object when absent or malformed."""
+        version = self._layout.version
+        if not is_grouped_check_result_schema_version(version):
+            return {}
+        definitions = load_check_body_schema(version)["definitions"]
+        if "spatial_reference" not in definitions:
+            return {}
+        try:
+            value = _collect(self._path, {"body.spatial_reference"}).get("body.spatial_reference", {})
+        except _ijson().JSONError as exc:
+            raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
+        return value if _part_validator(version, "spatial_reference").is_valid(value) else {}
 
-        Missing, malformed, and repeated drawings are omitted. Older body versions
-        have no embedded drawings. Finding and header reads do not use this method.
+    def report_visuals(self, visual_ids: Collection[str]) -> dict[str, dict[str, Any]]:
+        """Read requested valid plan bands and layout plans keyed by their IDs.
+
+        Missing, malformed, unknown-kind, and repeated drawings are omitted. Older
+        body versions have no embedded drawings. Finding and header reads do not
+        use this method.
         """
         version = self._layout.version
-        if not visual_ids or version != CHECK_RESULT_SCHEMA_VERSION_2_1_0:
+        if not visual_ids or not is_embedded_visual_check_result_schema_version(version):
             return {}
         ijson = _ijson()
-        validator = _part_validator(version, "plan_band")
+        definitions = load_check_body_schema(version)["definitions"]
         wanted = set(visual_ids)
         wanted.discard("")
 
@@ -403,11 +433,21 @@ class CheckResultReader:
                         selected.pop(name, None)
                         continue
                     seen.add(name)
-                    if validator.is_valid(drawing):
-                        min_x, min_y, max_x, max_y = drawing["crop_xy_mm"]
+                    kind = drawing.get("kind") if isinstance(drawing, dict) else None
+                    if kind not in ("plan_band", "layout_plan") or kind not in definitions:
+                        continue
+                    if not _part_validator(version, str(kind)).is_valid(drawing):
+                        continue
+                    min_x, min_y, max_x, max_y = drawing["crop_xy_mm"]
+                    if min_x >= max_x or min_y >= max_y:
+                        continue
+                    if kind == "plan_band":
                         bottom, top = drawing["z_band_mm"]
-                        if min_x < max_x and min_y < max_y and bottom < top:
-                            selected[name] = drawing
+                        if bottom >= top:
+                            continue
+                    elif drawing["floor_elevation_mm"] >= drawing["cut_z_mm"]:
+                        continue
+                    selected[name] = drawing
         except ijson.JSONError as exc:
             raise CheckResultReadError("INVALID_RESULT_FILE", "malformed result body JSON") from exc
         return selected
