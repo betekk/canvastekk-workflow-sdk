@@ -15,7 +15,7 @@
 - [ ] All published test vectors pass against reference implementations in both SDK test lanes, and the vectors are importable from the published Python and TypeScript packages.
 - [ ] `docs/RESULT-FILE.md` documents 2.2.0, the new keys and the grouping rule; the 2.1.0 section is unchanged.
 - [ ] A 2.2.0 example is added under `schemas/result-body/model_check.check/examples/` and its packaged mirror.
-- [ ] The version lands as a minor release (`feat` commits), and the PR release note names result body 2.2.0.
+- [ ] The version lands as a minor release (`feat` commits), and the release-note source names result body 2.2.0; Step 10 verifies that text in the actual PR body.
 
 ## Dependency & Consumer Map
 
@@ -72,7 +72,7 @@
     — **Consumers affected:** SDK users and all downstream ticket implementers.
 - [ ] **2.5** Run the full SDK gate on the final tree (Python Ruff, compile/type smoke, full pytest and wheel/sdist build; TypeScript ESLint, both typechecks, full Vitest and tsup build), verify built-package access to schema/example/vectors, tick satisfied ACs and record the final-SHA full-gate memo.
     — **Why:** this is a public schema and cross-module reader change, so both phases and the ticket exit require full verification.
-    — **Done when:** every applicable gate is green, built artifacts expose the new resources/exports, no unchecked implementation AC remains except merge-generated release notes, and `GATE <short-sha> tier=full` names the pushed tree.
+    — **Done when:** every applicable gate is green, built artifacts expose the new resources/exports, the phase's `feat` commit subject and the prepared PR release-note sentence name result body 2.2.0, no implementation AC remains unchecked, and `GATE <short-sha> tier=full` names the pushed tree.
     — **Consumers affected:** all SDK release consumers.
 
 ## Technical Notes
@@ -97,5 +97,6 @@ None in the run. Later reader/producer tickets are blocked by this SDK merge and
 
 ## Trace
 
+LOG Architecture review: one Major malformed-evidence finding corrected before implementation; release-note evidence is now the feat commit plus prepared PR text, with actual PR-body verification pinned to Step 10. Consumers inspected: plan executor, PR create route, Python/TypeScript schema and reader callers. Requirements Gaps: [].
 LOG Phase 1 full-gate escalation: public schema additions and cross-module consumers.
 LOG Phase 2 full-gate escalation: public reader contract and unconditional ticket exit gate.
